@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
@@ -19,7 +20,10 @@ export default function RootLayout({
         <Sidebar />
 
         <div className="ml-64 min-h-screen bg-slate-950">
-          <Topbar />
+          <Suspense fallback={null}>
+            <Topbar />
+          </Suspense>
+
           {children}
         </div>
       </body>
