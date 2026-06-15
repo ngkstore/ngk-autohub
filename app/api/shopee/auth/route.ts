@@ -18,7 +18,7 @@ function gerarAssinatura(
 
 export async function GET() {
   try {
-    const { data: configs } = await supabase
+    const { data: configs, error } = await supabase
       .from("configuracoes")
       .select("*")
       .in("chave", [
@@ -27,40 +27,33 @@ export async function GET() {
         "shopee_redirect_url",
       ]);
 
-    const partnerIdSupabase = configs?.find(
-      (item) => item.chave === "shopee_partner_id"
-    )?.valor;
-
-    const partnerKeySupabase = configs?.find(
-      (item) => item.chave === "shopee_partner_key"
-    )?.valor;
-
-    const redirectSupabase = configs?.find(
-      (item) => item.chave === "shopee_redirect_url"
-    )?.valor;
+    if (error) {
+      return NextResponse.json(
+        {
+          sucesso: false,
+          erro: error.message,
+        },
+        { status: 500 }
+      );
+    }
 
     const partnerId =
-      process.env.SHOPEE_PARTNER_ID || partnerIdSupabase;
+      configs?.find((c) => c.chave === "shopee_partner_id")?.valor ||
+      process.env.SHOPEE_PARTNER_ID;
 
     const partnerKey =
-      process.env.SHOPEE_PARTNER_KEY || partnerKeySupabase;
+      configs?.find((c) => c.chave === "shopee_partner_key")?.valor ||
+      process.env.SHOPEE_PARTNER_KEY;
 
     const redirectUrl =
-      process.env.NEXT_PUBLIC_SHOPEE_REDIRECT_URL ||
-      redirectSupabase ||
-      "https://ngk-autohub-nhwsisteg-ngkstores-projects.vercel.app/api/shopee/callback";
+      configs?.find((c) => c.chave === "shopee_redirect_url")?.valor ||
+      process.env.NEXT_PUBLIC_SHOPEE_REDIRECT_URL;
 
     if (!partnerId || !partnerKey) {
       return NextResponse.json(
         {
           sucesso: false,
           erro: "Partner ID e Partner Key da Shopee ainda não foram configurados.",
-          debug: {
-            temPartnerIdEnv: !!process.env.SHOPEE_PARTNER_ID,
-            temPartnerKeyEnv: !!process.env.SHOPEE_PARTNER_KEY,
-            temPartnerIdSupabase: !!partnerIdSupabase,
-            temPartnerKeySupabase: !!partnerKeySupabase,
-          },
         },
         { status: 400 }
       );
@@ -69,14 +62,38 @@ export async function GET() {
     const path = "/api/v2/shop/auth_partner";
     const timestamp = Math.floor(Date.now() / 1000);
 
-    const sign = gerarAssinatura(partnerId, path, timestamp, partnerKey);
+    const sign = gerarAssinatura(
+      String(partnerId),
+      path,
+      timestamp,
+      String(partnerKey)
+    );
 
-    const authUrl = new URL(`https://partner.shopeemobile.com${path}`);
+    const baseUrl =
+      process.env.SHOPEE_API_BASE_URL ||
+      "https://partner.test-stable.shopeemobile.com";
 
-    authUrl.searchParams.set("partner_id", partnerId);
-    authUrl.searchParams.set("timestamp", String(timestamp));
-    authUrl.searchParams.set("sign", sign);
-    authUrl.searchParams.set("redirect", redirectUrl);
+    const authUrl = new URL(`${baseUrl}${path}`);
+
+    authUrl.searchParams.set(
+      "partner_id",
+      String(partnerId)
+    );
+
+    authUrl.searchParams.set(
+      "timestamp",
+      String(timestamp)
+    );
+
+    authUrl.searchParams.set(
+      "sign",
+      sign
+    );
+
+    authUrl.searchParams.set(
+      "redirect",
+      String(redirectUrl)
+    );
 
     return NextResponse.redirect(authUrl.toString());
   } catch (error) {
@@ -86,7 +103,7 @@ export async function GET() {
         erro:
           error instanceof Error
             ? error.message
-            : "Erro desconhecido ao gerar link de autorização Shopee.",
+            : "Erro desconhecido",
       },
       { status: 500 }
     );
