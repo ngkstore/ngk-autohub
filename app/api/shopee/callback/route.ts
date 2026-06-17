@@ -60,6 +60,24 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const { data: lojaNgk, error: lojaError } = await supabase
+      .from("lojas")
+      .select("id, apelido, marketplace")
+      .ilike("apelido", "%NGK%")
+      .ilike("marketplace", "%shopee%")
+      .single();
+
+    if (lojaError || !lojaNgk) {
+      return NextResponse.json(
+        {
+          sucesso: false,
+          erro: "Loja NGK Shopee não encontrada no Supabase.",
+          detalhe: lojaError?.message,
+        },
+        { status: 404 }
+      );
+    }
+
     const path = "/api/v2/auth/token/get";
     const timestamp = Math.floor(Date.now() / 1000);
     const sign = gerarAssinatura(partnerId, path, timestamp, partnerKey);
@@ -91,15 +109,23 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    await supabase
+      .from("marketplace_tokens")
+      .delete()
+      .eq("loja_id", lojaNgk.id);
+
     const { error: tokenError } = await supabase
       .from("marketplace_tokens")
       .insert({
-        marketplace: "shopee",
-        shop_id: String(tokenData.shop_id || shopId),
-        main_account_id: mainAccountId,
-        access_token: tokenData.access_token,
-        refresh_token: tokenData.refresh_token,
-        expire_in: tokenData.expire_in,
+        loja_id: lojaNgk.id,
+        marketplace: "Shopee",
+        token_de_acesso: tokenData.access_token,
+        token_de_atualização: tokenData.refresh_token,
+        expirar_em: tokenData.expire_in,
+        id_da_loja: Number(tokenData.shop_id || shopId),
+        id_da_conta_principal: mainAccountId
+          ? Number(mainAccountId)
+          : null,
         status: "ativo",
         atualizado_em: new Date().toISOString(),
       });
@@ -117,6 +143,7 @@ export async function GET(request: NextRequest) {
     }
 
     await supabase.from("sincronizacoes").insert({
+      loja_id: lojaNgk.id,
       marketplace: "shopee",
       tipo: "oauth",
       status: "sucesso",
