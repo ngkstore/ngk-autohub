@@ -63,17 +63,20 @@ export default async function IntegracoesPage() {
                   normalizarMarketplace(loja.marketplace);
 
                 const token = tokens?.find((item) => {
-                  const marketplaceToken = normalizarMarketplace(
-                    item.marketplace ||
-                      item.mercado ||
-                      ""
-                  );
+                  const marketplaceToken =
+                    normalizarMarketplace(
+                      item.marketplace || ""
+                    );
 
                   return (
                     marketplaceToken ===
-                    marketplaceNormalizado
+                      marketplaceNormalizado &&
+                    item.loja_id === loja.id
                   );
                 });
+
+                const conectado =
+                  !!token?.access_token;
 
                 return (
                   <div
@@ -91,8 +94,7 @@ export default async function IntegracoesPage() {
                     <p className="mt-1 text-sm text-slate-400">
                       Token:
                       <span className="ml-2 text-white">
-                        {token?.access_token ||
-                        token?.token_de_acesso
+                        {conectado
                           ? "Configurado"
                           : "Não conectado"}
                       </span>
@@ -100,14 +102,12 @@ export default async function IntegracoesPage() {
 
                     <span
                       className={`mt-4 inline-block rounded-full px-3 py-1 text-xs font-semibold ${
-                        token?.access_token ||
-                        token?.token_de_acesso
+                        conectado
                           ? "bg-green-900 text-green-300"
                           : "bg-yellow-900 text-yellow-300"
                       }`}
                     >
-                      {token?.access_token ||
-                      token?.token_de_acesso
+                      {conectado
                         ? "Conectado"
                         : "Aguardando conexão"}
                     </span>
