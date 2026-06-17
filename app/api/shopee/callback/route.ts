@@ -25,20 +25,14 @@ export async function GET(request: NextRequest) {
 
     if (!code) {
       return NextResponse.json(
-        {
-          sucesso: false,
-          erro: "Código de autorização não recebido pela Shopee.",
-        },
+        { sucesso: false, erro: "Código de autorização não recebido pela Shopee." },
         { status: 400 }
       );
     }
 
     if (!shopId) {
       return NextResponse.json(
-        {
-          sucesso: false,
-          erro: "Shop ID não recebido pela Shopee.",
-        },
+        { sucesso: false, erro: "Shop ID não recebido pela Shopee." },
         { status: 400 }
       );
     }
@@ -50,10 +44,7 @@ export async function GET(request: NextRequest) {
 
     if (!partnerId || !partnerKey) {
       return NextResponse.json(
-        {
-          sucesso: false,
-          erro: "Partner ID ou Partner Key da Shopee não configurados.",
-        },
+        { sucesso: false, erro: "Partner ID ou Partner Key da Shopee não configurados." },
         { status: 500 }
       );
     }
@@ -84,9 +75,7 @@ export async function GET(request: NextRequest) {
 
     const response = await fetch(tokenUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         code,
         shop_id: Number(shopId),
@@ -107,15 +96,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    await supabase
-      .from("marketplace_tokens")
-      .delete()
-      .eq("id_da_loja", Number(shopId));
-
-    await supabase
-      .from("marketplace_tokens")
-      .delete()
-      .eq("loja_id", lojaNgk.id);
+    await supabase.from("marketplace_tokens").delete().eq("id_da_loja", Number(shopId));
+    await supabase.from("marketplace_tokens").delete().eq("loja_id", lojaNgk.id);
 
     const { error: tokenError } = await supabase
       .from("marketplace_tokens")
@@ -124,7 +106,7 @@ export async function GET(request: NextRequest) {
         mercado: "Shopee",
         token_de_acesso: tokenData.access_token,
         token_de_atualização: tokenData.refresh_token,
-        expirar_em: tokenData.expire_in,
+        expira_em: tokenData.expire_in,
         id_da_loja: Number(shopId),
         status: "ativo",
         atualizado_em: new Date().toISOString(),
