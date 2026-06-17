@@ -7,14 +7,24 @@ type Props = {
   label: string;
 };
 
-export default function SyncTipoButton({ tipo, label }: Props) {
+export default function SyncTipoButton({
+  tipo,
+  label,
+}: Props) {
   const [loading, setLoading] = useState(false);
 
   async function sincronizar() {
     try {
       setLoading(true);
 
-      const response = await fetch("/api/sincronizar", {
+      let endpoint = "/api/sincronizar";
+
+      if (tipo === "produtos") {
+        endpoint =
+          "/api/shopee/produtos/sincronizar";
+      }
+
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -28,14 +38,24 @@ export default function SyncTipoButton({ tipo, label }: Props) {
       const resultado = await response.json();
 
       if (resultado.sucesso) {
-        alert("Sincronização executada com sucesso.");
+        alert(
+          resultado.mensagem ||
+            "Sincronização executada com sucesso."
+        );
+
         location.reload();
       } else {
-        alert(resultado.erro || "Erro ao sincronizar.");
+        alert(
+          resultado.erro ||
+            "Erro ao sincronizar."
+        );
       }
     } catch (error) {
       console.error(error);
-      alert("Erro ao sincronizar.");
+
+      alert(
+        "Erro ao executar sincronização."
+      );
     } finally {
       setLoading(false);
     }
@@ -47,7 +67,9 @@ export default function SyncTipoButton({ tipo, label }: Props) {
       disabled={loading}
       className="rounded-xl bg-blue-600 px-5 py-4 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
     >
-      {loading ? "Sincronizando..." : label}
+      {loading
+        ? "Sincronizando..."
+        : label}
     </button>
   );
 }
