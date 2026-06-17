@@ -115,8 +115,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const accessToken = token.access_token;
-    const shopId = token.shop_id || token.id_da_loja;
+    const accessToken =
+      token.access_token || token.token_de_acesso;
+
+    const shopId =
+      token.shop_id || token.id_da_loja;
 
     if (!accessToken || !shopId) {
       return NextResponse.json(
@@ -124,9 +127,9 @@ export async function POST(request: NextRequest) {
           sucesso: false,
           erro: "Token ou shop_id ausente.",
           debug: {
-            temAccessToken: !!accessToken,
-            shopId,
-            lojaId,
+            accessTokenEncontrado: !!accessToken,
+            shopIdEncontrado: !!shopId,
+            tokenColumns: Object.keys(token),
           },
         },
         { status: 400 }
@@ -184,14 +187,7 @@ export async function POST(request: NextRequest) {
         {
           sucesso: false,
           erro: mensagemErro,
-          detalhe: {
-            statusHttp: itemListResponse.status,
-            shopeeError: itemListData.error,
-            shopeeMessage: itemListData.message,
-            requestId: itemListData.request_id,
-            shopId,
-            partnerId,
-          },
+          detalhe: itemListData,
         },
         { status: 500 }
       );
@@ -269,13 +265,7 @@ export async function POST(request: NextRequest) {
         {
           sucesso: false,
           erro: mensagemErro,
-          detalhe: {
-            statusHttp: baseInfoResponse.status,
-            shopeeError: baseInfoData.error,
-            shopeeMessage: baseInfoData.message,
-            requestId: baseInfoData.request_id,
-            totalItemIds: items.length,
-          },
+          detalhe: baseInfoData,
         },
         { status: 500 }
       );
