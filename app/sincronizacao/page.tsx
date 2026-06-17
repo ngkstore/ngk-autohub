@@ -1,10 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import SyncTipoButton from "../components/SyncTipoButton";
 
-type SearchParams =
-  | Promise<{ loja?: string; periodo?: string }>
-  | { loja?: string; periodo?: string };
-
 function normalizarTexto(valor?: string) {
   return valor
     ?.toLowerCase()
@@ -13,50 +9,18 @@ function normalizarTexto(valor?: string) {
     .trim();
 }
 
-function gerarSlugLoja(loja: any) {
-  const apelido = normalizarTexto(loja.apelido);
-  const marketplace = normalizarTexto(loja.marketplace);
-
-  if (apelido?.includes("ngk") && marketplace?.includes("shopee")) {
-    return "ngk-shopee";
-  }
-
-  if (apelido?.includes("pitibiribas") && marketplace?.includes("shopee")) {
-    return "pitibiribas-shopee";
-  }
-
-  if (apelido?.includes("ngk") && marketplace?.includes("tiktok")) {
-    return "ngk-tiktok";
-  }
-
-  if (apelido?.includes("pitibiribas") && marketplace?.includes("tiktok")) {
-    return "pitibiribas-tiktok";
-  }
-
-  return "";
-}
-
-export default async function SincronizacaoPage({
-  searchParams,
-}: {
-  searchParams?: SearchParams;
-}) {
-  const params = searchParams ? await searchParams : {};
-  const lojaSlug = params.loja || "todas";
-
+export default async function SincronizacaoPage() {
   const { data: lojas } = await supabase
     .from("lojas")
     .select("*")
     .order("criado_em", { ascending: false });
 
   const lojaSelecionada =
-    lojaSlug !== "todas"
-      ? lojas?.find((loja) => gerarSlugLoja(loja) === lojaSlug)
-      : lojas?.find(
-          (loja) =>
-            normalizarTexto(loja.apelido)?.includes("ngk") &&
-            normalizarTexto(loja.marketplace)?.includes("shopee")
-        );
+    lojas?.find(
+      (loja) =>
+        normalizarTexto(loja.apelido)?.includes("ngk") &&
+        normalizarTexto(loja.marketplace)?.includes("shopee")
+    ) || null;
 
   const { data: sincronizacoes } = await supabase
     .from("sincronizacoes")
@@ -75,7 +39,7 @@ export default async function SincronizacaoPage({
       <p className="mt-4 text-sm text-slate-400">
         Loja usada na sincronização:
         <span className="ml-2 font-semibold text-white">
-          {lojaSelecionada?.apelido || "Nenhuma loja selecionada"}
+          {lojaSelecionada?.apelido || "Nenhuma loja encontrada"}
         </span>
       </p>
 
