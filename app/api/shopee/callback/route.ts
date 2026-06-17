@@ -121,7 +121,7 @@ export async function GET(request: NextRequest) {
         marketplace: "Shopee",
         token_de_acesso: tokenData.access_token,
         token_de_atualização: tokenData.refresh_token,
-        expirar_em: tokenData.expire_in,
+        expira_em: tokenData.expire_in,
         id_da_loja: Number(tokenData.shop_id || shopId),
         id_da_conta_principal: mainAccountId
           ? Number(mainAccountId)
