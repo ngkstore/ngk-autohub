@@ -59,19 +59,30 @@ export default async function IntegracoesPage() {
           <div className="mt-6 space-y-4">
             {lojas && lojas.length > 0 ? (
               lojas.map((loja) => {
-                const token = tokens?.find(
-                  (item) => item.loja_id === loja.id
-                );
-
                 const marketplaceNormalizado =
                   normalizarMarketplace(loja.marketplace);
+
+                const token = tokens?.find((item) => {
+                  const marketplaceToken = normalizarMarketplace(
+                    item.marketplace ||
+                      item.mercado ||
+                      ""
+                  );
+
+                  return (
+                    marketplaceToken ===
+                    marketplaceNormalizado
+                  );
+                });
 
                 return (
                   <div
                     key={loja.id}
                     className="rounded-xl bg-slate-800 p-5"
                   >
-                    <p className="font-bold">{loja.apelido}</p>
+                    <p className="font-bold">
+                      {loja.apelido}
+                    </p>
 
                     <p className="mt-1 text-sm text-slate-400">
                       Marketplace: {loja.marketplace}
@@ -80,7 +91,8 @@ export default async function IntegracoesPage() {
                     <p className="mt-1 text-sm text-slate-400">
                       Token:
                       <span className="ml-2 text-white">
-                        {token?.access_token
+                        {token?.access_token ||
+                        token?.token_de_acesso
                           ? "Configurado"
                           : "Não conectado"}
                       </span>
@@ -88,12 +100,14 @@ export default async function IntegracoesPage() {
 
                     <span
                       className={`mt-4 inline-block rounded-full px-3 py-1 text-xs font-semibold ${
-                        token?.access_token
+                        token?.access_token ||
+                        token?.token_de_acesso
                           ? "bg-green-900 text-green-300"
                           : "bg-yellow-900 text-yellow-300"
                       }`}
                     >
-                      {token?.access_token
+                      {token?.access_token ||
+                      token?.token_de_acesso
                         ? "Conectado"
                         : "Aguardando conexão"}
                     </span>
@@ -101,14 +115,18 @@ export default async function IntegracoesPage() {
                     <div className="mt-4">
                       <SyncButton
                         lojaId={loja.id}
-                        marketplace={marketplaceNormalizado}
+                        marketplace={
+                          marketplaceNormalizado
+                        }
                       />
                     </div>
                   </div>
                 );
               })
             ) : (
-              <p className="text-slate-400">Nenhuma loja cadastrada.</p>
+              <p className="text-slate-400">
+                Nenhuma loja cadastrada.
+              </p>
             )}
           </div>
         </section>
@@ -119,7 +137,8 @@ export default async function IntegracoesPage() {
           </h2>
 
           <div className="mt-6 space-y-4">
-            {sincronizacoes && sincronizacoes.length > 0 ? (
+            {sincronizacoes &&
+            sincronizacoes.length > 0 ? (
               sincronizacoes.map((sync) => (
                 <div
                   key={sync.id}
@@ -132,7 +151,8 @@ export default async function IntegracoesPage() {
                       </p>
 
                       <p className="mt-1 text-sm text-orange-300">
-                        {sync.lojas?.apelido || "Sem loja"}
+                        {sync.lojas?.apelido ||
+                          "Sem loja"}
                       </p>
                     </div>
 
@@ -150,7 +170,8 @@ export default async function IntegracoesPage() {
                   <p className="mt-3 text-sm text-slate-400">
                     Registros importados:
                     <span className="ml-2 text-white">
-                      {sync.registros_importados ?? 0}
+                      {sync.registros_importados ??
+                        0}
                     </span>
                   </p>
 
@@ -160,7 +181,9 @@ export default async function IntegracoesPage() {
                       {sync.iniciado_em
                         ? new Date(
                             sync.iniciado_em
-                          ).toLocaleString("pt-BR")
+                          ).toLocaleString(
+                            "pt-BR"
+                          )
                         : "-"}
                     </span>
                   </p>
@@ -174,7 +197,8 @@ export default async function IntegracoesPage() {
               ))
             ) : (
               <p className="text-slate-400">
-                Nenhuma sincronização realizada ainda.
+                Nenhuma sincronização realizada
+                ainda.
               </p>
             )}
           </div>
