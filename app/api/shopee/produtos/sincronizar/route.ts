@@ -45,7 +45,15 @@ function pegarEstoque(item: any) {
   );
 }
 
+function montarErroShopee(titulo: string, data: any) {
+  return `${titulo} | error: ${data?.error || "-"} | message: ${
+    data?.message || "-"
+  } | request_id: ${data?.request_id || "-"}`;
+}
+
 export async function POST(request: NextRequest) {
+  const iniciadoEm = new Date().toISOString();
+
   try {
     const body = await request.json();
     const lojaId = body.lojaId;
@@ -108,13 +116,18 @@ export async function POST(request: NextRequest) {
     }
 
     const accessToken = token.access_token;
-    const shopId = token.shop_id;
+    const shopId = token.shop_id || token.id_da_loja;
 
     if (!accessToken || !shopId) {
       return NextResponse.json(
         {
           sucesso: false,
           erro: "Token ou shop_id ausente.",
+          debug: {
+            temAccessToken: !!accessToken,
+            shopId,
+            lojaId,
+          },
         },
         { status: 400 }
       );
@@ -124,34 +137,61 @@ export async function POST(request: NextRequest) {
     const timestamp = Math.floor(Date.now() / 1000);
 
     const itemListSign = gerarAssinatura(
-      partnerId,
+      String(partnerId),
       itemListPath,
       timestamp,
-      accessToken,
-      shopId,
-      partnerKey
+      String(accessToken),
+      String(shopId),
+      String(partnerKey)
     );
 
     const itemListUrl =
       `${baseUrl}${itemListPath}` +
       `?partner_id=${partnerId}` +
       `&timestamp=${timestamp}` +
-      `&access_token=${accessToken}` +
+      `&access_token=${encodeURIComponent(accessToken)}` +
       `&shop_id=${shopId}` +
       `&sign=${itemListSign}` +
       `&offset=0` +
       `&page_size=50` +
       `&item_status=NORMAL`;
 
-    const itemListResponse = await fetch(itemListUrl);
+    const itemListResponse = await fetch(itemListUrl, {
+      method: "GET",
+      cache: "no-store",
+    });
+
     const itemListData = await itemListResponse.json();
 
     if (!itemListResponse.ok || itemListData.error) {
+      const mensagemErro = montarErroShopee(
+        "Erro ao buscar lista de produtos na Shopee",
+        itemListData
+      );
+
+      await supabase.from("sincronizacoes").insert({
+        loja_id: lojaId,
+        marketplace: "shopee",
+        tipo: "produtos",
+        status: "erro",
+        registros_importados: 0,
+        mensagem: mensagemErro,
+        iniciado_em: iniciadoEm,
+        finalizado_em: new Date().toISOString(),
+      });
+
       return NextResponse.json(
         {
           sucesso: false,
-          erro: "Erro ao buscar lista de produtos na Shopee.",
-          detalhe: itemListData,
+          erro: mensagemErro,
+          detalhe: {
+            statusHttp: itemListResponse.status,
+            shopeeError: itemListData.error,
+            shopeeMessage: itemListData.message,
+            requestId: itemListData.request_id,
+            shopId,
+            partnerId,
+          },
         },
         { status: 500 }
       );
@@ -167,13 +207,13 @@ export async function POST(request: NextRequest) {
         status: "sucesso",
         registros_importados: 0,
         mensagem: "Nenhum produto encontrado na Shopee.",
-        iniciado_em: new Date().toISOString(),
+        iniciado_em: iniciadoEm,
         finalizado_em: new Date().toISOString(),
       });
 
       return NextResponse.json({
         sucesso: true,
-        mensagem: "Nenhum produto encontrado.",
+        mensagem: "Nenhum produto encontrado na Shopee.",
         total: 0,
       });
     }
@@ -184,32 +224,58 @@ export async function POST(request: NextRequest) {
     const timestampBaseInfo = Math.floor(Date.now() / 1000);
 
     const baseInfoSign = gerarAssinatura(
-      partnerId,
+      String(partnerId),
       baseInfoPath,
       timestampBaseInfo,
-      accessToken,
-      shopId,
-      partnerKey
+      String(accessToken),
+      String(shopId),
+      String(partnerKey)
     );
 
     const baseInfoUrl =
       `${baseUrl}${baseInfoPath}` +
       `?partner_id=${partnerId}` +
       `&timestamp=${timestampBaseInfo}` +
-      `&access_token=${accessToken}` +
+      `&access_token=${encodeURIComponent(accessToken)}` +
       `&shop_id=${shopId}` +
       `&sign=${baseInfoSign}` +
       `&item_id_list=${itemIds}`;
 
-    const baseInfoResponse = await fetch(baseInfoUrl);
+    const baseInfoResponse = await fetch(baseInfoUrl, {
+      method: "GET",
+      cache: "no-store",
+    });
+
     const baseInfoData = await baseInfoResponse.json();
 
     if (!baseInfoResponse.ok || baseInfoData.error) {
+      const mensagemErro = montarErroShopee(
+        "Erro ao buscar detalhes dos produtos na Shopee",
+        baseInfoData
+      );
+
+      await supabase.from("sincronizacoes").insert({
+        loja_id: lojaId,
+        marketplace: "shopee",
+        tipo: "produtos",
+        status: "erro",
+        registros_importados: 0,
+        mensagem: mensagemErro,
+        iniciado_em: iniciadoEm,
+        finalizado_em: new Date().toISOString(),
+      });
+
       return NextResponse.json(
         {
           sucesso: false,
-          erro: "Erro ao buscar detalhes dos produtos na Shopee.",
-          detalhe: baseInfoData,
+          erro: mensagemErro,
+          detalhe: {
+            statusHttp: baseInfoResponse.status,
+            shopeeError: baseInfoData.error,
+            shopeeMessage: baseInfoData.message,
+            requestId: baseInfoData.request_id,
+            totalItemIds: items.length,
+          },
         },
         { status: 500 }
       );
@@ -262,15 +328,16 @@ export async function POST(request: NextRequest) {
       tipo: "produtos",
       status: "sucesso",
       registros_importados: totalSalvos,
-      mensagem: `${totalSalvos} produtos sincronizados da Shopee.`,
-      iniciado_em: new Date().toISOString(),
+      mensagem: `${totalSalvos} produtos sincronizados da Shopee. Itens retornados na lista inicial: ${items.length}.`,
+      iniciado_em: iniciadoEm,
       finalizado_em: new Date().toISOString(),
     });
 
     return NextResponse.json({
       sucesso: true,
-      mensagem: "Produtos sincronizados com sucesso.",
+      mensagem: `${totalSalvos} produtos sincronizados com sucesso.`,
       total: totalSalvos,
+      itensEncontrados: items.length,
     });
   } catch (error) {
     return NextResponse.json(
