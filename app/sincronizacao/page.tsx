@@ -1,7 +1,63 @@
 import { supabase } from "@/lib/supabase";
 import SyncTipoButton from "../components/SyncTipoButton";
 
-export default async function SincronizacaoPage() {
+type SearchParams =
+  | Promise<{ loja?: string; periodo?: string }>
+  | { loja?: string; periodo?: string };
+
+function normalizarTexto(valor?: string) {
+  return valor
+    ?.toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+function gerarSlugLoja(loja: any) {
+  const apelido = normalizarTexto(loja.apelido);
+  const marketplace = normalizarTexto(loja.marketplace);
+
+  if (apelido?.includes("ngk") && marketplace?.includes("shopee")) {
+    return "ngk-shopee";
+  }
+
+  if (apelido?.includes("pitibiribas") && marketplace?.includes("shopee")) {
+    return "pitibiribas-shopee";
+  }
+
+  if (apelido?.includes("ngk") && marketplace?.includes("tiktok")) {
+    return "ngk-tiktok";
+  }
+
+  if (apelido?.includes("pitibiribas") && marketplace?.includes("tiktok")) {
+    return "pitibiribas-tiktok";
+  }
+
+  return "";
+}
+
+export default async function SincronizacaoPage({
+  searchParams,
+}: {
+  searchParams?: SearchParams;
+}) {
+  const params = searchParams ? await searchParams : {};
+  const lojaSlug = params.loja || "todas";
+
+  const { data: lojas } = await supabase
+    .from("lojas")
+    .select("*")
+    .order("criado_em", { ascending: false });
+
+  const lojaSelecionada =
+    lojaSlug !== "todas"
+      ? lojas?.find((loja) => gerarSlugLoja(loja) === lojaSlug)
+      : lojas?.find(
+          (loja) =>
+            normalizarTexto(loja.apelido)?.includes("ngk") &&
+            normalizarTexto(loja.marketplace)?.includes("shopee")
+        );
+
   const { data: sincronizacoes } = await supabase
     .from("sincronizacoes")
     .select("*, lojas(apelido)")
@@ -16,15 +72,46 @@ export default async function SincronizacaoPage() {
         Execute importações por módulo e acompanhe o histórico de sincronizações.
       </p>
 
+      <p className="mt-4 text-sm text-slate-400">
+        Loja usada na sincronização:
+        <span className="ml-2 font-semibold text-white">
+          {lojaSelecionada?.apelido || "Nenhuma loja selecionada"}
+        </span>
+      </p>
+
       <section className="mt-8 rounded-2xl bg-slate-900 p-6">
         <h2 className="text-2xl font-bold">Ações de Sincronização</h2>
 
         <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <SyncTipoButton tipo="produtos" label="Sincronizar Produtos" />
-          <SyncTipoButton tipo="pedidos" label="Sincronizar Pedidos" />
-          <SyncTipoButton tipo="avaliacoes" label="Sincronizar Avaliações" />
-          <SyncTipoButton tipo="financeiro" label="Sincronizar Financeiro" />
-          <SyncTipoButton tipo="geral" label="Sincronizar Tudo" />
+          <SyncTipoButton
+            tipo="produtos"
+            label="Sincronizar Produtos"
+            lojaId={lojaSelecionada?.id || ""}
+          />
+
+          <SyncTipoButton
+            tipo="pedidos"
+            label="Sincronizar Pedidos"
+            lojaId={lojaSelecionada?.id || ""}
+          />
+
+          <SyncTipoButton
+            tipo="avaliacoes"
+            label="Sincronizar Avaliações"
+            lojaId={lojaSelecionada?.id || ""}
+          />
+
+          <SyncTipoButton
+            tipo="financeiro"
+            label="Sincronizar Financeiro"
+            lojaId={lojaSelecionada?.id || ""}
+          />
+
+          <SyncTipoButton
+            tipo="geral"
+            label="Sincronizar Tudo"
+            lojaId={lojaSelecionada?.id || ""}
+          />
         </div>
       </section>
 

@@ -5,12 +5,10 @@ import { useState } from "react";
 type Props = {
   tipo: "produtos" | "pedidos" | "avaliacoes" | "financeiro" | "geral";
   label: string;
+  lojaId?: string;
 };
 
-export default function SyncTipoButton({
-  tipo,
-  label,
-}: Props) {
+export default function SyncTipoButton({ tipo, label, lojaId }: Props) {
   const [loading, setLoading] = useState(false);
 
   async function sincronizar() {
@@ -20,8 +18,12 @@ export default function SyncTipoButton({
       let endpoint = "/api/sincronizar";
 
       if (tipo === "produtos") {
-        endpoint =
-          "/api/shopee/produtos/sincronizar";
+        endpoint = "/api/shopee/produtos/sincronizar";
+
+        if (!lojaId) {
+          alert("Selecione uma loja antes de sincronizar produtos.");
+          return;
+        }
       }
 
       const response = await fetch(endpoint, {
@@ -32,30 +34,21 @@ export default function SyncTipoButton({
         body: JSON.stringify({
           tipo,
           marketplace: "shopee",
+          lojaId,
         }),
       });
 
       const resultado = await response.json();
 
       if (resultado.sucesso) {
-        alert(
-          resultado.mensagem ||
-            "Sincronização executada com sucesso."
-        );
-
+        alert(resultado.mensagem || "Sincronização executada com sucesso.");
         location.reload();
       } else {
-        alert(
-          resultado.erro ||
-            "Erro ao sincronizar."
-        );
+        alert(resultado.erro || "Erro ao sincronizar.");
       }
     } catch (error) {
       console.error(error);
-
-      alert(
-        "Erro ao executar sincronização."
-      );
+      alert("Erro ao executar sincronização.");
     } finally {
       setLoading(false);
     }
@@ -67,9 +60,7 @@ export default function SyncTipoButton({
       disabled={loading}
       className="rounded-xl bg-blue-600 px-5 py-4 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
     >
-      {loading
-        ? "Sincronizando..."
-        : label}
+      {loading ? "Sincronizando..." : label}
     </button>
   );
 }
