@@ -51,6 +51,60 @@ function montarErroShopee(titulo: string, data: any) {
   } | request_id: ${data?.request_id || "-"}`;
 }
 
+async function buscarDetalhesProdutos(params: {
+  baseUrl: string;
+  partnerId: string;
+  partnerKey: string;
+  accessToken: string;
+  shopId: string;
+  itemIds: string[];
+}) {
+  const {
+    baseUrl,
+    partnerId,
+    partnerKey,
+    accessToken,
+    shopId,
+    itemIds,
+  } = params;
+
+  const baseInfoPath = "/api/v2/product/get_item_base_info";
+  const timestamp = Math.floor(Date.now() / 1000);
+
+  const sign = gerarAssinatura(
+    partnerId,
+    baseInfoPath,
+    timestamp,
+    accessToken,
+    shopId,
+    partnerKey
+  );
+
+  const url =
+    `${baseUrl}${baseInfoPath}` +
+    `?partner_id=${partnerId}` +
+    `&timestamp=${timestamp}` +
+    `&access_token=${encodeURIComponent(accessToken)}` +
+    `&shop_id=${shopId}` +
+    `&sign=${sign}` +
+    `&item_id_list=${itemIds.join(",")}`;
+
+  const response = await fetch(url, {
+    method: "GET",
+    cache: "no-store",
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || data.error) {
+    throw new Error(
+      montarErroShopee("Erro ao buscar detalhes dos produtos na Shopee", data)
+    );
+  }
+
+  return data.response?.item_list || [];
+}
+
 export async function POST(request: NextRequest) {
   const iniciadoEm = new Date().toISOString();
 
@@ -60,10 +114,7 @@ export async function POST(request: NextRequest) {
 
     if (!lojaId) {
       return NextResponse.json(
-        {
-          sucesso: false,
-          erro: "lojaId não informado.",
-        },
+        { sucesso: false, erro: "lojaId não informado." },
         { status: 400 }
       );
     }
@@ -75,10 +126,7 @@ export async function POST(request: NextRequest) {
 
     if (!partnerId || !partnerKey) {
       return NextResponse.json(
-        {
-          sucesso: false,
-          erro: "Credenciais da Shopee não configuradas.",
-        },
+        { sucesso: false, erro: "Credenciais da Shopee não configuradas." },
         { status: 500 }
       );
     }
@@ -91,10 +139,7 @@ export async function POST(request: NextRequest) {
 
     if (lojaError || !loja) {
       return NextResponse.json(
-        {
-          sucesso: false,
-          erro: "Loja não encontrada.",
-        },
+        { sucesso: false, erro: "Loja não encontrada." },
         { status: 404 }
       );
     }
@@ -107,19 +152,13 @@ export async function POST(request: NextRequest) {
 
     if (tokenError || !token) {
       return NextResponse.json(
-        {
-          sucesso: false,
-          erro: "Token Shopee não encontrado para esta loja.",
-        },
+        { sucesso: false, erro: "Token Shopee não encontrado para esta loja." },
         { status: 404 }
       );
     }
 
-    const accessToken =
-      token.access_token || token.token_de_acesso;
-
-    const shopId =
-      token.shop_id || token.id_da_loja;
+    const accessToken = token.access_token || token.token_de_acesso;
+    const shopId = token.shop_id || token.id_da_loja;
 
     if (!accessToken || !shopId) {
       return NextResponse.json(
@@ -137,179 +176,132 @@ export async function POST(request: NextRequest) {
     }
 
     const itemListPath = "/api/v2/product/get_item_list";
-    const timestamp = Math.floor(Date.now() / 1000);
-
-    const itemListSign = gerarAssinatura(
-      String(partnerId),
-      itemListPath,
-      timestamp,
-      String(accessToken),
-      String(shopId),
-      String(partnerKey)
-    );
-
-    const itemListUrl =
-      `${baseUrl}${itemListPath}` +
-      `?partner_id=${partnerId}` +
-      `&timestamp=${timestamp}` +
-      `&access_token=${encodeURIComponent(accessToken)}` +
-      `&shop_id=${shopId}` +
-      `&sign=${itemListSign}` +
-      `&offset=0` +
-      `&page_size=50` +
-      `&item_status=NORMAL`;
-
-    const itemListResponse = await fetch(itemListUrl, {
-      method: "GET",
-      cache: "no-store",
-    });
-
-    const itemListData = await itemListResponse.json();
-
-    if (!itemListResponse.ok || itemListData.error) {
-      const mensagemErro = montarErroShopee(
-        "Erro ao buscar lista de produtos na Shopee",
-        itemListData
-      );
-
-      await supabase.from("sincronizacoes").insert({
-        loja_id: lojaId,
-        marketplace: "shopee",
-        tipo: "produtos",
-        status: "erro",
-        registros_importados: 0,
-        mensagem: mensagemErro,
-        iniciado_em: iniciadoEm,
-        finalizado_em: new Date().toISOString(),
-      });
-
-      return NextResponse.json(
-        {
-          sucesso: false,
-          erro: mensagemErro,
-          detalhe: itemListData,
-        },
-        { status: 500 }
-      );
-    }
-
-    const items = itemListData.response?.item || [];
-
-    if (items.length === 0) {
-      await supabase.from("sincronizacoes").insert({
-        loja_id: lojaId,
-        marketplace: "shopee",
-        tipo: "produtos",
-        status: "sucesso",
-        registros_importados: 0,
-        mensagem: "Nenhum produto encontrado na Shopee.",
-        iniciado_em: iniciadoEm,
-        finalizado_em: new Date().toISOString(),
-      });
-
-      return NextResponse.json({
-        sucesso: true,
-        mensagem: "Nenhum produto encontrado na Shopee.",
-        total: 0,
-      });
-    }
-
-    const itemIds = items.map((item: any) => item.item_id).join(",");
-
-    const baseInfoPath = "/api/v2/product/get_item_base_info";
-    const timestampBaseInfo = Math.floor(Date.now() / 1000);
-
-    const baseInfoSign = gerarAssinatura(
-      String(partnerId),
-      baseInfoPath,
-      timestampBaseInfo,
-      String(accessToken),
-      String(shopId),
-      String(partnerKey)
-    );
-
-    const baseInfoUrl =
-      `${baseUrl}${baseInfoPath}` +
-      `?partner_id=${partnerId}` +
-      `&timestamp=${timestampBaseInfo}` +
-      `&access_token=${encodeURIComponent(accessToken)}` +
-      `&shop_id=${shopId}` +
-      `&sign=${baseInfoSign}` +
-      `&item_id_list=${itemIds}`;
-
-    const baseInfoResponse = await fetch(baseInfoUrl, {
-      method: "GET",
-      cache: "no-store",
-    });
-
-    const baseInfoData = await baseInfoResponse.json();
-
-    if (!baseInfoResponse.ok || baseInfoData.error) {
-      const mensagemErro = montarErroShopee(
-        "Erro ao buscar detalhes dos produtos na Shopee",
-        baseInfoData
-      );
-
-      await supabase.from("sincronizacoes").insert({
-        loja_id: lojaId,
-        marketplace: "shopee",
-        tipo: "produtos",
-        status: "erro",
-        registros_importados: 0,
-        mensagem: mensagemErro,
-        iniciado_em: iniciadoEm,
-        finalizado_em: new Date().toISOString(),
-      });
-
-      return NextResponse.json(
-        {
-          sucesso: false,
-          erro: mensagemErro,
-          detalhe: baseInfoData,
-        },
-        { status: 500 }
-      );
-    }
-
-    const produtosShopee = baseInfoData.response?.item_list || [];
+    const pageSize = 50;
+    let offset = 0;
     let totalSalvos = 0;
+    let totalItensEncontrados = 0;
+    let continuar = true;
 
-    for (const item of produtosShopee) {
-      const produto = {
-        loja_id: lojaId,
-        marketplace: "shopee",
-        item_id: String(item.item_id),
-        shop_id: String(shopId),
-        sku: item.item_sku || String(item.item_id),
-        nome: item.item_name || "Produto sem nome",
-        preco: pegarPreco(item),
-        estoque: pegarEstoque(item),
-        status: item.item_status || "desconhecido",
-        imagem_url: item.image?.image_url_list?.[0] || null,
-        categoria: item.category_id ? String(item.category_id) : null,
-        atualizado_em: new Date().toISOString(),
-      };
+    while (continuar) {
+      const timestamp = Math.floor(Date.now() / 1000);
 
-      const { data: produtoExistente } = await supabase
-        .from("produtos")
-        .select("id")
-        .eq("loja_id", lojaId)
-        .eq("item_id", String(item.item_id))
-        .maybeSingle();
+      const sign = gerarAssinatura(
+        String(partnerId),
+        itemListPath,
+        timestamp,
+        String(accessToken),
+        String(shopId),
+        String(partnerKey)
+      );
 
-      if (produtoExistente?.id) {
-        await supabase
-          .from("produtos")
-          .update(produto)
-          .eq("id", produtoExistente.id);
-      } else {
-        await supabase.from("produtos").insert({
-          ...produto,
-          criado_em: new Date().toISOString(),
+      const itemListUrl =
+        `${baseUrl}${itemListPath}` +
+        `?partner_id=${partnerId}` +
+        `&timestamp=${timestamp}` +
+        `&access_token=${encodeURIComponent(accessToken)}` +
+        `&shop_id=${shopId}` +
+        `&sign=${sign}` +
+        `&offset=${offset}` +
+        `&page_size=${pageSize}` +
+        `&item_status=NORMAL`;
+
+      const itemListResponse = await fetch(itemListUrl, {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      const itemListData = await itemListResponse.json();
+
+      if (!itemListResponse.ok || itemListData.error) {
+        const mensagemErro = montarErroShopee(
+          "Erro ao buscar lista de produtos na Shopee",
+          itemListData
+        );
+
+        await supabase.from("sincronizacoes").insert({
+          loja_id: lojaId,
+          marketplace: "shopee",
+          tipo: "produtos",
+          status: "erro",
+          registros_importados: totalSalvos,
+          mensagem: mensagemErro,
+          iniciado_em: iniciadoEm,
+          finalizado_em: new Date().toISOString(),
         });
+
+        return NextResponse.json(
+          { sucesso: false, erro: mensagemErro, detalhe: itemListData },
+          { status: 500 }
+        );
       }
 
-      totalSalvos++;
+      const items = itemListData.response?.item || [];
+      totalItensEncontrados += items.length;
+
+      if (items.length === 0) {
+        continuar = false;
+        break;
+      }
+
+      const itemIds = items.map((item: any) => String(item.item_id));
+
+      const produtosShopee = await buscarDetalhesProdutos({
+        baseUrl,
+        partnerId: String(partnerId),
+        partnerKey: String(partnerKey),
+        accessToken: String(accessToken),
+        shopId: String(shopId),
+        itemIds,
+      });
+
+      for (const item of produtosShopee) {
+        const produto = {
+          loja_id: lojaId,
+          marketplace: "shopee",
+          item_id: String(item.item_id),
+          shop_id: String(shopId),
+          sku: item.item_sku || String(item.item_id),
+          nome: item.item_name || "Produto sem nome",
+          preco: pegarPreco(item),
+          estoque: pegarEstoque(item),
+          status: item.item_status || "desconhecido",
+          imagem_url: item.image?.image_url_list?.[0] || null,
+          categoria: item.category_id ? String(item.category_id) : null,
+          atualizado_em: new Date().toISOString(),
+        };
+
+        const { data: produtoExistente } = await supabase
+          .from("produtos")
+          .select("id")
+          .eq("loja_id", lojaId)
+          .eq("item_id", String(item.item_id))
+          .maybeSingle();
+
+        if (produtoExistente?.id) {
+          await supabase
+            .from("produtos")
+            .update(produto)
+            .eq("id", produtoExistente.id);
+        } else {
+          await supabase.from("produtos").insert({
+            ...produto,
+            criado_em: new Date().toISOString(),
+          });
+        }
+
+        totalSalvos++;
+      }
+
+      const hasNextPage = itemListData.response?.has_next_page;
+      const nextOffset = itemListData.response?.next_offset;
+
+      if (hasNextPage && nextOffset !== undefined && nextOffset !== null) {
+        offset = Number(nextOffset);
+      } else if (items.length === pageSize) {
+        offset += pageSize;
+      } else {
+        continuar = false;
+      }
     }
 
     await supabase.from("sincronizacoes").insert({
@@ -318,7 +310,7 @@ export async function POST(request: NextRequest) {
       tipo: "produtos",
       status: "sucesso",
       registros_importados: totalSalvos,
-      mensagem: `${totalSalvos} produtos sincronizados da Shopee. Itens retornados na lista inicial: ${items.length}.`,
+      mensagem: `${totalSalvos} produtos sincronizados da Shopee. Itens encontrados: ${totalItensEncontrados}.`,
       iniciado_em: iniciadoEm,
       finalizado_em: new Date().toISOString(),
     });
@@ -327,9 +319,23 @@ export async function POST(request: NextRequest) {
       sucesso: true,
       mensagem: `${totalSalvos} produtos sincronizados com sucesso.`,
       total: totalSalvos,
-      itensEncontrados: items.length,
+      itensEncontrados: totalItensEncontrados,
     });
   } catch (error) {
+    await supabase.from("sincronizacoes").insert({
+      loja_id: null,
+      marketplace: "shopee",
+      tipo: "produtos",
+      status: "erro",
+      registros_importados: 0,
+      mensagem:
+        error instanceof Error
+          ? error.message
+          : "Erro desconhecido ao sincronizar produtos.",
+      iniciado_em: iniciadoEm,
+      finalizado_em: new Date().toISOString(),
+    });
+
     return NextResponse.json(
       {
         sucesso: false,
