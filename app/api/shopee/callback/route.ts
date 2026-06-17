@@ -22,7 +22,6 @@ export async function GET(request: NextRequest) {
 
     const code = searchParams.get("code");
     const shopId = searchParams.get("shop_id");
-    const mainAccountId = searchParams.get("main_account_id");
 
     if (!code) {
       return NextResponse.json(
@@ -39,7 +38,6 @@ export async function GET(request: NextRequest) {
         {
           sucesso: false,
           erro: "Shop ID não recebido pela Shopee.",
-          mainAccountId,
         },
         { status: 400 }
       );
@@ -112,20 +110,22 @@ export async function GET(request: NextRequest) {
     await supabase
       .from("marketplace_tokens")
       .delete()
+      .eq("id_da_loja", Number(shopId));
+
+    await supabase
+      .from("marketplace_tokens")
+      .delete()
       .eq("loja_id", lojaNgk.id);
 
     const { error: tokenError } = await supabase
       .from("marketplace_tokens")
       .insert({
         loja_id: lojaNgk.id,
-        marketplace: "Shopee",
+        mercado: "Shopee",
         token_de_acesso: tokenData.access_token,
         token_de_atualização: tokenData.refresh_token,
-        expira_em: tokenData.expire_in,
-        id_da_loja: Number(tokenData.shop_id || shopId),
-        id_da_conta_principal: mainAccountId
-          ? Number(mainAccountId)
-          : null,
+        expirar_em: tokenData.expire_in,
+        id_da_loja: Number(shopId),
         status: "ativo",
         atualizado_em: new Date().toISOString(),
       });
