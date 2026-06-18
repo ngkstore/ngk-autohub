@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/shopee/pedidos/processar-lotes",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}
