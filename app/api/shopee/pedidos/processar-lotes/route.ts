@@ -10,16 +10,26 @@ function gerarAssinatura(
   shopId: string,
   partnerKey: string
 ) {
-  const baseString = `${partnerId}${path}${timestamp}${accessToken}${shopId}`;
-
   return crypto
     .createHmac("sha256", partnerKey)
-    .update(baseString)
+    .update(`${partnerId}${path}${timestamp}${accessToken}${shopId}`)
+    .digest("hex");
+}
+
+function gerarAssinaturaSimples(
+  partnerId: string,
+  path: string,
+  timestamp: number,
+  partnerKey: string
+) {
+  return crypto
+    .createHmac("sha256", partnerKey)
+    .update(`${partnerId}${path}${timestamp}`)
     .digest("hex");
 }
 
 function classificarPedido(status: string) {
-  const statusNormalizado = status?.toUpperCase() || "";
+  const s = status?.toUpperCase() || "";
 
   const efetivados = [
     "READY_TO_SHIP",
@@ -32,8 +42,70 @@ function classificarPedido(status: string) {
   const faturamento = ["TO_CONFIRM_RECEIVE", "COMPLETED"];
 
   return {
-    pedido_efetivado: efetivados.includes(statusNormalizado),
-    entra_faturamento: faturamento.includes(statusNormalizado),
+    pedido_efetivado: efetivados.includes(s),
+    entra_faturamento: faturamento.includes(s),
+  };
+}
+
+async function atualizarToken(params: {
+  tokenId: string;
+  refreshToken: string;
+  shopId: string;
+  partnerId: string;
+  partnerKey: string;
+  baseUrl: string;
+}) {
+  const path = "/api/v2/auth/access_token/get";
+  const timestamp = Math.floor(Date.now() / 1000);
+
+  const sign = gerarAssinaturaSimples(
+    params.partnerId,
+    path,
+    timestamp,
+    params.partnerKey
+  );
+
+  const url =
+    `${params.baseUrl}${path}` +
+    `?partner_id=${params.partnerId}` +
+    `&timestamp=${timestamp}` +
+    `&sign=${sign}`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      refresh_token: params.refreshToken,
+      partner_id: Number(params.partnerId),
+      shop_id: Number(params.shopId),
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || data.error) {
+    throw new Error(
+      `Erro ao atualizar token Shopee: ${data?.error || "-"} | ${
+        data?.message || "-"
+      }`
+    );
+  }
+
+  await supabase
+    .from("marketplace_tokens")
+    .update({
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      shop_id: String(params.shopId),
+      expire_in: data.expire_in,
+      status: "ativo",
+      atualizado_em: new Date().toISOString(),
+    })
+    .eq("id", params.tokenId);
+
+  return {
+    accessToken: data.access_token,
+    refreshToken: data.refresh_token,
   };
 }
 
@@ -53,7 +125,7 @@ async function processarLote() {
       );
     }
 
-    const { data: job, error: jobError } = await supabase
+    const { data: job } = await supabase
       .from("sync_jobs")
       .select("*")
       .eq("marketplace", "shopee")
@@ -62,17 +134,6 @@ async function processarLote() {
       .order("data_inicio", { ascending: true })
       .limit(1)
       .maybeSingle();
-
-    if (jobError) {
-      return NextResponse.json(
-        {
-          sucesso: false,
-          erro: "Erro ao buscar job pendente.",
-          detalhe: jobError.message,
-        },
-        { status: 500 }
-      );
-    }
 
     if (!job) {
       return NextResponse.json({
@@ -83,78 +144,29 @@ async function processarLote() {
 
     await supabase
       .from("sync_jobs")
-      .update({
-        status: "processando",
-        atualizado_em: new Date().toISOString(),
-      })
+      .update({ status: "processando", atualizado_em: new Date().toISOString() })
       .eq("id", job.id);
 
     const lojaId = job.loja_id;
-
-    if (!lojaId) {
-      await supabase
-        .from("sync_jobs")
-        .update({
-          status: "erro",
-          atualizado_em: new Date().toISOString(),
-        })
-        .eq("id", job.id);
-
-      return NextResponse.json(
-        { sucesso: false, erro: "Job sem loja_id." },
-        { status: 400 }
-      );
-    }
 
     const { data: token, error: tokenError } = await supabase
       .from("marketplace_tokens")
       .select("*")
       .eq("loja_id", lojaId)
+      .eq("status", "ativo")
+      .limit(1)
       .single();
 
     if (tokenError || !token) {
-      await supabase
-        .from("sync_jobs")
-        .update({
-          status: "erro",
-          atualizado_em: new Date().toISOString(),
-        })
-        .eq("id", job.id);
-
-      return NextResponse.json(
-        {
-          sucesso: false,
-          erro: "Token Shopee não encontrado para esta loja.",
-          detalhe: tokenError?.message,
-        },
-        { status: 404 }
-      );
+      throw new Error("Token Shopee não encontrado para esta loja.");
     }
 
-    const accessToken = token.access_token || token.token_de_acesso;
-    const shopId = token.shop_id || token.id_da_loja;
+    let accessToken = token.access_token;
+    let refreshToken = token.refresh_token;
+    const shopId = String(token.shop_id);
 
-    if (!accessToken || !shopId) {
-      await supabase
-        .from("sync_jobs")
-        .update({
-          status: "erro",
-          atualizado_em: new Date().toISOString(),
-        })
-        .eq("id", job.id);
-
-      return NextResponse.json(
-        {
-          sucesso: false,
-          erro: "Token ou shop_id ausente.",
-          debug: {
-            accessTokenEncontrado: !!accessToken,
-            shopIdEncontrado: !!shopId,
-            tokenColumns: Object.keys(token),
-          },
-        },
-        { status: 400 }
-      );
+    if (!accessToken || !refreshToken || !shopId) {
+      throw new Error("Access token, refresh token ou shop_id ausente.");
     }
 
     const timeFrom = Math.floor(new Date(job.data_inicio).getTime() / 1000);
@@ -166,6 +178,7 @@ async function processarLote() {
     let cursor = "";
     let hasNextPage = true;
     let totalPedidos = 0;
+    let tentativaRefresh = false;
 
     while (hasNextPage) {
       const timestamp = Math.floor(Date.now() / 1000);
@@ -191,46 +204,39 @@ async function processarLote() {
         `&time_to=${timeTo}` +
         `&page_size=${pageSize}`;
 
-      if (cursor) {
-        url += `&cursor=${encodeURIComponent(cursor)}`;
-      }
+      if (cursor) url += `&cursor=${encodeURIComponent(cursor)}`;
 
-      const response = await fetch(url, {
-        method: "GET",
-        cache: "no-store",
-      });
-
+      const response = await fetch(url, { method: "GET", cache: "no-store" });
       const data = await response.json();
 
-      if (!response.ok || data.error) {
-        await supabase
-          .from("sync_jobs")
-          .update({
-            status: "erro",
-            atualizado_em: new Date().toISOString(),
-          })
-          .eq("id", job.id);
+      const erroToken =
+        data?.error === "invalid_access_token" ||
+        data?.error === "token_de_acesso_inválido" ||
+        String(data?.message || "").toLowerCase().includes("token");
 
-        await supabase.from("sincronizacoes").insert({
-          loja_id: lojaId,
-          marketplace: "shopee",
-          tipo: "pedidos",
-          status: "erro",
-          registros_importados: totalPedidos,
-          mensagem: `Erro Shopee get_order_list: ${
-            data?.error || "-"
-          } | ${data?.message || "-"}`,
-          iniciado_em: inicioExecucao,
-          finalizado_em: new Date().toISOString(),
+      if ((!response.ok || data.error) && erroToken && !tentativaRefresh) {
+        tentativaRefresh = true;
+
+        const novoToken = await atualizarToken({
+          tokenId: token.id,
+          refreshToken,
+          shopId,
+          partnerId: String(partnerId),
+          partnerKey: String(partnerKey),
+          baseUrl,
         });
 
-        return NextResponse.json(
-          {
-            sucesso: false,
-            erro: "Erro ao buscar lista de pedidos na Shopee.",
-            detalhe: data,
-          },
-          { status: 500 }
+        accessToken = novoToken.accessToken;
+        refreshToken = novoToken.refreshToken;
+
+        continue;
+      }
+
+      if (!response.ok || data.error) {
+        throw new Error(
+          `Erro Shopee get_order_list: ${data?.error || "-"} | ${
+            data?.message || "-"
+          }`
         );
       }
 
@@ -266,10 +272,7 @@ async function processarLote() {
           .maybeSingle();
 
         if (existente?.id) {
-          await supabase
-            .from("pedidos")
-            .update(registro)
-            .eq("id", existente.id);
+          await supabase.from("pedidos").update(registro).eq("id", existente.id);
         } else {
           await supabase.from("pedidos").insert({
             ...registro,
@@ -292,9 +295,7 @@ async function processarLote() {
         })
         .eq("id", job.id);
 
-      if (!hasNextPage || pedidos.length === 0) {
-        break;
-      }
+      if (!hasNextPage || pedidos.length === 0) break;
     }
 
     await supabase
@@ -325,6 +326,19 @@ async function processarLote() {
       total: totalPedidos,
     });
   } catch (error) {
+    await supabase.from("sincronizacoes").insert({
+      marketplace: "shopee",
+      tipo: "pedidos",
+      status: "erro",
+      registros_importados: 0,
+      mensagem:
+        error instanceof Error
+          ? error.message
+          : "Erro desconhecido ao processar lote.",
+      iniciado_em: inicioExecucao,
+      finalizado_em: new Date().toISOString(),
+    });
+
     return NextResponse.json(
       {
         sucesso: false,
