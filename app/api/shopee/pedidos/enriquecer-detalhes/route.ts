@@ -26,10 +26,7 @@ async function enriquecerPedidos() {
 
     if (!partnerId || !partnerKey) {
       return NextResponse.json(
-        {
-          sucesso: false,
-          erro: "Credenciais Shopee não configuradas.",
-        },
+        { sucesso: false, erro: "Credenciais Shopee não configuradas." },
         { status: 500 }
       );
     }
@@ -39,6 +36,7 @@ async function enriquecerPedidos() {
       .select("id, loja_id, pedido_externo_id, dados_pedido")
       .eq("marketplace", "shopee")
       .not("pedido_externo_id", "is", null)
+      .not("pedido_externo_id", "like", "SH-%")
       .order("atualizado_em", { ascending: false })
       .limit(20);
 
@@ -49,9 +47,10 @@ async function enriquecerPedidos() {
     if (!pedidos || pedidos.length === 0) {
       return NextResponse.json({
         sucesso: true,
-        mensagem: "Nenhum pedido Shopee encontrado para enriquecer.",
+        mensagem: "Nenhum pedido real Shopee encontrado para enriquecer.",
         encontrados: 0,
         atualizados: 0,
+        ignorados: 0,
         erros: 0,
       });
     }
@@ -74,13 +73,11 @@ async function enriquecerPedidos() {
           Array.isArray(pedido.dados_pedido.item_list)
         ) {
           ignorados++;
-
           detalhes.push({
             pedido_externo_id: pedido.pedido_externo_id,
             status: "ignorado",
             mensagem: "Pedido já possui item_list em dados_pedido.",
           });
-
           continue;
         }
 
@@ -94,13 +91,11 @@ async function enriquecerPedidos() {
 
         if (tokenError || !token?.shop_id || !token?.access_token) {
           erros++;
-
           detalhes.push({
             pedido_externo_id: pedido.pedido_externo_id,
             status: "erro",
             mensagem: "Token não encontrado para a loja do pedido.",
           });
-
           continue;
         }
 
@@ -119,7 +114,6 @@ async function enriquecerPedidos() {
         );
 
         const url = new URL(`${SHOPEE_API_URL}${path}`);
-
         url.searchParams.set("partner_id", String(partnerId));
         url.searchParams.set("timestamp", String(timestamp));
         url.searchParams.set("access_token", accessToken);
@@ -158,7 +152,6 @@ async function enriquecerPedidos() {
 
         if (!response.ok || resultado.error) {
           erros++;
-
           detalhes.push({
             pedido_externo_id: pedido.pedido_externo_id,
             status: "erro",
@@ -166,7 +159,6 @@ async function enriquecerPedidos() {
               resultado?.message || "Erro ao consultar get_order_detail"
             }`,
           });
-
           continue;
         }
 
@@ -174,13 +166,11 @@ async function enriquecerPedidos() {
 
         if (!detalhePedido) {
           erros++;
-
           detalhes.push({
             pedido_externo_id: pedido.pedido_externo_id,
             status: "erro",
             mensagem: "Shopee não retornou detalhes para este pedido.",
           });
-
           continue;
         }
 
@@ -197,18 +187,15 @@ async function enriquecerPedidos() {
 
         if (updateError) {
           erros++;
-
           detalhes.push({
             pedido_externo_id: pedido.pedido_externo_id,
             status: "erro",
             mensagem: `Erro ao salvar pedido: ${updateError.message}`,
           });
-
           continue;
         }
 
         atualizados++;
-
         detalhes.push({
           pedido_externo_id: pedido.pedido_externo_id,
           status: "atualizado",
@@ -216,7 +203,6 @@ async function enriquecerPedidos() {
         });
       } catch (error) {
         erros++;
-
         detalhes.push({
           pedido_externo_id: pedido.pedido_externo_id,
           status: "erro",
