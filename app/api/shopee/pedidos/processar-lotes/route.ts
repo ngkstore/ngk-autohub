@@ -144,7 +144,10 @@ async function processarLote() {
 
     await supabase
       .from("sync_jobs")
-      .update({ status: "processando", atualizado_em: new Date().toISOString() })
+      .update({
+        status: "processando",
+        atualizado_em: new Date().toISOString(),
+      })
       .eq("id", job.id);
 
     const lojaId = job.loja_id;
@@ -153,6 +156,7 @@ async function processarLote() {
       .from("marketplace_tokens")
       .select("*")
       .eq("loja_id", lojaId)
+      .eq("marketplace", "shopee")
       .eq("status", "ativo")
       .limit(1)
       .single();
@@ -204,9 +208,15 @@ async function processarLote() {
         `&time_to=${timeTo}` +
         `&page_size=${pageSize}`;
 
-      if (cursor) url += `&cursor=${encodeURIComponent(cursor)}`;
+      if (cursor) {
+        url += `&cursor=${encodeURIComponent(cursor)}`;
+      }
 
-      const response = await fetch(url, { method: "GET", cache: "no-store" });
+      const response = await fetch(url, {
+        method: "GET",
+        cache: "no-store",
+      });
+
       const data = await response.json();
 
       const erroToken =
@@ -249,10 +259,9 @@ async function processarLote() {
 
         const registro = {
           loja_id: lojaId,
-          mercado: "Shopee",
           marketplace: "shopee",
           pedido_externo_id: orderSn,
-          nome_do_cliente: null,
+          cliente_nome: null,
           valor_total: 0,
           status: statusShopee,
           data_pedido: pedido.create_time
@@ -272,12 +281,23 @@ async function processarLote() {
           .maybeSingle();
 
         if (existente?.id) {
-          await supabase.from("pedidos").update(registro).eq("id", existente.id);
+          const { error: updateError } = await supabase
+            .from("pedidos")
+            .update(registro)
+            .eq("id", existente.id);
+
+          if (updateError) {
+            throw new Error(`Erro ao atualizar pedido: ${updateError.message}`);
+          }
         } else {
-          await supabase.from("pedidos").insert({
+          const { error: insertError } = await supabase.from("pedidos").insert({
             ...registro,
             criado_em: new Date().toISOString(),
           });
+
+          if (insertError) {
+            throw new Error(`Erro ao inserir pedido: ${insertError.message}`);
+          }
         }
 
         totalPedidos++;
@@ -295,7 +315,9 @@ async function processarLote() {
         })
         .eq("id", job.id);
 
-      if (!hasNextPage || pedidos.length === 0) break;
+      if (!hasNextPage || pedidos.length === 0) {
+        break;
+      }
     }
 
     await supabase
