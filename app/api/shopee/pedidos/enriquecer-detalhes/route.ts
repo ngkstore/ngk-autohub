@@ -4,8 +4,8 @@ import { supabase } from "@/lib/supabase";
 export async function GET() {
   const { data, error } = await supabase
     .from("pedidos")
-    .select("id, pedido_externo_id, loja_id, mercado")
-    .eq("mercado", "shopee")
+    .select("id, pedido_externo_id, loja_id, marketplace")
+    .eq("marketplace", "shopee")
     .limit(5);
 
   if (error) {
@@ -17,7 +17,7 @@ export async function GET() {
 
   return NextResponse.json({
     sucesso: true,
-    quantidade: data.length,
+    quantidade: data?.length ?? 0,
     pedidos: data,
   });
 }
