@@ -37,7 +37,7 @@ function classificarPedido(status: string) {
   };
 }
 
-export async function POST() {
+async function processarLote() {
   const inicioExecucao = new Date().toISOString();
 
   try {
@@ -336,4 +336,12 @@ export async function POST() {
       { status: 500 }
     );
   }
+}
+
+export async function GET() {
+  return processarLote();
+}
+
+export async function POST() {
+  return processarLote();
 }

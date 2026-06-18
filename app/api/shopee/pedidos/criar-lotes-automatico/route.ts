@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
-export async function POST() {
+async function criarLoteAutomatico() {
   try {
     const lojaId = "329df5fb-0d8f-4eb5-af36-ff216152cedf";
 
@@ -69,4 +69,12 @@ export async function POST() {
       { status: 500 }
     );
   }
+}
+
+export async function GET() {
+  return criarLoteAutomatico();
+}
+
+export async function POST() {
+  return criarLoteAutomatico();
 }
