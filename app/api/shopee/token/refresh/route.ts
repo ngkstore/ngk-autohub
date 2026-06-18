@@ -58,10 +58,9 @@ export async function POST(request: NextRequest) {
     }
 
     const refreshToken =
-      token.refresh_token || token.token_de_atualização;
+      token.refresh_token || token["token_de_atualização"];
 
-    const shopId =
-      token.shop_id || token.id_da_loja;
+    const shopId = token.shop_id || token.id_da_loja;
 
     if (!refreshToken || !shopId) {
       return NextResponse.json(
@@ -118,19 +117,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const novoAccessToken = data.access_token;
-    const novoRefreshToken = data.refresh_token;
-    const expireIn = data.expire_in;
-
     const { error: updateError } = await supabase
       .from("marketplace_tokens")
       .update({
-        access_token: novoAccessToken,
-        refresh_token: novoRefreshToken,
-        token_de_acesso: novoAccessToken,
-        token_de_atualização: novoRefreshToken,
-        expire_in: expireIn,
-        expira_em: expireIn,
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        shop_id: String(shopId),
+        expire_in: data.expire_in,
         status: "ativo",
         atualizado_em: new Date().toISOString(),
       })
@@ -151,7 +144,7 @@ export async function POST(request: NextRequest) {
       sucesso: true,
       mensagem: "Token Shopee atualizado com sucesso.",
       shopId,
-      expireIn,
+      expireIn: data.expire_in,
     });
   } catch (error) {
     return NextResponse.json(
