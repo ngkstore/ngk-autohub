@@ -29,10 +29,7 @@ function classificarPedido(status: string) {
     "COMPLETED",
   ];
 
-  const faturamento = [
-    "TO_CONFIRM_RECEIVE",
-    "COMPLETED",
-  ];
+  const faturamento = ["TO_CONFIRM_RECEIVE", "COMPLETED"];
 
   return {
     pedido_efetivado: efetivados.includes(statusNormalizado),
@@ -62,7 +59,7 @@ export async function POST() {
     const { data: job, error: jobError } = await supabase
       .from("sync_jobs")
       .select("*")
-      .eq("marketplace", "shopee")
+      .eq("mercado", "Shopee")
       .eq("tipo", "pedidos")
       .eq("status", "pendente")
       .order("data_inicio", { ascending: true })
@@ -134,13 +131,17 @@ export async function POST() {
         {
           sucesso: false,
           erro: "Token Shopee não encontrado para esta loja.",
+          detalhe: tokenError?.message,
         },
         { status: 404 }
       );
     }
 
-    const accessToken = token.access_token || token.token_de_acesso;
-    const shopId = token.shop_id || token.id_da_loja;
+    const accessToken =
+      token.access_token || token.token_de_acesso;
+
+    const shopId =
+      token.shop_id || token.id_da_loja;
 
     if (!accessToken || !shopId) {
       await supabase
@@ -155,13 +156,23 @@ export async function POST() {
         {
           sucesso: false,
           erro: "Token ou shop_id ausente.",
+          debug: {
+            accessTokenEncontrado: !!accessToken,
+            shopIdEncontrado: !!shopId,
+            tokenColumns: Object.keys(token),
+          },
         },
         { status: 400 }
       );
     }
 
-    const timeFrom = Math.floor(new Date(job.data_inicio).getTime() / 1000);
-    const timeTo = Math.floor(new Date(job.data_fim).getTime() / 1000);
+    const timeFrom = Math.floor(
+      new Date(job.data_inicio).getTime() / 1000
+    );
+
+    const timeTo = Math.floor(
+      new Date(job.data_fim).getTime() / 1000
+    );
 
     const path = "/api/v2/order/get_order_list";
     const pageSize = 50;
