@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/shopee/pedidos/criar-lotes-automatico",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/shopee/pedidos/processar-lotes",
       "schedule": "*/5 * * * *"
     }
