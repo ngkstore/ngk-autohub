@@ -183,6 +183,7 @@ async function processarLote() {
     let hasNextPage = true;
     let totalPedidos = 0;
     let tentativaRefresh = false;
+    let debugPrimeiroRetorno: unknown = null;
 
     while (hasNextPage) {
       const timestamp = Math.floor(Date.now() / 1000);
@@ -219,6 +220,12 @@ async function processarLote() {
 
       const data = await response.json();
 
+      if (!debugPrimeiroRetorno) {
+        debugPrimeiroRetorno = data;
+      }
+
+      console.log("RETORNO GET_ORDER_LIST SHOPEE:", JSON.stringify(data, null, 2));
+
       const erroToken =
         data?.error === "invalid_access_token" ||
         data?.error === "token_de_acesso_inválido" ||
@@ -252,8 +259,16 @@ async function processarLote() {
 
       const pedidos = data.response?.order_list || [];
 
+      console.log("PEDIDOS SHOPEE:", JSON.stringify(pedidos, null, 2));
+
       for (const pedido of pedidos) {
         const orderSn = pedido.order_sn;
+
+        if (!orderSn) {
+          console.log("PEDIDO SEM ORDER_SN:", JSON.stringify(pedido, null, 2));
+          continue;
+        }
+
         const statusShopee = pedido.order_status || "UNKNOWN";
         const classificacao = classificarPedido(statusShopee);
 
@@ -346,6 +361,7 @@ async function processarLote() {
       mensagem: `${totalPedidos} pedidos sincronizados no lote.`,
       jobId: job.id,
       total: totalPedidos,
+      debug_primeiro_retorno: debugPrimeiroRetorno,
     });
   } catch (error) {
     await supabase.from("sincronizacoes").insert({
