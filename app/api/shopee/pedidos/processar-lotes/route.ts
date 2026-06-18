@@ -48,10 +48,7 @@ export async function POST() {
 
     if (!partnerId || !partnerKey) {
       return NextResponse.json(
-        {
-          sucesso: false,
-          erro: "Credenciais da Shopee não configuradas.",
-        },
+        { sucesso: false, erro: "Credenciais da Shopee não configuradas." },
         { status: 500 }
       );
     }
@@ -59,7 +56,7 @@ export async function POST() {
     const { data: job, error: jobError } = await supabase
       .from("sync_jobs")
       .select("*")
-      .eq("mercado", "Shopee")
+      .eq("marketplace", "shopee")
       .eq("tipo", "pedidos")
       .eq("status", "pendente")
       .order("data_inicio", { ascending: true })
@@ -104,10 +101,7 @@ export async function POST() {
         .eq("id", job.id);
 
       return NextResponse.json(
-        {
-          sucesso: false,
-          erro: "Job sem loja_id.",
-        },
+        { sucesso: false, erro: "Job sem loja_id." },
         { status: 400 }
       );
     }
@@ -137,11 +131,8 @@ export async function POST() {
       );
     }
 
-    const accessToken =
-      token.access_token || token.token_de_acesso;
-
-    const shopId =
-      token.shop_id || token.id_da_loja;
+    const accessToken = token.access_token || token.token_de_acesso;
+    const shopId = token.shop_id || token.id_da_loja;
 
     if (!accessToken || !shopId) {
       await supabase
@@ -166,13 +157,8 @@ export async function POST() {
       );
     }
 
-    const timeFrom = Math.floor(
-      new Date(job.data_inicio).getTime() / 1000
-    );
-
-    const timeTo = Math.floor(
-      new Date(job.data_fim).getTime() / 1000
-    );
+    const timeFrom = Math.floor(new Date(job.data_inicio).getTime() / 1000);
+    const timeTo = Math.floor(new Date(job.data_fim).getTime() / 1000);
 
     const path = "/api/v2/order/get_order_list";
     const pageSize = 50;
