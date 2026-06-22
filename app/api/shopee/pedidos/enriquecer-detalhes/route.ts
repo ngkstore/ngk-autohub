@@ -31,7 +31,8 @@ async function enriquecer(limite: number) {
 }
 
 export async function GET(request: NextRequest) {
-  const limite = Number(request.nextUrl.searchParams.get("limite")) || 300;
+  // Padrão maior no GET (usado pelo cron) para dar vazão ao volume.
+  const limite = Number(request.nextUrl.searchParams.get("limite")) || 1000;
   return enriquecer(limite);
 }
 
