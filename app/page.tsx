@@ -20,6 +20,20 @@ type PedidoRow = {
   cliente_nome: string | null;
 };
 
+// Formato retornado pela função SQL resumo_pedidos (cálculo no banco).
+type ResumoPedidos = {
+  total_pedidos: number;
+  pedidos_efetivados: number;
+  pedidos_faturados: number;
+  pedidos_cancelados: number;
+  faturamento_geral: number;
+  faturamento_efetivado: number;
+  faturamento_concluido: number;
+  por_status: { status: string; quantidade: number }[];
+  por_marketplace: { marketplace: string; faturamento: number }[];
+  vendas_por_dia: { dia: string; faturamento: number }[];
+};
+
 const mapaLojas: Record<string, string> = {
   "ngk-shopee": "NGK Shopee",
   "pitibiribas-shopee": "Pitibiribas Shopee",
@@ -104,14 +118,19 @@ function num(valor: number | string | null) {
   return Number(valor || 0);
 }
 
-// Busca TODOS os pedidos do filtro paginando (o Supabase limita a 1000 por
-// requisição), para os totais ficarem corretos mesmo com milhares de pedidos.
+function formatarDiaCurto(dia: string) {
+  const [, mes, d] = dia.split("-");
+  return `${d}/${mes}`;
+}
+
+// Fallback (só usado se a função SQL ainda não existir): pagina os pedidos
+// para somar tudo no app, contornando o limite de 1000 linhas do Supabase.
 async function buscarTodosPedidos(
   lojaId: string | null,
   periodoFiltro: string | null
 ): Promise<PedidoRow[]> {
   const pageSize = 1000;
-  const maxPaginas = 100; // trava de segurança (até 100 mil pedidos)
+  const maxPaginas = 200; // trava de segurança
   const todos: PedidoRow[] = [];
 
   for (let pagina = 0; pagina < maxPaginas; pagina++) {
@@ -138,6 +157,107 @@ async function buscarTodosPedidos(
   }
 
   return todos;
+}
+
+type ResumoCalculado = {
+  totalPedidos: number;
+  efetivadosCount: number;
+  faturadosCount: number;
+  canceladosCount: number;
+  faturamentoGeral: number;
+  faturamentoEfetivado: number;
+  faturamentoConcluido: number;
+  vendasPorPeriodo: { data: string; faturamento: number }[];
+  faturamentoPorMarketplace: { marketplace: string; faturamento: number }[];
+  pedidosPorStatus: { status: string; quantidade: number }[];
+};
+
+// Calcula o resumo: tenta a função SQL (rápida e ilimitada) e, se ela ainda
+// não existir, cai no fallback paginado no app.
+async function calcularResumoPedidos(
+  lojaId: string | null,
+  periodoFiltro: string | null
+): Promise<ResumoCalculado> {
+  const { data: resumoRpc } = await supabase.rpc("resumo_pedidos", {
+    p_loja_id: lojaId,
+    p_inicio: periodoFiltro,
+  });
+
+  const resumo = resumoRpc as ResumoPedidos | null;
+
+  if (resumo) {
+    return {
+      totalPedidos: num(resumo.total_pedidos),
+      efetivadosCount: num(resumo.pedidos_efetivados),
+      faturadosCount: num(resumo.pedidos_faturados),
+      canceladosCount: num(resumo.pedidos_cancelados),
+      faturamentoGeral: num(resumo.faturamento_geral),
+      faturamentoEfetivado: num(resumo.faturamento_efetivado),
+      faturamentoConcluido: num(resumo.faturamento_concluido),
+      vendasPorPeriodo: (resumo.vendas_por_dia || []).map((v) => ({
+        data: formatarDiaCurto(v.dia),
+        faturamento: num(v.faturamento),
+      })),
+      faturamentoPorMarketplace: (resumo.por_marketplace || []).map((m) => ({
+        marketplace: m.marketplace || "sem marketplace",
+        faturamento: num(m.faturamento),
+      })),
+      pedidosPorStatus: (resumo.por_status || []).map((s) => ({
+        status: rotuloStatus(s.status),
+        quantidade: num(s.quantidade),
+      })),
+    };
+  }
+
+  // ---- Fallback paginado ----
+  const pedidos = await buscarTodosPedidos(lojaId, periodoFiltro);
+
+  const efetivados = pedidos.filter((p) => p.pedido_efetivado);
+  const faturados = pedidos.filter((p) => p.entra_faturamento);
+  const cancelados = pedidos.filter(
+    (p) => !p.pedido_efetivado && p.status !== "UNPAID"
+  );
+
+  const vendasMap = new Map<string, number>();
+  efetivados.forEach((p) => {
+    if (!p.data_pedido) return;
+    const chave = p.data_pedido.slice(0, 10);
+    vendasMap.set(chave, (vendasMap.get(chave) || 0) + num(p.valor_total));
+  });
+
+  const marketplaceMap = new Map<string, number>();
+  efetivados.forEach((p) => {
+    const mk = p.marketplace || "sem marketplace";
+    marketplaceMap.set(mk, (marketplaceMap.get(mk) || 0) + num(p.valor_total));
+  });
+
+  const statusMap = new Map<string, number>();
+  pedidos.forEach((p) => {
+    const label = rotuloStatus(p.status);
+    statusMap.set(label, (statusMap.get(label) || 0) + 1);
+  });
+
+  return {
+    totalPedidos: pedidos.length,
+    efetivadosCount: efetivados.length,
+    faturadosCount: faturados.length,
+    canceladosCount: cancelados.length,
+    faturamentoGeral: pedidos.reduce((t, p) => t + num(p.valor_total), 0),
+    faturamentoEfetivado: efetivados.reduce((t, p) => t + num(p.valor_total), 0),
+    faturamentoConcluido: faturados.reduce((t, p) => t + num(p.valor_total), 0),
+    vendasPorPeriodo: Array.from(vendasMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([chave, faturamento]) => ({
+        data: formatarDiaCurto(chave),
+        faturamento,
+      })),
+    faturamentoPorMarketplace: Array.from(marketplaceMap.entries()).map(
+      ([marketplace, faturamento]) => ({ marketplace, faturamento })
+    ),
+    pedidosPorStatus: Array.from(statusMap.entries())
+      .map(([status, quantidade]) => ({ status, quantidade }))
+      .sort((a, b) => b.quantidade - a.quantidade),
+  };
 }
 
 export default async function Dashboard({ searchParams }: DashboardProps) {
@@ -186,6 +306,17 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
     .order("faturamento", { ascending: false })
     .limit(10);
 
+  // Pedidos efetivados recentes (query leve com limite — sem problema de 1000).
+  let recentesQuery = supabase
+    .from("pedidos")
+    .select(
+      "valor_total, marketplace, status, pedido_externo_id, cliente_nome, data_pedido"
+    )
+    .eq("pedido_efetivado", true)
+    .not("data_pedido", "is", null)
+    .order("data_pedido", { ascending: false })
+    .limit(20);
+
   if (lojaId) {
     avaliacoesQuery = avaliacoesQuery.eq("loja_id", lojaId);
     avaliacoesMediaQuery = avaliacoesMediaQuery.eq("loja_id", lojaId);
@@ -193,6 +324,7 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
     produtosSemEstoqueQuery = produtosSemEstoqueQuery.eq("loja_id", lojaId);
     financeiroQuery = financeiroQuery.eq("loja_id", lojaId);
     rankingQuery = rankingQuery.eq("loja_id", lojaId);
+    recentesQuery = recentesQuery.eq("loja_id", lojaId);
   }
 
   if (periodoFiltro) {
@@ -204,9 +336,10 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
       periodoFiltro
     );
     financeiroQuery = financeiroQuery.gte("data_movimento", periodoFiltro);
+    recentesQuery = recentesQuery.gte("data_pedido", periodoFiltro);
   }
 
-  const pedidos = await buscarTodosPedidos(lojaId, periodoFiltro);
+  const resumo = await calcularResumoPedidos(lojaId, periodoFiltro);
 
   const { count: totalAvaliacoes } = await avaliacoesQuery;
   const { data: avaliacoesMedia } = await avaliacoesMediaQuery;
@@ -214,6 +347,9 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
   const { count: produtosSemEstoque } = await produtosSemEstoqueQuery;
   const { data: financeiro } = await financeiroQuery;
   const { data: rankingProdutos } = await rankingQuery;
+  const { data: efetivadosRecentesData } = await recentesQuery;
+
+  const efetivadosRecentes = (efetivadosRecentesData as PedidoRow[]) || [];
 
   let respostasQuery = supabase
     .from("respostas_ia")
@@ -241,35 +377,14 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
     .select("*", { count: "exact", head: true })
     .eq("status", "ativo");
 
-  // ---- Métricas de pedidos ----
-  const totalPedidos = pedidos.length;
-
-  const pedidosEfetivados = pedidos.filter((p) => p.pedido_efetivado);
-  const pedidosFaturados = pedidos.filter((p) => p.entra_faturamento);
-  const pedidosCancelados = pedidos.filter(
-    (p) => !p.pedido_efetivado && p.status !== "UNPAID"
-  );
-
-  const faturamentoGeral = pedidos.reduce((t, p) => t + num(p.valor_total), 0);
-
-  const faturamentoEfetivado = pedidosEfetivados.reduce(
-    (t, p) => t + num(p.valor_total),
-    0
-  );
-
-  const faturamentoConcluido = pedidosFaturados.reduce(
-    (t, p) => t + num(p.valor_total),
-    0
-  );
-
   const ticketMedio =
-    pedidosEfetivados.length > 0
-      ? faturamentoEfetivado / pedidosEfetivados.length
+    resumo.efetivadosCount > 0
+      ? resumo.faturamentoEfetivado / resumo.efetivadosCount
       : 0;
 
   const taxaEfetivacao =
-    totalPedidos > 0
-      ? Math.round((pedidosEfetivados.length / totalPedidos) * 100)
+    resumo.totalPedidos > 0
+      ? Math.round((resumo.efetivadosCount / resumo.totalPedidos) * 100)
       : 0;
 
   const totalReceitas =
@@ -298,23 +413,6 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
     ? Math.round(((totalRespostas ?? 0) / totalAvaliacoes) * 100)
     : 0;
 
-  // ---- Dados para gráficos (baseados em pedidos efetivados) ----
-  const vendasMap = new Map<string, number>();
-
-  pedidosEfetivados.forEach((pedido) => {
-    if (!pedido.data_pedido) return;
-
-    const chave = pedido.data_pedido.slice(0, 10); // yyyy-mm-dd
-    vendasMap.set(chave, (vendasMap.get(chave) || 0) + num(pedido.valor_total));
-  });
-
-  const vendasPorPeriodo = Array.from(vendasMap.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([chave, faturamento]) => {
-      const [, mes, dia] = chave.split("-");
-      return { data: `${dia}/${mes}`, faturamento };
-    });
-
   const financeiroResumo = [
     { nome: "Receitas", valor: totalReceitas },
     { nome: "Despesas", valor: totalDespesas },
@@ -327,36 +425,6 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
       avaliacoesMedia?.filter((item) => Number(item.avaliacao) === nota)
         .length || 0,
   }));
-
-  const marketplaceMap = new Map<string, number>();
-
-  pedidosEfetivados.forEach((pedido) => {
-    const marketplace = pedido.marketplace || "sem marketplace";
-    marketplaceMap.set(
-      marketplace,
-      (marketplaceMap.get(marketplace) || 0) + num(pedido.valor_total)
-    );
-  });
-
-  const faturamentoPorMarketplace = Array.from(marketplaceMap.entries()).map(
-    ([marketplace, faturamento]) => ({ marketplace, faturamento })
-  );
-
-  const statusMap = new Map<string, number>();
-
-  pedidos.forEach((pedido) => {
-    const label = rotuloStatus(pedido.status);
-    statusMap.set(label, (statusMap.get(label) || 0) + 1);
-  });
-
-  const pedidosPorStatus = Array.from(statusMap.entries())
-    .map(([status, quantidade]) => ({ status, quantidade }))
-    .sort((a, b) => b.quantidade - a.quantidade);
-
-  // Pedidos efetivados mais recentes (com data), para a tabela.
-  const efetivadosRecentes = pedidosEfetivados
-    .filter((p) => p.data_pedido)
-    .slice(0, 20);
 
   return (
     <div className="p-8 text-white">
@@ -375,17 +443,17 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
             Faturamento Efetivado (vendas reais)
           </p>
           <p className="mt-2 text-4xl font-bold text-emerald-300">
-            {formatarMoeda(faturamentoEfetivado)}
+            {formatarMoeda(resumo.faturamentoEfetivado)}
           </p>
           <p className="mt-1 text-xs text-slate-500">
-            {pedidosEfetivados.length} pedido(s) efetivado(s)
+            {resumo.efetivadosCount} pedido(s) efetivado(s)
           </p>
         </div>
 
         <div className="rounded-2xl bg-slate-900 p-6">
           <p className="text-sm text-slate-400">Faturamento Geral (todos)</p>
           <p className="mt-2 text-4xl font-bold text-green-300">
-            {formatarMoeda(faturamentoGeral)}
+            {formatarMoeda(resumo.faturamentoGeral)}
           </p>
           <p className="mt-1 text-xs text-slate-500">
             inclui pendentes e cancelados
@@ -395,10 +463,10 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
         <div className="rounded-2xl bg-slate-900 p-6">
           <p className="text-sm text-slate-400">Faturamento Concluído</p>
           <p className="mt-2 text-4xl font-bold text-teal-300">
-            {formatarMoeda(faturamentoConcluido)}
+            {formatarMoeda(resumo.faturamentoConcluido)}
           </p>
           <p className="mt-1 text-xs text-slate-500">
-            {pedidosFaturados.length} pedido(s) concluído(s)/a confirmar
+            {resumo.faturadosCount} pedido(s) concluído(s)/a confirmar
           </p>
         </div>
       </div>
@@ -407,13 +475,13 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
       <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-2xl bg-slate-900 p-6">
           <p className="text-sm text-slate-400">Total de Pedidos</p>
-          <p className="mt-2 text-4xl font-bold">{totalPedidos}</p>
+          <p className="mt-2 text-4xl font-bold">{resumo.totalPedidos}</p>
         </div>
 
         <div className="rounded-2xl bg-slate-900 p-6">
           <p className="text-sm text-slate-400">Pedidos Efetivados</p>
           <p className="mt-2 text-4xl font-bold text-emerald-300">
-            {pedidosEfetivados.length}
+            {resumo.efetivadosCount}
           </p>
           <p className="mt-1 text-xs text-slate-500">
             {taxaEfetivacao}% do total
@@ -423,7 +491,7 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
         <div className="rounded-2xl bg-slate-900 p-6">
           <p className="text-sm text-slate-400">Cancelados / Não Efetivados</p>
           <p className="mt-2 text-4xl font-bold text-red-300">
-            {pedidosCancelados.length}
+            {resumo.canceladosCount}
           </p>
         </div>
 
@@ -467,11 +535,11 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
       </div>
 
       <DashboardCharts
-        vendasPorPeriodo={vendasPorPeriodo}
+        vendasPorPeriodo={resumo.vendasPorPeriodo}
         financeiroResumo={financeiroResumo}
         avaliacoesPorNota={avaliacoesPorNota}
-        faturamentoPorMarketplace={faturamentoPorMarketplace}
-        pedidosPorStatus={pedidosPorStatus}
+        faturamentoPorMarketplace={resumo.faturamentoPorMarketplace}
+        pedidosPorStatus={resumo.pedidosPorStatus}
       />
 
       {/* Pedidos efetivados recentes */}
