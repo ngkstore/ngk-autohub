@@ -33,13 +33,33 @@ function gerarAssinaturaSimples(
     .digest("hex");
 }
 
+type ItemPedido = {
+  model_discounted_price?: number;
+  model_original_price?: number;
+  model_quantity_purchased?: number;
+};
+
 type DetalhePedido = {
   order_sn: string;
   order_status?: string;
   total_amount?: number | string;
   buyer_username?: string;
   create_time?: number;
+  actual_shipping_fee?: number | string;
+  item_list?: ItemPedido[];
 };
+
+// Venda real = soma do preço de venda dos itens (preço com desconto do anúncio
+// x quantidade). É o valor das mercadorias que o cliente paga, sem frete.
+function calcularVendaItens(detalhe: DetalhePedido) {
+  const itens = Array.isArray(detalhe.item_list) ? detalhe.item_list : [];
+
+  return itens.reduce((total, item) => {
+    const preco = Number(item.model_discounted_price || 0);
+    const qtd = Number(item.model_quantity_purchased || 0);
+    return total + preco * qtd;
+  }, 0);
+}
 
 type TokenLoja = {
   id: string;
@@ -309,10 +329,15 @@ export async function enriquecerPedidosPendentes({
         const statusShopee = detalhe.order_status || "UNKNOWN";
         const classificacao = classificarPedido(statusShopee);
 
+        // Venda real pelos itens; se não houver item_list, cai no total_amount.
+        const vendaItens = calcularVendaItens(detalhe);
+        const valorVenda =
+          vendaItens > 0 ? vendaItens : Number(detalhe.total_amount ?? 0);
+
         const { error: updateError } = await supabase
           .from("pedidos")
           .update({
-            valor_total: Number(detalhe.total_amount ?? 0),
+            valor_total: valorVenda,
             cliente_nome: detalhe.buyer_username ?? null,
             status: statusShopee,
             data_pedido: detalhe.create_time
