@@ -35,6 +35,9 @@ function gerarAssinaturaSimples(
 export function classificarPedido(status: string) {
   const s = status?.toUpperCase() || "";
 
+  // Status que representam uma venda válida (não cancelada/não paga).
+  // O faturamento é reconhecido a partir de "Pronto p/ envio", então
+  // entra_faturamento acompanha pedido_efetivado.
   const efetivados = [
     "READY_TO_SHIP",
     "PROCESSED",
@@ -43,11 +46,11 @@ export function classificarPedido(status: string) {
     "COMPLETED",
   ];
 
-  const faturamento = ["TO_CONFIRM_RECEIVE", "COMPLETED"];
+  const efetivado = efetivados.includes(s);
 
   return {
-    pedido_efetivado: efetivados.includes(s),
-    entra_faturamento: faturamento.includes(s),
+    pedido_efetivado: efetivado,
+    entra_faturamento: efetivado,
   };
 }
 
