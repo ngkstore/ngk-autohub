@@ -60,37 +60,48 @@ function rotuloStatus(status?: string | null) {
   return statusLabels[status] || status;
 }
 
+// Data (YYYY-MM-DD) no fuso de Brasília.
+function diaBRT(date: Date) {
+  return date.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
+
+// Início do dia em Brasília como instante absoluto (Brasil usa UTC-3 fixo).
+function isoInicioBRT(ano: number, mes: number, dia: number) {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${ano}-${p(mes)}-${p(dia)}T00:00:00-03:00`;
+}
+
 function getPeriodoFiltro(periodo?: string) {
-  const hoje = new Date();
-  const inicio = new Date();
+  const [ano, mes, dia] = diaBRT(new Date()).split("-").map(Number);
+  const base = new Date(Date.UTC(ano, mes - 1, dia));
+
+  const isoDe = (d: Date) =>
+    isoInicioBRT(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
+
+  const recuar = (dias: number) => {
+    const d = new Date(base);
+    d.setUTCDate(d.getUTCDate() - dias);
+    return isoDe(d);
+  };
 
   switch (periodo) {
     case "hoje":
-      inicio.setHours(0, 0, 0, 0);
-      return inicio.toISOString();
+      return isoInicioBRT(ano, mes, dia);
 
     case "ontem":
-      inicio.setDate(hoje.getDate() - 1);
-      inicio.setHours(0, 0, 0, 0);
-      return inicio.toISOString();
+      return recuar(1);
 
     case "7dias":
-      inicio.setDate(hoje.getDate() - 7);
-      return inicio.toISOString();
+      return recuar(7);
 
     case "30dias":
-      inicio.setDate(hoje.getDate() - 30);
-      return inicio.toISOString();
+      return recuar(30);
 
     case "mes":
-      inicio.setDate(1);
-      inicio.setHours(0, 0, 0, 0);
-      return inicio.toISOString();
+      return isoInicioBRT(ano, mes, 1);
 
     case "ano":
-      inicio.setMonth(0, 1);
-      inicio.setHours(0, 0, 0, 0);
-      return inicio.toISOString();
+      return isoInicioBRT(ano, 1, 1);
 
     default:
       return null;
@@ -221,7 +232,7 @@ async function calcularResumoPedidos(
   const vendasMap = new Map<string, number>();
   efetivados.forEach((p) => {
     if (!p.data_pedido) return;
-    const chave = p.data_pedido.slice(0, 10);
+    const chave = diaBRT(new Date(p.data_pedido)); // agrupa por dia em Brasília
     vendasMap.set(chave, (vendasMap.get(chave) || 0) + num(p.valor_total));
   });
 

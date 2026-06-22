@@ -78,11 +78,15 @@ as $$
           order by dia
         ), '[]'::json)
        from (
-         select to_char(date_trunc('day', data_pedido), 'YYYY-MM-DD') as dia,
+         -- Agrupa por dia no fuso de Brasília, para bater com o Shopee.
+         select to_char(
+                  (data_pedido at time zone 'America/Sao_Paulo')::date,
+                  'YYYY-MM-DD'
+                ) as dia,
                 coalesce(sum(valor_total), 0) as faturamento
          from filtrados
          where pedido_efetivado and data_pedido is not null
-         group by to_char(date_trunc('day', data_pedido), 'YYYY-MM-DD')
+         group by (data_pedido at time zone 'America/Sao_Paulo')::date
        ) v)
   );
 $$;
