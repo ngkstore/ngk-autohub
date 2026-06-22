@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import SyncTipoButton from "../components/SyncTipoButton";
+import SincronizarPedidosButton from "../components/SincronizarPedidosButton";
 
 function normalizarTexto(valor?: string) {
   return valor
@@ -77,6 +78,10 @@ export default async function SincronizacaoPage() {
             lojaId={lojaSelecionada?.id || ""}
           />
         </div>
+      </section>
+
+      <section className="mt-8">
+        <SincronizarPedidosButton lojaId={lojaSelecionada?.id || ""} />
       </section>
 
       <section className="mt-8 rounded-2xl bg-slate-900 p-6">
