@@ -20,11 +20,22 @@ type Props = {
   financeiroResumo?: { nome: string; valor: number }[];
   avaliacoesPorNota?: { nota: string; quantidade: number }[];
   faturamentoPorMarketplace?: { marketplace: string; faturamento: number }[];
+  pedidosPorStatus?: { status: string; quantidade: number }[];
 };
 
 const coresFinanceiro = ["#22c55e", "#ef4444", "#3b82f6"];
 const coresAvaliacoes = ["#ef4444", "#f97316", "#facc15", "#84cc16", "#22c55e"];
 const coresMarketplace = ["#3b82f6", "#f97316", "#22c55e", "#8b5cf6"];
+const coresStatus = [
+  "#22c55e",
+  "#3b82f6",
+  "#f97316",
+  "#8b5cf6",
+  "#facc15",
+  "#ef4444",
+  "#14b8a6",
+  "#94a3b8",
+];
 
 function temDados(lista?: unknown[]) {
   return Array.isArray(lista) && lista.length > 0;
@@ -43,6 +54,7 @@ export default function DashboardCharts({
   financeiroResumo = [],
   avaliacoesPorNota = [],
   faturamentoPorMarketplace = [],
+  pedidosPorStatus = [],
 }: Props) {
   return (
     <div className="mt-10 grid grid-cols-1 gap-6 xl:grid-cols-2">
@@ -130,6 +142,36 @@ export default function DashboardCharts({
                     <Cell
                       key={index}
                       fill={coresAvaliacoes[index % coresAvaliacoes.length]}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <EmptyChart />
+        )}
+      </div>
+
+      <div className="rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-lg">
+        <h2 className="mb-6 text-2xl font-bold text-white">
+          📦 Pedidos por Status
+        </h2>
+
+        {temDados(pedidosPorStatus) ? (
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={pedidosPorStatus}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <XAxis dataKey="status" stroke="#94a3b8" />
+                <YAxis stroke="#94a3b8" />
+                <Tooltip />
+
+                <Bar dataKey="quantidade" radius={[10, 10, 0, 0]}>
+                  {pedidosPorStatus.map((_, index) => (
+                    <Cell
+                      key={index}
+                      fill={coresStatus[index % coresStatus.length]}
                     />
                   ))}
                 </Bar>
