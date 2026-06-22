@@ -32,7 +32,7 @@ function gerarAssinaturaSimples(
     .digest("hex");
 }
 
-function classificarPedido(status: string) {
+export function classificarPedido(status: string) {
   const s = status?.toUpperCase() || "";
 
   const efetivados = [
