@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import {
-  processarLotesPendentes,
+  processarUmLote,
   JANELA_MAXIMA_DIAS,
 } from "@/lib/shopee/sincronizarPedidos";
 
@@ -54,44 +54,48 @@ export async function POST(request: NextRequest) {
     const inicio = new Date(agora);
     inicio.setDate(inicio.getDate() - dias);
 
-    const { error: insertError } = await supabase.from("sync_jobs").insert({
-      marketplace: "shopee",
-      tipo: "pedidos",
-      status: "pendente",
-      loja_id: lojaId,
-      data_inicio: inicio.toISOString(),
-      data_fim: agora.toISOString(),
-      progresso: 0,
-      total_registros: 0,
-      criado_em: new Date().toISOString(),
-      atualizado_em: new Date().toISOString(),
-    });
+    const { data: novoLote, error: insertError } = await supabase
+      .from("sync_jobs")
+      .insert({
+        marketplace: "shopee",
+        tipo: "pedidos",
+        status: "pendente",
+        loja_id: lojaId,
+        data_inicio: inicio.toISOString(),
+        data_fim: agora.toISOString(),
+        progresso: 0,
+        total_registros: 0,
+        criado_em: new Date().toISOString(),
+        atualizado_em: new Date().toISOString(),
+      })
+      .select("id, loja_id, data_inicio, data_fim")
+      .single();
 
-    if (insertError) {
+    if (insertError || !novoLote) {
       return NextResponse.json(
         {
           sucesso: false,
           erro: "Erro ao criar lote.",
-          detalhe: insertError.message,
+          detalhe: insertError?.message,
         },
         { status: 500 }
       );
     }
 
-    const { lotesProcessados, totalPedidos, resultados } =
-      await processarLotesPendentes();
-
-    const houveErro = resultados.some((r) => r.status === "erro");
+    // Processa apenas o lote recém-criado (a janela pedida), para o teste ser
+    // rápido e isolado — não drena o backlog acumulado pelo cron.
+    const resultado = await processarUmLote(novoLote);
+    const houveErro = resultado.status === "erro";
 
     return NextResponse.json({
       sucesso: !houveErro,
       mensagem: houveErro
-        ? "Sincronização concluída com erros. Veja os detalhes abaixo."
-        : `${totalPedidos} pedido(s) sincronizado(s) dos últimos ${dias} dia(s).`,
+        ? resultado.mensagem
+        : `${resultado.total} pedido(s) sincronizado(s) dos últimos ${dias} dia(s).`,
       janelaDias: dias,
-      lotesProcessados,
-      totalPedidos,
-      resultados,
+      lotesProcessados: 1,
+      totalPedidos: resultado.total,
+      resultados: [resultado],
     });
   } catch (error) {
     return NextResponse.json(

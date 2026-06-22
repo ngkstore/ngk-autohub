@@ -43,7 +43,22 @@ export default function SincronizarPedidosButton({ lojaId }: Props) {
         body: JSON.stringify({ lojaId, dias }),
       });
 
-      const data: Resultado = await response.json();
+      const texto = await response.text();
+
+      let data: Resultado;
+      try {
+        data = JSON.parse(texto);
+      } catch {
+        // Resposta não-JSON (ex.: erro/timeout da Vercel). Mostra o texto cru.
+        data = {
+          sucesso: false,
+          erro: `Falha no servidor (HTTP ${response.status}). Resposta: ${texto.slice(
+            0,
+            500
+          )}`,
+        };
+      }
+
       setResultado(data);
     } catch (error) {
       setResultado({
