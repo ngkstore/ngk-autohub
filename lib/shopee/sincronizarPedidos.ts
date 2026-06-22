@@ -113,6 +113,12 @@ async function atualizarToken(params: {
   };
 }
 
+type ShopeeOrderResumo = {
+  order_sn: string;
+  order_status?: string;
+  create_time?: number;
+};
+
 export type ResultadoLote = {
   jobId: string;
   status: "concluido" | "erro";
@@ -253,62 +259,90 @@ export async function processarUmLote(job: SyncJob): Promise<ResultadoLote> {
         );
       }
 
-      const pedidos = data.response?.order_list || [];
+      const pedidos: ShopeeOrderResumo[] = (
+        data.response?.order_list || []
+      ).filter((p: { order_sn?: string }) => p.order_sn);
 
-      for (const pedido of pedidos) {
-        const orderSn = pedido.order_sn;
+      if (pedidos.length > 0) {
+        const agoraIso = new Date().toISOString();
 
-        if (!orderSn) {
-          continue;
+        const registros = pedidos.map((pedido) => {
+          const statusShopee = pedido.order_status || "UNKNOWN";
+          const classificacao = classificarPedido(statusShopee);
+
+          return {
+            loja_id: lojaId,
+            marketplace: "shopee",
+            pedido_externo_id: pedido.order_sn,
+            status: statusShopee,
+            data_pedido: pedido.create_time
+              ? new Date(pedido.create_time * 1000).toISOString()
+              : null,
+            pedido_efetivado: classificacao.pedido_efetivado,
+            entra_faturamento: classificacao.entra_faturamento,
+            dados_pedido: pedido,
+            atualizado_em: agoraIso,
+          };
+        });
+
+        const orderSns = registros.map((r) => r.pedido_externo_id);
+
+        // 1 consulta pra descobrir quais já existem (em vez de 1 por pedido).
+        const { data: existentes } = await supabase
+          .from("pedidos")
+          .select("id, pedido_externo_id")
+          .eq("loja_id", lojaId)
+          .in("pedido_externo_id", orderSns);
+
+        const mapaExistentes = new Map<string, string>(
+          (existentes || []).map((e: { pedido_externo_id: string; id: string }) => [
+            e.pedido_externo_id,
+            e.id,
+          ])
+        );
+
+        const novos = registros.filter(
+          (r) => !mapaExistentes.has(r.pedido_externo_id)
+        );
+        const atualizar = registros.filter((r) =>
+          mapaExistentes.has(r.pedido_externo_id)
+        );
+
+        // Insere todos os novos de uma vez.
+        if (novos.length > 0) {
+          const { error: insertError } = await supabase.from("pedidos").insert(
+            novos.map((r) => ({
+              ...r,
+              cliente_nome: null,
+              valor_total: 0,
+              criado_em: agoraIso,
+            }))
+          );
+
+          if (insertError) {
+            throw new Error(`Erro ao inserir pedidos: ${insertError.message}`);
+          }
         }
 
-        const statusShopee = pedido.order_status || "UNKNOWN";
-        const classificacao = classificarPedido(statusShopee);
-
-        const registro = {
-          loja_id: lojaId,
-          marketplace: "shopee",
-          pedido_externo_id: orderSn,
-          cliente_nome: null,
-          valor_total: 0,
-          status: statusShopee,
-          data_pedido: pedido.create_time
-            ? new Date(pedido.create_time * 1000).toISOString()
-            : null,
-          pedido_efetivado: classificacao.pedido_efetivado,
-          entra_faturamento: classificacao.entra_faturamento,
-          dados_pedido: pedido,
-          atualizado_em: new Date().toISOString(),
-        };
-
-        const { data: existente } = await supabase
-          .from("pedidos")
-          .select("id")
-          .eq("loja_id", lojaId)
-          .eq("pedido_externo_id", orderSn)
-          .maybeSingle();
-
-        if (existente?.id) {
+        // Atualiza só o que muda (status/flags), preservando os dados
+        // enriquecidos (valor, cliente, item_list) gravados depois.
+        for (const r of atualizar) {
           const { error: updateError } = await supabase
             .from("pedidos")
-            .update(registro)
-            .eq("id", existente.id);
+            .update({
+              status: r.status,
+              pedido_efetivado: r.pedido_efetivado,
+              entra_faturamento: r.entra_faturamento,
+              atualizado_em: r.atualizado_em,
+            })
+            .eq("id", mapaExistentes.get(r.pedido_externo_id));
 
           if (updateError) {
             throw new Error(`Erro ao atualizar pedido: ${updateError.message}`);
           }
-        } else {
-          const { error: insertError } = await supabase.from("pedidos").insert({
-            ...registro,
-            criado_em: new Date().toISOString(),
-          });
-
-          if (insertError) {
-            throw new Error(`Erro ao inserir pedido: ${insertError.message}`);
-          }
         }
 
-        totalPedidos++;
+        totalPedidos += registros.length;
       }
 
       hasNextPage = !!data.response?.more;
