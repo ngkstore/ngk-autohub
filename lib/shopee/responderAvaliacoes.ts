@@ -45,12 +45,12 @@ type AvaliacaoRow = {
   nome_produto: string | null;
 };
 
-type TokenLoja = { accessToken: string; shopId: string };
+type TokenLoja = { accessToken: string; shopId: string; lojaId: string | null };
 
 async function obterToken(): Promise<TokenLoja> {
   const { data: token } = await supabase
     .from("marketplace_tokens")
-    .select("access_token, shop_id")
+    .select("access_token, shop_id, loja_id")
     .eq("marketplace", "shopee")
     .eq("status", "ativo")
     .limit(1)
@@ -59,7 +59,11 @@ async function obterToken(): Promise<TokenLoja> {
   if (!token?.access_token || !token?.shop_id) {
     throw new Error("Nenhuma loja Shopee com token ativo.");
   }
-  return { accessToken: token.access_token, shopId: String(token.shop_id) };
+  return {
+    accessToken: token.access_token,
+    shopId: String(token.shop_id),
+    lojaId: token.loja_id ?? null,
+  };
 }
 
 async function gerarRespostaIA(client: Anthropic, avaliacao: AvaliacaoRow) {
@@ -206,6 +210,7 @@ export async function responderAvaliacoesLote({
   );
 
   // Marca como respondidas.
+  const agoraIso = new Date().toISOString();
   for (const item of aPublicar) {
     await supabase
       .from("avaliacoes")
@@ -213,9 +218,22 @@ export async function responderAvaliacoesLote({
         ja_respondida: true,
         status: "respondida",
         resposta_shopee: item.comment,
+        respondida_em: agoraIso,
       })
       .eq("id", item.id);
   }
+
+  // Registra a rodada no histórico (para acompanhar o ritmo).
+  await supabase.from("sincronizacoes").insert({
+    loja_id: token.lojaId,
+    marketplace: "shopee",
+    tipo: "avaliacoes-resposta",
+    status: "sucesso",
+    registros_importados: aPublicar.length,
+    mensagem: `${aPublicar.length} resposta(s) publicada(s) (modelo: ${comModelo} • IA: ${comIA}).`,
+    iniciado_em: agoraIso,
+    finalizado_em: new Date().toISOString(),
+  });
 
   const { count } = await supabase
     .from("avaliacoes")

@@ -11,17 +11,34 @@ type ResultadoTeste = {
   restantes?: number;
 };
 
+type Status = {
+  total?: number;
+  respondidas?: number;
+  pendentes?: number;
+  respondidasUltimaHora?: number;
+  respondidasUltimoDia?: number;
+};
+
 export default function ResponderAvaliacoesControl() {
   const [ativo, setAtivo] = useState<boolean | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [testando, setTestando] = useState(false);
   const [resultado, setResultado] = useState<ResultadoTeste | null>(null);
+  const [status, setStatus] = useState<Status | null>(null);
+
+  function carregarStatus() {
+    fetch("/api/shopee/avaliacoes/status")
+      .then((r) => r.json())
+      .then((d) => setStatus(d))
+      .catch(() => {});
+  }
 
   useEffect(() => {
     fetch("/api/shopee/avaliacoes/auto")
       .then((r) => r.json())
       .then((d) => setAtivo(!!d.ativo))
       .catch(() => setAtivo(false));
+    carregarStatus();
   }, []);
 
   async function alternar() {
@@ -116,6 +133,53 @@ export default function ResponderAvaliacoesControl() {
           {testando ? "Testando..." : "Testar ruins 1-2★ (5)"}
         </button>
       </div>
+
+      {status && (
+        <div className="mt-5 rounded-xl bg-slate-800 p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-slate-200">
+              Status das avaliações
+            </p>
+            <button
+              onClick={carregarStatus}
+              className="text-xs text-slate-400 underline hover:text-slate-200"
+            >
+              Atualizar
+            </button>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-5">
+            <div>
+              <p className="text-xs text-slate-400">Sincronizadas</p>
+              <p className="text-xl font-bold">{status.total ?? 0}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400">Respondidas</p>
+              <p className="text-xl font-bold text-green-300">
+                {status.respondidas ?? 0}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400">Pendentes</p>
+              <p className="text-xl font-bold text-yellow-300">
+                {status.pendentes ?? 0}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400">Última hora</p>
+              <p className="text-xl font-bold text-sky-300">
+                {status.respondidasUltimaHora ?? 0}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400">Últimas 24h</p>
+              <p className="text-xl font-bold text-sky-300">
+                {status.respondidasUltimoDia ?? 0}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {resultado && (
         <div
