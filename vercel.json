@@ -22,7 +22,7 @@
     },
     {
       "path": "/api/shopee/avaliacoes/sincronizar",
-      "schedule": "*/30 * * * *"
+      "schedule": "*/5 * * * *"
     }
   ]
 }

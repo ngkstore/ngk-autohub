@@ -40,14 +40,14 @@ export default function ResponderAvaliacoesControl() {
     }
   }
 
-  async function testar() {
+  async function testar(notaMax?: number) {
     setTestando(true);
     setResultado(null);
     try {
       const r = await fetch("/api/shopee/avaliacoes/responder", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ limite: 5 }),
+        body: JSON.stringify({ limite: 5, notaMax }),
       });
       const texto = await r.text();
       try {
@@ -101,11 +101,19 @@ export default function ResponderAvaliacoesControl() {
         </button>
 
         <button
-          onClick={testar}
+          onClick={() => testar()}
           disabled={testando}
           className="rounded-xl bg-pink-600 px-4 py-2 text-sm font-semibold text-white hover:bg-pink-500 disabled:opacity-50"
         >
           {testando ? "Testando..." : "Testar agora (5)"}
+        </button>
+
+        <button
+          onClick={() => testar(2)}
+          disabled={testando}
+          className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+        >
+          {testando ? "Testando..." : "Testar ruins 1-2★ (5)"}
         </button>
       </div>
 

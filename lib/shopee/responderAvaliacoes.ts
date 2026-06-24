@@ -136,13 +136,21 @@ export type ResultadoResponder = {
 // IA Haiku p/ 1-4★), publica na Shopee e marca como respondida.
 export async function responderAvaliacoesLote({
   limite = 20,
-}: { limite?: number } = {}): Promise<ResultadoResponder> {
-  const { data: pendentes } = await supabase
+  notaMax,
+}: { limite?: number; notaMax?: number } = {}): Promise<ResultadoResponder> {
+  let query = supabase
     .from("avaliacoes")
     .select("id, comment_id, avaliacao, comentario, nome_produto")
     .eq("marketplace", "shopee")
     .eq("ja_respondida", false)
-    .not("comment_id", "is", null)
+    .not("comment_id", "is", null);
+
+  // Permite testar/priorizar só as avaliações ruins (ex.: notaMax = 2).
+  if (typeof notaMax === "number") {
+    query = query.lte("avaliacao", notaMax);
+  }
+
+  const { data: pendentes } = await query
     .order("data_avaliacao", { ascending: false })
     .limit(limite);
 

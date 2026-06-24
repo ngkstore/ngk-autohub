@@ -12,15 +12,17 @@ const FIM_JANELA_ATIVA = 30; // minutos 0-29 = sprint; 30-59 = pausa
 // POST: execução manual (teste). Body opcional { limite }.
 export async function POST(request: NextRequest) {
   let limite = 5;
+  let notaMax: number | undefined;
   try {
     const body = await request.json();
     if (body?.limite) limite = Number(body.limite);
+    if (body?.notaMax) notaMax = Number(body.notaMax);
   } catch {
     // usa padrão
   }
 
   try {
-    const resultado = await responderAvaliacoesLote({ limite });
+    const resultado = await responderAvaliacoesLote({ limite, notaMax });
     return NextResponse.json({ sucesso: !resultado.erro, ...resultado });
   } catch (error) {
     return NextResponse.json(
