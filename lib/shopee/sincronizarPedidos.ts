@@ -35,22 +35,17 @@ function gerarAssinaturaSimples(
 export function classificarPedido(status: string) {
   const s = status?.toUpperCase() || "";
 
-  // Status que representam uma venda válida (não cancelada/não paga).
-  // O faturamento é reconhecido a partir de "Pronto p/ envio", então
-  // entra_faturamento acompanha pedido_efetivado.
-  const efetivados = [
-    "READY_TO_SHIP",
-    "PROCESSED",
-    "SHIPPED",
-    "TO_CONFIRM_RECEIVE",
-    "COMPLETED",
-  ];
+  // "Pago/efetivado" = mesmo critério do "Pedidos Pagos" do Shopee: qualquer
+  // pedido que NÃO seja "não pago", "cancelado" ou desconhecido. Inclui, por
+  // ex., "Aguardando NF" (INVOICE_PENDING) e "Em cancelamento" (IN_CANCEL),
+  // que já foram pagos. entra_faturamento acompanha pedido_efetivado.
+  const naoPagos = ["UNPAID", "CANCELLED", "UNKNOWN", ""];
 
-  const efetivado = efetivados.includes(s);
+  const pago = !naoPagos.includes(s);
 
   return {
-    pedido_efetivado: efetivado,
-    entra_faturamento: efetivado,
+    pedido_efetivado: pago,
+    entra_faturamento: pago,
   };
 }
 
