@@ -153,7 +153,15 @@ export default async function AvaliacoesPage({
                   {avaliacao.comentario}
                 </p>
 
-                {resposta ? (
+                {avaliacao.resposta_shopee ? (
+                  <div className="mt-4 rounded-lg bg-green-900/40 p-4">
+                    <p className="text-sm font-semibold text-green-300">
+                      Resposta publicada na Shopee:
+                    </p>
+
+                    <p className="mt-2">{avaliacao.resposta_shopee}</p>
+                  </div>
+                ) : resposta ? (
                   <div className="mt-4 rounded-lg bg-green-900/40 p-4">
                     <p className="text-sm font-semibold text-green-300">
                       Resposta IA:
@@ -162,7 +170,10 @@ export default async function AvaliacoesPage({
                     <p className="mt-2">{resposta.resposta}</p>
                   </div>
                 ) : (
-                  <div className="mt-4">
+                  <div className="mt-4 flex items-center gap-3">
+                    <span className="rounded-full bg-yellow-900 px-3 py-1 text-xs font-semibold text-yellow-300">
+                      Pendente
+                    </span>
                     <GerarRespostaButton avaliacao={avaliacao} />
                   </div>
                 )}
