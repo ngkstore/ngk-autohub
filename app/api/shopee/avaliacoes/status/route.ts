@@ -6,8 +6,13 @@ export const dynamic = "force-dynamic";
 async function contar(
   filtro: (q: ReturnType<typeof baseQuery>) => ReturnType<typeof baseQuery>
 ) {
-  const { count } = await filtro(baseQuery());
-  return count ?? 0;
+  try {
+    const { count, error } = await filtro(baseQuery());
+    if (error) return 0;
+    return count ?? 0;
+  } catch {
+    return 0;
+  }
 }
 
 function baseQuery() {

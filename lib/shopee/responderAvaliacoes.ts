@@ -209,7 +209,8 @@ export async function responderAvaliacoesLote({
     aPublicar.map(({ comment_id, comment }) => ({ comment_id, comment }))
   );
 
-  // Marca como respondidas.
+  // Marca como respondidas (crítico — não inclui respondida_em, que pode não
+  // existir ainda; assim a marcação nunca falha e evita resposta duplicada).
   const agoraIso = new Date().toISOString();
   for (const item of aPublicar) {
     await supabase
@@ -218,10 +219,18 @@ export async function responderAvaliacoesLote({
         ja_respondida: true,
         status: "respondida",
         resposta_shopee: item.comment,
-        respondida_em: agoraIso,
       })
       .eq("id", item.id);
   }
+
+  // Carimbo de horário — best-effort (ignora erro se a coluna ainda não existe).
+  await supabase
+    .from("avaliacoes")
+    .update({ respondida_em: agoraIso })
+    .in(
+      "id",
+      aPublicar.map((i) => i.id)
+    );
 
   // Registra a rodada no histórico (para acompanhar o ritmo).
   await supabase.from("sincronizacoes").insert({
