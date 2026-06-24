@@ -15,6 +15,10 @@
     {
       "path": "/api/shopee/pedidos/enriquecer-financeiro",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/shopee/avaliacoes/responder",
+      "schedule": "* * * * *"
     }
   ]
 }
