@@ -21,11 +21,14 @@ language sql
 stable
 as $$
   with filtrados as (
-    select *
+    select *,
+           -- Data de referência: pagamento (igual ao "Pedidos Pagos" do
+           -- Shopee); cai para a data de criação se o pagamento faltar.
+           coalesce(data_pagamento, data_pedido) as data_ref
     from pedidos
     where (p_loja_id is null or loja_id = p_loja_id)
-      and (p_inicio is null or data_pedido >= p_inicio)
-      and (p_fim is null or data_pedido < p_fim)
+      and (p_inicio is null or coalesce(data_pagamento, data_pedido) >= p_inicio)
+      and (p_fim is null or coalesce(data_pagamento, data_pedido) < p_fim)
   )
   select json_build_object(
     'total_pedidos',
@@ -83,15 +86,15 @@ as $$
           order by dia
         ), '[]'::json)
        from (
-         -- Agrupa por dia no fuso de Brasília, para bater com o Shopee.
+         -- Agrupa por dia de pagamento no fuso de Brasília (igual ao Shopee).
          select to_char(
-                  (data_pedido at time zone 'America/Sao_Paulo')::date,
+                  (data_ref at time zone 'America/Sao_Paulo')::date,
                   'YYYY-MM-DD'
                 ) as dia,
                 coalesce(sum(valor_total), 0) as faturamento
          from filtrados
-         where pedido_efetivado and data_pedido is not null
-         group by (data_pedido at time zone 'America/Sao_Paulo')::date
+         where pedido_efetivado and data_ref is not null
+         group by (data_ref at time zone 'America/Sao_Paulo')::date
        ) v)
   );
 $$;

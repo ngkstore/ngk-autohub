@@ -45,6 +45,7 @@ type DetalhePedido = {
   total_amount?: number | string;
   buyer_username?: string;
   create_time?: number;
+  pay_time?: number;
   actual_shipping_fee?: number | string;
   item_list?: ItemPedido[];
 };
@@ -342,6 +343,9 @@ export async function enriquecerPedidosPendentes({
             status: statusShopee,
             data_pedido: detalhe.create_time
               ? new Date(detalhe.create_time * 1000).toISOString()
+              : null,
+            data_pagamento: detalhe.pay_time
+              ? new Date(detalhe.pay_time * 1000).toISOString()
               : null,
             pedido_efetivado: classificacao.pedido_efetivado,
             entra_faturamento: classificacao.entra_faturamento,
