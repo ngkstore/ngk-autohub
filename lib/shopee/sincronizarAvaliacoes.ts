@@ -33,17 +33,22 @@ export type ResultadoSyncAvaliacoes = {
   novosOuAtualizados: number;
   nextCursor: string;
   done: boolean;
+  paginasUsadas: number;
   erro?: string;
 };
 
 // Sincroniza avaliações da Shopee a partir de um cursor, processando até
 // `maxPaginas` páginas por chamada (o cliente repassa o nextCursor até done).
+// Se `itemId` for informado, busca os comentários daquele produto (necessário
+// para alcançar o histórico completo — a consulta da loja inteira tem teto).
 export async function sincronizarAvaliacoesPagina({
   cursor = "",
   maxPaginas = 40,
+  itemId,
 }: {
   cursor?: string;
   maxPaginas?: number;
+  itemId?: number;
 }): Promise<ResultadoSyncAvaliacoes> {
   const partnerId = process.env.SHOPEE_PARTNER_ID;
   const partnerKey = process.env.SHOPEE_PARTNER_KEY;
@@ -86,8 +91,10 @@ export async function sincronizarAvaliacoesPagina({
   let processados = 0;
   let novosOuAtualizados = 0;
   let done = false;
+  let paginasUsadas = 0;
 
   for (let pagina = 0; pagina < maxPaginas; pagina++) {
+    paginasUsadas++;
     const timestamp = Math.floor(Date.now() / 1000);
     const sign = gerarAssinatura(
       String(partnerId),
@@ -106,6 +113,7 @@ export async function sincronizarAvaliacoesPagina({
     url.searchParams.set("sign", sign);
     url.searchParams.set("cursor", cursorAtual);
     url.searchParams.set("page_size", "100");
+    if (itemId) url.searchParams.set("item_id", String(itemId));
 
     const response = await fetch(url.toString(), {
       method: "GET",
@@ -119,6 +127,7 @@ export async function sincronizarAvaliacoesPagina({
         novosOuAtualizados,
         nextCursor: cursorAtual,
         done: false,
+        paginasUsadas,
         erro: `${data?.error || "erro"} | ${data?.message || "get_comment"}`,
       };
     }
@@ -167,6 +176,7 @@ export async function sincronizarAvaliacoesPagina({
           novosOuAtualizados,
           nextCursor: cursorAtual,
           done: false,
+          paginasUsadas,
           erro: `Erro ao salvar avaliações: ${upsertError.message}`,
         };
       }
@@ -189,5 +199,6 @@ export async function sincronizarAvaliacoesPagina({
     novosOuAtualizados,
     nextCursor: cursorAtual,
     done,
+    paginasUsadas,
   };
 }
