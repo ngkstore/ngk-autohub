@@ -8,9 +8,13 @@
 --
 -- É seguro rodar de novo: "create or replace" apenas atualiza a função.
 
+-- Remove a versão antiga (sem p_fim), se existir, para não haver duplicidade.
+drop function if exists resumo_pedidos(uuid, timestamptz);
+
 create or replace function resumo_pedidos(
   p_loja_id uuid default null,
-  p_inicio timestamptz default null
+  p_inicio timestamptz default null,
+  p_fim timestamptz default null
 )
 returns json
 language sql
@@ -21,6 +25,7 @@ as $$
     from pedidos
     where (p_loja_id is null or loja_id = p_loja_id)
       and (p_inicio is null or data_pedido >= p_inicio)
+      and (p_fim is null or data_pedido < p_fim)
   )
   select json_build_object(
     'total_pedidos',
@@ -92,4 +97,4 @@ as $$
 $$;
 
 -- Permite que o app (chave anônima) chame a função.
-grant execute on function resumo_pedidos(uuid, timestamptz) to anon, authenticated;
+grant execute on function resumo_pedidos(uuid, timestamptz, timestamptz) to anon, authenticated;

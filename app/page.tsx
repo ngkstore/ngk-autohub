@@ -71,37 +71,44 @@ function isoInicioBRT(ano: number, mes: number, dia: number) {
   return `${ano}-${p(mes)}-${p(dia)}T00:00:00-03:00`;
 }
 
-function getPeriodoFiltro(periodo?: string) {
+// Retorna o intervalo [inicio, fim) em Brasília. fim é exclusivo (use < fim),
+// para "ontem" não pegar hoje, "este mês" não pegar o mês seguinte, etc.
+function getPeriodoFiltro(
+  periodo?: string
+): { inicio: string; fim: string } | null {
   const [ano, mes, dia] = diaBRT(new Date()).split("-").map(Number);
   const base = new Date(Date.UTC(ano, mes - 1, dia));
 
   const isoDe = (d: Date) =>
     isoInicioBRT(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
 
-  const recuar = (dias: number) => {
+  const deslocar = (dias: number) => {
     const d = new Date(base);
-    d.setUTCDate(d.getUTCDate() - dias);
+    d.setUTCDate(d.getUTCDate() + dias);
     return isoDe(d);
   };
 
+  const inicioHoje = isoInicioBRT(ano, mes, dia);
+  const inicioAmanha = deslocar(1); // fim padrão (exclusivo) para períodos até hoje
+
   switch (periodo) {
     case "hoje":
-      return isoInicioBRT(ano, mes, dia);
+      return { inicio: inicioHoje, fim: inicioAmanha };
 
     case "ontem":
-      return recuar(1);
+      return { inicio: deslocar(-1), fim: inicioHoje };
 
     case "7dias":
-      return recuar(7);
+      return { inicio: deslocar(-7), fim: inicioAmanha };
 
     case "30dias":
-      return recuar(30);
+      return { inicio: deslocar(-30), fim: inicioAmanha };
 
     case "mes":
-      return isoInicioBRT(ano, mes, 1);
+      return { inicio: isoInicioBRT(ano, mes, 1), fim: inicioAmanha };
 
     case "ano":
-      return isoInicioBRT(ano, 1, 1);
+      return { inicio: isoInicioBRT(ano, 1, 1), fim: inicioAmanha };
 
     default:
       return null;
@@ -136,9 +143,11 @@ function formatarDiaCurto(dia: string) {
 
 // Fallback (só usado se a função SQL ainda não existir): pagina os pedidos
 // para somar tudo no app, contornando o limite de 1000 linhas do Supabase.
+type Periodo = { inicio: string; fim: string } | null;
+
 async function buscarTodosPedidos(
   lojaId: string | null,
-  periodoFiltro: string | null
+  periodo: Periodo
 ): Promise<PedidoRow[]> {
   const pageSize = 1000;
   const maxPaginas = 200; // trava de segurança
@@ -156,7 +165,11 @@ async function buscarTodosPedidos(
       .range(de, de + pageSize - 1);
 
     if (lojaId) query = query.eq("loja_id", lojaId);
-    if (periodoFiltro) query = query.gte("data_pedido", periodoFiltro);
+    if (periodo) {
+      query = query
+        .gte("data_pedido", periodo.inicio)
+        .lt("data_pedido", periodo.fim);
+    }
 
     const { data, error } = await query;
 
@@ -187,11 +200,12 @@ type ResumoCalculado = {
 // não existir, cai no fallback paginado no app.
 async function calcularResumoPedidos(
   lojaId: string | null,
-  periodoFiltro: string | null
+  periodo: Periodo
 ): Promise<ResumoCalculado> {
   const { data: resumoRpc } = await supabase.rpc("resumo_pedidos", {
     p_loja_id: lojaId,
-    p_inicio: periodoFiltro,
+    p_inicio: periodo?.inicio ?? null,
+    p_fim: periodo?.fim ?? null,
   });
 
   const resumo = resumoRpc as ResumoPedidos | null;
@@ -221,7 +235,7 @@ async function calcularResumoPedidos(
   }
 
   // ---- Fallback paginado ----
-  const pedidos = await buscarTodosPedidos(lojaId, periodoFiltro);
+  const pedidos = await buscarTodosPedidos(lojaId, periodo);
 
   const efetivados = pedidos.filter((p) => p.pedido_efetivado);
   const faturados = pedidos.filter((p) => p.entra_faturamento);
@@ -275,7 +289,7 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
   const params = await searchParams;
 
   const lojaSlug = params.loja;
-  const periodoFiltro = getPeriodoFiltro(params.periodo);
+  const periodo = getPeriodoFiltro(params.periodo);
   const apelidoLoja = lojaSlug ? mapaLojas[lojaSlug] : null;
 
   let lojaId: string | null = null;
@@ -338,19 +352,28 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
     recentesQuery = recentesQuery.eq("loja_id", lojaId);
   }
 
-  if (periodoFiltro) {
-    avaliacoesQuery = avaliacoesQuery.gte("criado_em", periodoFiltro);
-    avaliacoesMediaQuery = avaliacoesMediaQuery.gte("criado_em", periodoFiltro);
-    ultimasQuery = ultimasQuery.gte("criado_em", periodoFiltro);
-    produtosSemEstoqueQuery = produtosSemEstoqueQuery.gte(
-      "criado_em",
-      periodoFiltro
-    );
-    financeiroQuery = financeiroQuery.gte("data_movimento", periodoFiltro);
-    recentesQuery = recentesQuery.gte("data_pedido", periodoFiltro);
+  if (periodo) {
+    avaliacoesQuery = avaliacoesQuery
+      .gte("criado_em", periodo.inicio)
+      .lt("criado_em", periodo.fim);
+    avaliacoesMediaQuery = avaliacoesMediaQuery
+      .gte("criado_em", periodo.inicio)
+      .lt("criado_em", periodo.fim);
+    ultimasQuery = ultimasQuery
+      .gte("criado_em", periodo.inicio)
+      .lt("criado_em", periodo.fim);
+    produtosSemEstoqueQuery = produtosSemEstoqueQuery
+      .gte("criado_em", periodo.inicio)
+      .lt("criado_em", periodo.fim);
+    financeiroQuery = financeiroQuery
+      .gte("data_movimento", periodo.inicio)
+      .lt("data_movimento", periodo.fim);
+    recentesQuery = recentesQuery
+      .gte("data_pedido", periodo.inicio)
+      .lt("data_pedido", periodo.fim);
   }
 
-  const resumo = await calcularResumoPedidos(lojaId, periodoFiltro);
+  const resumo = await calcularResumoPedidos(lojaId, periodo);
 
   const { count: totalAvaliacoes } = await avaliacoesQuery;
   const { data: avaliacoesMedia } = await avaliacoesMediaQuery;
@@ -373,8 +396,10 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
     respostasQuery = respostasQuery.eq("avaliacoes.loja_id", lojaId);
   }
 
-  if (periodoFiltro) {
-    respostasQuery = respostasQuery.gte("avaliacoes.criado_em", periodoFiltro);
+  if (periodo) {
+    respostasQuery = respostasQuery
+      .gte("avaliacoes.criado_em", periodo.inicio)
+      .lt("avaliacoes.criado_em", periodo.fim);
   }
 
   const { count: totalRespostas } = await respostasQuery;
