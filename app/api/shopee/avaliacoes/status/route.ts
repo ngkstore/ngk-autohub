@@ -37,6 +37,16 @@ export async function GET() {
         contar((q) => q.gte("respondida_em", umDia)),
       ]);
 
+    const { data: estado } = await supabase
+      .from("configuracoes")
+      .select("chave, valor")
+      .in("chave", ["avaliacoes_cursor", "avaliacoes_backfill_done"]);
+
+    const cfg: Record<string, string> = {};
+    (estado || []).forEach((r) => {
+      cfg[r.chave] = r.valor;
+    });
+
     return NextResponse.json({
       sucesso: true,
       total,
@@ -44,6 +54,10 @@ export async function GET() {
       pendentes,
       respondidasUltimaHora: ultimaHora,
       respondidasUltimoDia: ultimoDia,
+      backfill: {
+        cursor: cfg["avaliacoes_cursor"] ?? null,
+        concluido: cfg["avaliacoes_backfill_done"] === "true",
+      },
     });
   } catch (error) {
     return NextResponse.json(
