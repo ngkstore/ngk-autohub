@@ -6,7 +6,9 @@ import { enviarTelegram } from "@/lib/telegram";
 const BASE_URL_PADRAO = "https://partner.shopeemobile.com";
 
 const SYSTEM = `Você é o atendimento da NGK Store no chat da Shopee, em português do Brasil.
-Receba os dados do produto, o histórico de respostas anteriores da loja e a conversa atual, e gere uma resposta curta, acolhedora e correta.
+Receba os dados do produto, o histórico de respostas anteriores da loja e a CONVERSA ATUAL COMPLETA, e gere uma resposta curta, acolhedora e correta.
+
+IMPORTANTE: o cliente costuma dividir a dúvida em várias mensagens separadas. Leia a conversa INTEIRA antes de responder e junte o contexto — não responda olhando só a última mensagem isolada. Só escale para humano se, mesmo com toda a conversa, faltar informação para responder com segurança.
 
 Classifique a mensagem do cliente em uma categoria e responda conforme as regras:
 - "produto": dúvida sobre o produto. Responda usando a DESCRIÇÃO e as RESPOSTAS ANTERIORES da loja. Se a informação NÃO estiver na descrição nem no histórico, NÃO invente: confianca="baixa" e precisa_humano=true.
@@ -189,20 +191,30 @@ export async function responderChatsLote({
       }
     }
 
-    // Pergunta real do cliente: última mensagem COM TEXTO vinda do cliente
-    // (o resumo da conversa às vezes vem vazio).
-    const { data: ultimaCliente } = await supabase
+    // Conversa COMPLETA (do início ao fim) — o cliente costuma quebrar a
+    // dúvida em várias mensagens; o robô precisa de todo o contexto.
+    const { data: thread } = await supabase
       .from("chat_mensagens")
-      .select("texto")
+      .select("de_loja, texto, created_timestamp")
       .eq("conversation_id", c.conversation_id)
-      .eq("de_loja", false)
       .not("texto", "is", null)
       .neq("texto", "")
       .order("created_timestamp", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(40);
 
-    const pergunta = ultimaCliente?.texto || c.ultima_mensagem || "";
+    const mensagensOrdenadas = (thread || []).slice().reverse();
+    const conversaTxt =
+      mensagensOrdenadas.length > 0
+        ? mensagensOrdenadas
+            .map((m) => `${m.de_loja ? "Loja" : "Cliente"}: ${m.texto}`)
+            .join("\n")
+        : "(sem mensagens de texto)";
+
+    // Pergunta = última mensagem do cliente (para exibição/notificação).
+    const ultimaDoCliente = [...mensagensOrdenadas]
+      .reverse()
+      .find((m) => !m.de_loja);
+    const pergunta = ultimaDoCliente?.texto || c.ultima_mensagem || "";
 
     let decisao = null;
     let escalar: boolean;
@@ -210,15 +222,18 @@ export async function responderChatsLote({
     let confianca = "baixa";
     let resposta = "";
 
-    if (!pergunta.trim()) {
+    const temTextoCliente = mensagensOrdenadas.some((m) => !m.de_loja);
+
+    if (!temTextoCliente) {
       // Cliente mandou só imagem/anexo (sem texto) -> escala para humano.
       escalar = true;
       categoria = "anexo";
     } else {
       const contexto =
         `=== PRODUTO ===\n${produtoTxt}\n\n` +
-        `=== RESPOSTAS ANTERIORES DA LOJA (aprenda com elas) ===\n${historicoTxt}\n\n` +
-        `=== MENSAGEM DO CLIENTE ===\n${pergunta}`;
+        `=== RESPOSTAS ANTERIORES DA LOJA NESTE PRODUTO (aprenda com elas) ===\n${historicoTxt}\n\n` +
+        `=== CONVERSA ATUAL COM ESTE CLIENTE (do início ao fim) ===\n${conversaTxt}\n\n` +
+        `Responda à(s) última(s) mensagem(ns) do cliente, considerando TODA a conversa acima.`;
 
       decisao = await decidir(client, contexto);
       escalar =
