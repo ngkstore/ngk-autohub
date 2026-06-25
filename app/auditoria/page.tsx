@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -162,7 +163,14 @@ export default async function AuditoriaPage({ searchParams }: AuditoriaPageProps
                   {divergentes && divergentes.length > 0 ? (
                     divergentes.map((p, i) => (
                       <tr key={`${p.pedido_externo_id}-${i}`} className="border-t border-slate-800">
-                        <td className="p-4 font-semibold">{p.pedido_externo_id}</td>
+                        <td className="p-4 font-semibold">
+                          <Link
+                            href={`/auditoria/pedido?order_sn=${p.pedido_externo_id}`}
+                            className="text-cyan-300 underline hover:text-cyan-200"
+                          >
+                            {p.pedido_externo_id}
+                          </Link>
+                        </td>
                         <td className="p-4 text-green-300">{moeda(n(p.valor_total))}</td>
                         <td className="p-4 text-slate-300">{moeda(n(p.taxa_esperada))}</td>
                         <td className="p-4 text-slate-300">{moeda(n(p.taxa_real))}</td>
