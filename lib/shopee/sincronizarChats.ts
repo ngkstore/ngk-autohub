@@ -165,6 +165,9 @@ export async function sincronizarChatsPagina({
         to_id: toId,
         to_name: c.to_name ?? null,
         item_id: itemIdConversa,
+        latest_message_id: c.latest_message_id
+          ? String(c.latest_message_id)
+          : null,
         ultimo_remetente: precisaResposta ? "cliente" : "loja",
         precisa_resposta: precisaResposta,
         unread_count: c.unread_count ?? 0,
