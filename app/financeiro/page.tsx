@@ -1,184 +1,268 @@
 import { supabase } from "@/lib/supabase";
 
+export const dynamic = "force-dynamic";
+
 type FinanceiroPageProps = {
-  searchParams: {
-    loja?: string;
-    periodo?: string;
-  };
+  searchParams: Promise<{ loja?: string; periodo?: string }>;
 };
 
-function getPeriodoFiltro(periodo?: string) {
-  const hoje = new Date();
-  const inicio = new Date();
+type ResumoFinanceiro = {
+  pedidos: number;
+  vendas: number;
+  valor_pago: number;
+  valor_liquido: number;
+  taxa_comissao: number;
+  taxa_servico: number;
+  cupom_loja: number;
+  cupom_shopee: number;
+  frete: number;
+  desconto_vendedor: number;
+  pendentes_conciliacao: number;
+};
+
+const mapaLojas: Record<string, string> = {
+  "ngk-shopee": "NGK Shopee",
+  "pitibiribas-shopee": "Pitibiribas Shopee",
+  "ngk-tiktok": "NGK TikTok",
+  "pitibiribas-tiktok": "Pitibiribas TikTok",
+};
+
+function diaBRT(date: Date) {
+  return date.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
+
+function isoInicioBRT(ano: number, mes: number, dia: number) {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${ano}-${p(mes)}-${p(dia)}T00:00:00-03:00`;
+}
+
+function getPeriodoFiltro(periodo?: string): { inicio: string; fim: string } | null {
+  const [ano, mes, dia] = diaBRT(new Date()).split("-").map(Number);
+  const base = new Date(Date.UTC(ano, mes - 1, dia));
+  const isoDe = (d: Date) =>
+    isoInicioBRT(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
+  const deslocar = (dias: number) => {
+    const d = new Date(base);
+    d.setUTCDate(d.getUTCDate() + dias);
+    return isoDe(d);
+  };
+  const inicioHoje = isoInicioBRT(ano, mes, dia);
+  const inicioAmanha = deslocar(1);
 
   switch (periodo) {
     case "hoje":
-      inicio.setHours(0, 0, 0, 0);
-      return inicio.toISOString();
-
+      return { inicio: inicioHoje, fim: inicioAmanha };
     case "ontem":
-      inicio.setDate(hoje.getDate() - 1);
-      inicio.setHours(0, 0, 0, 0);
-      return inicio.toISOString();
-
+      return { inicio: deslocar(-1), fim: inicioHoje };
     case "7dias":
-      inicio.setDate(hoje.getDate() - 7);
-      return inicio.toISOString();
-
+      return { inicio: deslocar(-7), fim: inicioAmanha };
     case "30dias":
-      inicio.setDate(hoje.getDate() - 30);
-      return inicio.toISOString();
-
+      return { inicio: deslocar(-30), fim: inicioAmanha };
     case "mes":
-      inicio.setDate(1);
-      inicio.setHours(0, 0, 0, 0);
-      return inicio.toISOString();
-
+      return { inicio: isoInicioBRT(ano, mes, 1), fim: inicioAmanha };
     case "ano":
-      inicio.setMonth(0, 1);
-      inicio.setHours(0, 0, 0, 0);
-      return inicio.toISOString();
-
+      return { inicio: isoInicioBRT(ano, 1, 1), fim: inicioAmanha };
     default:
       return null;
   }
 }
 
-export default async function FinanceiroPage({
-  searchParams,
-}: FinanceiroPageProps) {
-  const lojaFiltro = searchParams?.loja;
-  const periodoFiltro = getPeriodoFiltro(searchParams?.periodo);
+function num(v: number | string | null) {
+  return Number(v || 0);
+}
 
-  let query = supabase
-    .from("financeiro")
-    .select("*, lojas(apelido)")
-    .order("criado_em", { ascending: false })
-    .limit(50);
+function moeda(v: number) {
+  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
 
-  if (lojaFiltro && lojaFiltro !== "todas") {
+function dataHora(d: string) {
+  return new Date(d).toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+  });
+}
+
+export default async function FinanceiroPage({ searchParams }: FinanceiroPageProps) {
+  const params = await searchParams;
+  const apelido = params.loja ? mapaLojas[params.loja] : null;
+  const periodo = getPeriodoFiltro(params.periodo);
+
+  let lojaId: string | null = null;
+  if (apelido) {
     const { data: loja } = await supabase
       .from("lojas")
       .select("id")
-      .eq("apelido", lojaFiltro)
+      .eq("apelido", apelido)
       .single();
-
-    if (loja?.id) {
-      query = query.eq("loja_id", loja.id);
-    }
+    lojaId = loja?.id || null;
   }
 
-  if (periodoFiltro) {
-    query = query.gte("data_movimento", periodoFiltro);
+  const { data: resumoRpc } = await supabase.rpc("resumo_financeiro", {
+    p_loja_id: lojaId,
+    p_inicio: periodo?.inicio ?? null,
+    p_fim: periodo?.fim ?? null,
+  });
+
+  const r = (resumoRpc as ResumoFinanceiro | null) || {
+    pedidos: 0,
+    vendas: 0,
+    valor_pago: 0,
+    valor_liquido: 0,
+    taxa_comissao: 0,
+    taxa_servico: 0,
+    cupom_loja: 0,
+    cupom_shopee: 0,
+    frete: 0,
+    desconto_vendedor: 0,
+    pendentes_conciliacao: 0,
+  };
+
+  const taxasTotais = num(r.taxa_comissao) + num(r.taxa_servico);
+  const cuponsTotais = num(r.cupom_loja) + num(r.cupom_shopee);
+
+  // Pedidos conciliados recentes
+  let recentesQuery = supabase
+    .from("pedidos")
+    .select(
+      "pedido_externo_id, cliente_nome, valor_total, taxa_comissao, taxa_servico, valor_liquido, data_pagamento"
+    )
+    .eq("marketplace", "shopee")
+    .not("escrow_atualizado_em", "is", null)
+    .order("data_pagamento", { ascending: false, nullsFirst: false })
+    .limit(20);
+
+  if (lojaId) recentesQuery = recentesQuery.eq("loja_id", lojaId);
+  if (periodo) {
+    recentesQuery = recentesQuery
+      .gte("data_pagamento", periodo.inicio)
+      .lt("data_pagamento", periodo.fim);
   }
+  const { data: recentes } = await recentesQuery;
 
-  const { data: movimentos } = await query;
-
-  const totalReceitas =
-    movimentos
-      ?.filter((item) => item.tipo === "receita")
-      .reduce((total, item) => total + Number(item.valor || 0), 0) || 0;
-
-  const totalDespesas =
-    movimentos
-      ?.filter((item) => item.tipo === "despesa")
-      .reduce((total, item) => total + Number(item.valor || 0), 0) || 0;
-
-  const saldo = totalReceitas - totalDespesas;
+  const semDados = !resumoRpc;
 
   return (
     <div className="p-8 text-white">
       <h1 className="text-4xl font-bold">Financeiro</h1>
-
       <p className="mt-2 text-slate-400">
-        Conciliação financeira, taxas, comissões, fretes e lucro por marketplace.
+        Conciliação real da Shopee: vendas, cupons, frete, taxas e o valor
+        líquido a receber (dados do repasse/escrow).
       </p>
 
+      {semDados && (
+        <div className="mt-4 rounded-xl bg-yellow-900/40 px-4 py-3 text-sm text-yellow-200">
+          A função SQL <code>resumo_financeiro</code> ainda não foi criada — rode
+          o arquivo <code>supabase/resumo_financeiro.sql</code> no Supabase.
+        </div>
+      )}
+
+      {/* Destaque */}
       <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="rounded-2xl border border-emerald-700 bg-slate-900 p-6">
+          <p className="text-sm text-slate-400">Valor Líquido a Receber</p>
+          <p className="mt-2 text-4xl font-bold text-emerald-300">
+            {moeda(num(r.valor_liquido))}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            {r.pedidos} pedido(s) conciliado(s)
+          </p>
+        </div>
+
         <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Receitas</p>
+          <p className="text-sm text-slate-400">Vendas (mercadoria)</p>
           <p className="mt-2 text-4xl font-bold text-green-300">
-            R$ {totalReceitas.toFixed(2)}
+            {moeda(num(r.vendas))}
           </p>
         </div>
 
         <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Despesas / Taxas</p>
-          <p className="mt-2 text-4xl font-bold text-red-300">
-            R$ {totalDespesas.toFixed(2)}
-          </p>
-        </div>
-
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Saldo Estimado</p>
+          <p className="text-sm text-slate-400">Valor Pago pelos Clientes</p>
           <p className="mt-2 text-4xl font-bold text-blue-300">
-            R$ {saldo.toFixed(2)}
+            {moeda(num(r.valor_pago))}
           </p>
         </div>
       </div>
 
-      <section className="mt-10 rounded-2xl bg-slate-900 p-6">
-        <h2 className="text-2xl font-bold">Movimentações Financeiras</h2>
+      {/* Composição */}
+      <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-2xl bg-slate-900 p-6">
+          <p className="text-sm text-slate-400">Taxas (comissão + serviço)</p>
+          <p className="mt-2 text-3xl font-bold text-red-300">
+            {moeda(taxasTotais)}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            comissão {moeda(num(r.taxa_comissao))} • serviço{" "}
+            {moeda(num(r.taxa_servico))}
+          </p>
+        </div>
 
-        <div className="mt-6 overflow-hidden rounded-xl border border-slate-800">
+        <div className="rounded-2xl bg-slate-900 p-6">
+          <p className="text-sm text-slate-400">Cupons (loja + Shopee)</p>
+          <p className="mt-2 text-3xl font-bold text-orange-300">
+            {moeda(cuponsTotais)}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            loja {moeda(num(r.cupom_loja))} • shopee {moeda(num(r.cupom_shopee))}
+          </p>
+        </div>
+
+        <div className="rounded-2xl bg-slate-900 p-6">
+          <p className="text-sm text-slate-400">Frete</p>
+          <p className="mt-2 text-3xl font-bold text-slate-200">
+            {moeda(num(r.frete))}
+          </p>
+        </div>
+
+        <div className="rounded-2xl bg-slate-900 p-6">
+          <p className="text-sm text-slate-400">Pendentes de conciliação</p>
+          <p className="mt-2 text-3xl font-bold text-yellow-300">
+            {r.pendentes_conciliacao}
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            pedidos pagos ainda sem escrow
+          </p>
+        </div>
+      </div>
+
+      {/* Tabela */}
+      <section className="mt-10 rounded-2xl bg-slate-900 p-6">
+        <h2 className="text-2xl font-bold">Pedidos Conciliados Recentes</h2>
+        <div className="mt-6 overflow-x-auto rounded-xl border border-slate-800">
           <table className="w-full text-left">
             <thead className="bg-slate-800 text-sm text-slate-300">
               <tr>
-                <th className="p-4">Tipo</th>
-                <th className="p-4">Descrição</th>
-                <th className="p-4">Loja</th>
-                <th className="p-4">Marketplace</th>
-                <th className="p-4">Valor</th>
+                <th className="p-4">Pedido</th>
+                <th className="p-4">Cliente</th>
+                <th className="p-4">Venda</th>
+                <th className="p-4">Taxas</th>
+                <th className="p-4">Líquido</th>
                 <th className="p-4">Data</th>
               </tr>
             </thead>
-
             <tbody>
-              {movimentos && movimentos.length > 0 ? (
-                movimentos.map((item) => (
-                  <tr key={item.id} className="border-t border-slate-800">
-                    <td className="p-4">
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                          item.tipo === "receita"
-                            ? "bg-green-900 text-green-300"
-                            : "bg-red-900 text-red-300"
-                        }`}
-                      >
-                        {item.tipo || "sem tipo"}
-                      </span>
+              {recentes && recentes.length > 0 ? (
+                recentes.map((p, i) => (
+                  <tr key={`${p.pedido_externo_id}-${i}`} className="border-t border-slate-800">
+                    <td className="p-4 font-semibold">{p.pedido_externo_id}</td>
+                    <td className="p-4 text-slate-300">{p.cliente_nome || "-"}</td>
+                    <td className="p-4 text-green-300">{moeda(num(p.valor_total))}</td>
+                    <td className="p-4 text-red-300">
+                      {moeda(num(p.taxa_comissao) + num(p.taxa_servico))}
                     </td>
-
-                    <td className="p-4 font-semibold">
-                      {item.descricao || "-"}
+                    <td className="p-4 font-semibold text-emerald-300">
+                      {moeda(num(p.valor_liquido))}
                     </td>
-
-                    <td className="p-4 text-orange-300">
-                      {item.lojas?.apelido || "Sem loja"}
-                    </td>
-
-                    <td className="p-4 text-slate-300">
-                      {item.marketplace}
-                    </td>
-
-                    <td className="p-4">
-                      R$ {Number(item.valor || 0).toFixed(2)}
-                    </td>
-
                     <td className="p-4 text-slate-400">
-                      {item.data_movimento
-                        ? new Date(item.data_movimento).toLocaleDateString(
-                            "pt-BR"
-                          )
-                        : "-"}
+                      {p.data_pagamento ? dataHora(p.data_pagamento) : "-"}
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
                   <td className="p-4 text-slate-400" colSpan={6}>
-                    Nenhuma movimentação financeira encontrada para o filtro
-                    selecionado.
+                    Nenhum pedido conciliado no período. Rode &quot;Conciliar
+                    Financeiro&quot; na tela de Sincronização.
                   </td>
                 </tr>
               )}
