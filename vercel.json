@@ -23,6 +23,10 @@
     {
       "path": "/api/shopee/avaliacoes/sincronizar",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/shopee/chat/sincronizar",
+      "schedule": "*/10 * * * *"
     }
   ]
 }
