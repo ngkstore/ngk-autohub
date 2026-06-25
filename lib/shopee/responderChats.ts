@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import { supabase } from "@/lib/supabase";
+import { enviarTelegram } from "@/lib/telegram";
 
 const BASE_URL_PADRAO = "https://partner.shopeemobile.com";
 
@@ -155,6 +156,7 @@ export async function responderChatsLote({
   for (const c of pendentes) {
     // Produto da conversa
     let produtoTxt = "Produto não identificado.";
+    let nomeProduto = "Produto";
     if (c.item_id) {
       const { data: prod } = await supabase
         .from("produtos")
@@ -162,6 +164,7 @@ export async function responderChatsLote({
         .eq("item_id", c.item_id)
         .maybeSingle();
       if (prod) {
+        nomeProduto = prod.nome || "Produto";
         produtoTxt =
           `Nome: ${prod.nome}\nPreço: ${prod.preco}\nEstoque: ${prod.estoque}\n` +
           `Descrição: ${(prod.descricao || "(sem descrição)").slice(0, 1500)}`;
@@ -229,6 +232,18 @@ export async function responderChatsLote({
             resposta_ia: resposta,
           })
           .eq("conversation_id", c.conversation_id);
+
+        // Notifica você no Telegram para responder rápido (não estourar prazo).
+        await enviarTelegram(
+          `🔔 Chat para você responder\n\n` +
+            `Cliente: ${c.to_name || "-"}\n` +
+            `Produto: ${nomeProduto}\n` +
+            `Assunto: ${categoria} (confiança ${confianca})\n\n` +
+            `Cliente disse:\n"${c.ultima_mensagem}"\n\n` +
+            `Sugestão da IA:\n${resposta || "(sem sugestão)"}\n\n` +
+            `➡️ Responda pelo app da Shopee.`
+        );
+
         escalados++;
       } else {
         await enviarMensagem(token, String(c.to_id), resposta);
