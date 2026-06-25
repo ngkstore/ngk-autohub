@@ -136,9 +136,8 @@ export async function responderChatsLote({
   const pendentes = (conversas || [])
     .filter(
       (c) =>
-        c.ultima_mensagem &&
         String(c.ultimo_tratado_msg_id ?? "") !==
-          String(c.latest_message_id ?? "")
+        String(c.latest_message_id ?? "")
     )
     .slice(0, limite);
 
@@ -190,27 +189,52 @@ export async function responderChatsLote({
       }
     }
 
-    const contexto =
-      `=== PRODUTO ===\n${produtoTxt}\n\n` +
-      `=== RESPOSTAS ANTERIORES DA LOJA (aprenda com elas) ===\n${historicoTxt}\n\n` +
-      `=== MENSAGEM DO CLIENTE ===\n${c.ultima_mensagem}`;
+    // Pergunta real do cliente: última mensagem COM TEXTO vinda do cliente
+    // (o resumo da conversa às vezes vem vazio).
+    const { data: ultimaCliente } = await supabase
+      .from("chat_mensagens")
+      .select("texto")
+      .eq("conversation_id", c.conversation_id)
+      .eq("de_loja", false)
+      .not("texto", "is", null)
+      .neq("texto", "")
+      .order("created_timestamp", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    const decisao = await decidir(client, contexto);
+    const pergunta = ultimaCliente?.texto || c.ultima_mensagem || "";
 
-    const escalar =
-      !decisao ||
-      decisao.precisa_humano === true ||
-      decisao.confianca === "baixa" ||
-      decisao.categoria === "defeito";
+    let decisao = null;
+    let escalar: boolean;
+    let categoria = "outro";
+    let confianca = "baixa";
+    let resposta = "";
 
-    const resposta = decisao?.resposta || "";
-    const categoria = decisao?.categoria || "outro";
-    const confianca = decisao?.confianca || "baixa";
+    if (!pergunta.trim()) {
+      // Cliente mandou só imagem/anexo (sem texto) -> escala para humano.
+      escalar = true;
+      categoria = "anexo";
+    } else {
+      const contexto =
+        `=== PRODUTO ===\n${produtoTxt}\n\n` +
+        `=== RESPOSTAS ANTERIORES DA LOJA (aprenda com elas) ===\n${historicoTxt}\n\n` +
+        `=== MENSAGEM DO CLIENTE ===\n${pergunta}`;
+
+      decisao = await decidir(client, contexto);
+      escalar =
+        !decisao ||
+        decisao.precisa_humano === true ||
+        decisao.confianca === "baixa" ||
+        decisao.categoria === "defeito";
+      resposta = decisao?.resposta || "";
+      categoria = decisao?.categoria || "outro";
+      confianca = decisao?.confianca || "baixa";
+    }
 
     propostas.push({
       conversation_id: c.conversation_id,
       cliente: c.to_name,
-      pergunta: c.ultima_mensagem,
+      pergunta: pergunta || "(sem texto — anexo/imagem)",
       categoria,
       confianca,
       acao: escalar ? "escalar" : "responder",
@@ -256,7 +280,7 @@ export async function responderChatsLote({
             `Cliente: ${c.to_name || "-"}\n` +
             `Produto: ${nomeProduto}\n` +
             `Assunto: ${categoria} (confiança ${confianca})\n\n` +
-            `Cliente disse:\n"${c.ultima_mensagem}"\n\n` +
+            `Cliente disse:\n"${pergunta || "(enviou um anexo/imagem)"}"\n\n` +
             `Sugestão da IA:\n${resposta || "(sem sugestão)"}`,
           botoes
         );
