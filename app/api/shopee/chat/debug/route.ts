@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { supabase } from "@/lib/supabase";
 
@@ -56,8 +56,13 @@ async function chamarShopee(
 
 // Diagnóstico do Chat (sellerchat): lista conversas e lê as mensagens da
 // primeira, para confirmarmos o acesso e a estrutura real dos campos.
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const sp = request.nextUrl.searchParams;
+    const tipo = sp.get("type") || "all";
+    const direction = sp.get("direction") || "latest";
+    const pageSize = sp.get("page_size") || "10";
+
     const partnerId = process.env.SHOPEE_PARTNER_ID;
     const partnerKey = process.env.SHOPEE_PARTNER_KEY;
     if (!partnerId || !partnerKey) {
@@ -90,7 +95,7 @@ export async function GET() {
     // 1) Lista de conversas
     const conversas = await chamarShopee(
       "/api/v2/sellerchat/get_conversation_list",
-      { type: "all", page_size: "10" },
+      { type: tipo, direction, page_size: pageSize },
       token
     );
 
