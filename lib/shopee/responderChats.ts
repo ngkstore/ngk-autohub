@@ -233,15 +233,32 @@ export async function responderChatsLote({
           })
           .eq("conversation_id", c.conversation_id);
 
-        // Notifica você no Telegram para responder rápido (não estourar prazo).
+        // Notifica você no Telegram. Se houver sugestão, oferece aprovar com 1 toque.
+        const botoes = resposta
+          ? [
+              [
+                {
+                  text: "✅ Aprovar e enviar a sugestão",
+                  callback_data: `ap:${c.conversation_id}`,
+                },
+              ],
+              [
+                {
+                  text: "✏️ Eu respondo",
+                  callback_data: `rj:${c.conversation_id}`,
+                },
+              ],
+            ]
+          : undefined;
+
         await enviarTelegram(
           `🔔 Chat para você responder\n\n` +
             `Cliente: ${c.to_name || "-"}\n` +
             `Produto: ${nomeProduto}\n` +
             `Assunto: ${categoria} (confiança ${confianca})\n\n` +
             `Cliente disse:\n"${c.ultima_mensagem}"\n\n` +
-            `Sugestão da IA:\n${resposta || "(sem sugestão)"}\n\n` +
-            `➡️ Responda pelo app da Shopee.`
+            `Sugestão da IA:\n${resposta || "(sem sugestão)"}`,
+          botoes
         );
 
         escalados++;
