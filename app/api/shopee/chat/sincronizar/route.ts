@@ -27,19 +27,11 @@ async function setConfig(chave: string, valor: string) {
   }
 }
 
-// POST: rodada manual. Body opcional { nextTimestamp }.
-export async function POST(request: Request) {
-  let nextTimestamp = "";
+// POST: sincroniza AGORA as conversas mais novas (usado pelo botão).
+export async function POST() {
   try {
-    const body = await request.json();
-    if (typeof body?.nextTimestamp === "string") nextTimestamp = body.nextTimestamp;
-  } catch {
-    // padrão
-  }
-
-  try {
-    const r = await sincronizarChatsPagina({ nextTimestamp });
-    return NextResponse.json({ sucesso: !r.erro, ...r });
+    const r = await sincronizarChatsPagina({ direction: "latest" });
+    return NextResponse.json({ sucesso: !r.erro, fase: "novas", ...r });
   } catch (error) {
     return NextResponse.json(
       {
@@ -51,10 +43,14 @@ export async function POST(request: Request) {
   }
 }
 
-// GET: cron progressivo. Varre o histórico de conversas; ao terminar, refaz a
-// primeira página periodicamente para capturar conversas novas.
+// GET: cron. SEMPRE puxa as conversas novas primeiro (responsivo); e, se o
+// histórico ainda não terminou, avança uma página antiga em paralelo.
 export async function GET() {
   try {
+    // 1) Conversas novas (mais recentes) — para o chat ficar responsivo.
+    const novas = await sincronizarChatsPagina({ direction: "latest" });
+
+    // 2) Backfill do histórico (em paralelo, sem atrapalhar as novas).
     const { data: rows } = await supabase
       .from("configuracoes")
       .select("chave, valor")
@@ -65,26 +61,22 @@ export async function GET() {
       estado[r.chave] = r.valor;
     });
 
-    const done = estado[CHAVE_DONE] === "true";
-
-    // Se o histórico terminou, sincroniza só a primeira página (conversas novas).
-    const nextTimestamp = done ? "" : estado[CHAVE_TS] || "";
-
-    const r = await sincronizarChatsPagina({ nextTimestamp });
-
-    if (r.erro) {
-      return NextResponse.json({ sucesso: false, fase: done ? "novas" : "historico", ...r });
-    }
-
-    if (!done) {
-      await setConfig(CHAVE_TS, r.nextTimestamp);
-      if (r.done) await setConfig(CHAVE_DONE, "true");
+    let historico = null;
+    if (estado[CHAVE_DONE] !== "true") {
+      historico = await sincronizarChatsPagina({
+        direction: "older",
+        nextTimestamp: estado[CHAVE_TS] || "",
+      });
+      if (!historico.erro) {
+        await setConfig(CHAVE_TS, historico.nextTimestamp);
+        if (historico.done) await setConfig(CHAVE_DONE, "true");
+      }
     }
 
     return NextResponse.json({
-      sucesso: true,
-      fase: done ? "novas" : "historico",
-      ...r,
+      sucesso: !novas.erro,
+      novas,
+      historico,
     });
   } catch (error) {
     return NextResponse.json(

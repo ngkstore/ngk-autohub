@@ -89,15 +89,17 @@ export type ResultadoSyncChat = {
 export async function sincronizarChatsPagina({
   nextTimestamp = "",
   maxConversas = 25,
+  direction = "older",
 }: {
   nextTimestamp?: string;
   maxConversas?: number;
+  direction?: "latest" | "older";
 }): Promise<ResultadoSyncChat> {
   const token = await obterToken();
 
   const params: Record<string, string> = {
     type: "all",
-    direction: "older",
+    direction,
     page_size: String(maxConversas),
   };
   if (nextTimestamp) params.next_timestamp = nextTimestamp;

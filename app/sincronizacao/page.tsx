@@ -6,6 +6,7 @@ import EnriquecerFinanceiroButton from "../components/EnriquecerFinanceiroButton
 import SincronizarAvaliacoesButton from "../components/SincronizarAvaliacoesButton";
 import ResponderAvaliacoesControl from "../components/ResponderAvaliacoesControl";
 import ResponderChatControl from "../components/ResponderChatControl";
+import SincronizarChatButton from "../components/SincronizarChatButton";
 
 function normalizarTexto(valor?: string) {
   return valor
@@ -103,6 +104,10 @@ export default async function SincronizacaoPage() {
 
       <section className="mt-8">
         <ResponderAvaliacoesControl />
+      </section>
+
+      <section className="mt-8">
+        <SincronizarChatButton />
       </section>
 
       <section className="mt-8">
