@@ -164,14 +164,33 @@ export async function responderChatsLote({
   const propostas: PropostaChat[] = [];
 
   for (const c of pendentes) {
+    // item_id da conversa; se não houver, infere pelo pedido recente do cliente.
+    let itemId: number | null = c.item_id ?? null;
+    if (!itemId && c.to_name) {
+      const { data: ped } = await supabase
+        .from("pedidos")
+        .select("dados_pedido")
+        .eq("marketplace", "shopee")
+        .eq("cliente_nome", c.to_name)
+        .order("data_pedido", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const itens = (
+        ped?.dados_pedido as { item_list?: { item_id?: number }[] } | null
+      )?.item_list;
+      if (Array.isArray(itens) && itens[0]?.item_id) {
+        itemId = Number(itens[0].item_id);
+      }
+    }
+
     // Produto da conversa
     let produtoTxt = "Produto não identificado.";
     let nomeProduto = "Produto";
-    if (c.item_id) {
+    if (itemId) {
       const { data: prod } = await supabase
         .from("produtos")
         .select("nome, descricao, preco, estoque")
-        .eq("item_id", c.item_id)
+        .eq("item_id", itemId)
         .maybeSingle();
       if (prod) {
         nomeProduto = prod.nome || "Produto";
@@ -183,11 +202,11 @@ export async function responderChatsLote({
 
     // Respostas anteriores da loja para este produto
     let historicoTxt = "(sem histórico)";
-    if (c.item_id) {
+    if (itemId) {
       const { data: msgs } = await supabase
         .from("chat_mensagens")
         .select("de_loja, texto, created_timestamp")
-        .eq("item_id", c.item_id)
+        .eq("item_id", itemId)
         .not("texto", "is", null)
         .order("created_timestamp", { ascending: false })
         .limit(16);

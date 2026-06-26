@@ -33,24 +33,45 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ sucesso: false, erro: "Nenhuma conversa encontrada." });
     }
 
+    // item_id da conversa, ou inferido pelo pedido recente do cliente.
+    let itemId: number | null = conversa.item_id ?? null;
+    let itemInferido = false;
+    if (!itemId && conversa.to_name) {
+      const { data: ped } = await supabase
+        .from("pedidos")
+        .select("dados_pedido")
+        .eq("marketplace", "shopee")
+        .eq("cliente_nome", conversa.to_name)
+        .order("data_pedido", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const itens = (
+        ped?.dados_pedido as { item_list?: { item_id?: number }[] } | null
+      )?.item_list;
+      if (Array.isArray(itens) && itens[0]?.item_id) {
+        itemId = Number(itens[0].item_id);
+        itemInferido = true;
+      }
+    }
+
     // Produto + descrição
     let produto: { nome?: string; descricao?: string } | null = null;
-    if (conversa.item_id) {
+    if (itemId) {
       const { data } = await supabase
         .from("produtos")
         .select("nome, descricao")
-        .eq("item_id", conversa.item_id)
+        .eq("item_id", itemId)
         .maybeSingle();
       produto = data;
     }
 
     // Histórico de Q&A do produto
     let historico: { de_loja: boolean; texto: string }[] = [];
-    if (conversa.item_id) {
+    if (itemId) {
       const { data } = await supabase
         .from("chat_mensagens")
         .select("de_loja, texto")
-        .eq("item_id", conversa.item_id)
+        .eq("item_id", itemId)
         .not("texto", "is", null)
         .neq("texto", "")
         .order("created_timestamp", { ascending: false })
@@ -74,8 +95,9 @@ export async function GET(request: NextRequest) {
       sucesso: true,
       conversation_id: conversa.conversation_id,
       cliente: conversa.to_name,
-      item_id: conversa.item_id,
-      tem_item_id: !!conversa.item_id,
+      item_id: itemId,
+      tem_item_id: !!itemId,
+      item_inferido_do_pedido: itemInferido,
       produto_nome: produto?.nome || null,
       descricao_tem: descricao.length > 0,
       descricao_tamanho: descricao.length,
