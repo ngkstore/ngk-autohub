@@ -16,6 +16,7 @@ type Resultado = {
   sucesso: boolean;
   erro?: string;
   enviar?: boolean;
+  autonomo?: boolean;
   enviados?: number;
   escalados?: number;
   propostas?: Proposta[];
@@ -23,15 +24,23 @@ type Resultado = {
 
 export default function ResponderChatControl() {
   const [ativo, setAtivo] = useState<boolean | null>(null);
+  const [autonomo, setAutonomo] = useState<boolean | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [salvandoAuto, setSalvandoAuto] = useState(false);
   const [rodando, setRodando] = useState(false);
   const [resultado, setResultado] = useState<Resultado | null>(null);
 
   useEffect(() => {
     fetch("/api/shopee/chat/auto")
       .then((r) => r.json())
-      .then((d) => setAtivo(!!d.ativo))
-      .catch(() => setAtivo(false));
+      .then((d) => {
+        setAtivo(!!d.ativo);
+        setAutonomo(!!d.autonomo);
+      })
+      .catch(() => {
+        setAtivo(false);
+        setAutonomo(false);
+      });
   }, []);
 
   async function alternar() {
@@ -44,8 +53,25 @@ export default function ResponderChatControl() {
       });
       const d = await r.json();
       setAtivo(!!d.ativo);
+      setAutonomo(!!d.autonomo);
     } finally {
       setSalvando(false);
+    }
+  }
+
+  async function alternarAutonomo() {
+    setSalvandoAuto(true);
+    try {
+      const r = await fetch("/api/shopee/chat/auto", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ autonomo: !autonomo }),
+      });
+      const d = await r.json();
+      setAtivo(!!d.ativo);
+      setAutonomo(!!d.autonomo);
+    } finally {
+      setSalvandoAuto(false);
     }
   }
 
@@ -56,7 +82,7 @@ export default function ResponderChatControl() {
       const r = await fetch("/api/shopee/chat/responder", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ limite: 5, enviar }),
+        body: JSON.stringify({ limite: 5, enviar, autonomo: !!autonomo }),
       });
       const texto = await r.text();
       try {
@@ -122,6 +148,36 @@ export default function ResponderChatControl() {
         >
           {rodando ? "..." : "Responder de verdade (5)"}
         </button>
+      </div>
+
+      <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-slate-800 pt-5">
+        <span className="text-sm text-slate-300">Modo 100% autônomo:</span>
+        <span
+          className={`rounded-full px-3 py-1 text-xs font-semibold ${
+            autonomo ? "bg-amber-900 text-amber-300" : "bg-slate-700 text-slate-300"
+          }`}
+        >
+          {autonomo === null ? "..." : autonomo ? "LIGADO" : "DESLIGADO"}
+        </span>
+
+        <button
+          onClick={alternarAutonomo}
+          disabled={salvandoAuto || autonomo === null}
+          className={`rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${
+            autonomo
+              ? "bg-red-700 hover:bg-red-600"
+              : "bg-amber-700 hover:bg-amber-600"
+          }`}
+        >
+          {salvandoAuto ? "Salvando..." : autonomo ? "Desligar autônomo" : "Ligar autônomo"}
+        </button>
+
+        <p className="w-full text-xs text-slate-500">
+          Quando ligado, o robô responde <strong>todas</strong> as conversas
+          (nunca escala): se não houver uma dúvida clara, manda uma saudação
+          curta só para manter a taxa de resposta da Shopee. Os botões de teste
+          acima já usam este modo.
+        </p>
       </div>
 
       {resultado && (

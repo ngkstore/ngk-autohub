@@ -6,22 +6,25 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 const CHAVE_ATIVO = "responder_chat_ativo";
+const CHAVE_AUTONOMO = "responder_chat_autonomo";
 
-// POST: manual. { limite, enviar }. enviar=false (padrão) = só gera p/ revisão.
+// POST: manual. { limite, enviar, autonomo }. enviar=false = só gera p/ revisão.
 export async function POST(request: NextRequest) {
   let limite = 5;
   let enviar = false;
+  let autonomo = false;
   try {
     const body = await request.json();
     if (body?.limite) limite = Number(body.limite);
     if (typeof body?.enviar === "boolean") enviar = body.enviar;
+    if (typeof body?.autonomo === "boolean") autonomo = body.autonomo;
   } catch {
     // padrão
   }
 
   try {
-    const r = await responderChatsLote({ limite, enviar });
-    return NextResponse.json({ sucesso: !r.erro, enviar, ...r });
+    const r = await responderChatsLote({ limite, enviar, autonomo });
+    return NextResponse.json({ sucesso: !r.erro, enviar, autonomo, ...r });
   } catch (error) {
     return NextResponse.json(
       {
@@ -36,18 +39,23 @@ export async function POST(request: NextRequest) {
 // GET: cron. Só responde de verdade se o robô estiver ligado.
 export async function GET() {
   try {
-    const { data: cfg } = await supabase
+    const { data: cfgs } = await supabase
       .from("configuracoes")
-      .select("valor")
-      .eq("chave", CHAVE_ATIVO)
-      .maybeSingle();
+      .select("chave, valor")
+      .in("chave", [CHAVE_ATIVO, CHAVE_AUTONOMO]);
 
-    if (cfg?.valor !== "true") {
+    const mapa: Record<string, string> = {};
+    (cfgs || []).forEach((c) => {
+      mapa[c.chave] = c.valor;
+    });
+
+    if (mapa[CHAVE_ATIVO] !== "true") {
       return NextResponse.json({ sucesso: true, idle: true, motivo: "robô desligado" });
     }
 
-    const r = await responderChatsLote({ limite: 15, enviar: true });
-    return NextResponse.json({ sucesso: !r.erro, ...r });
+    const autonomo = mapa[CHAVE_AUTONOMO] === "true";
+    const r = await responderChatsLote({ limite: 15, enviar: true, autonomo });
+    return NextResponse.json({ sucesso: !r.erro, autonomo, ...r });
   } catch (error) {
     return NextResponse.json(
       {

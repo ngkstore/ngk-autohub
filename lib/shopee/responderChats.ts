@@ -134,7 +134,12 @@ export type ResultadoChat = {
 export async function responderChatsLote({
   limite = 10,
   enviar = false,
-}: { limite?: number; enviar?: boolean } = {}): Promise<ResultadoChat> {
+  autonomo = false,
+}: {
+  limite?: number;
+  enviar?: boolean;
+  autonomo?: boolean;
+} = {}): Promise<ResultadoChat> {
   const { data: conversas } = await supabase
     .from("chat_conversas")
     .select(
@@ -299,20 +304,30 @@ export async function responderChatsLote({
       confianca = decisao?.confianca || "baixa";
     }
 
+    // Modo 100% autônomo: responde TUDO (nunca escala). Se a IA não gerou
+    // texto (ex.: cliente só mandou imagem), envia uma mensagem gentil
+    // pedindo mais detalhes, em vez de deixar pra você.
+    if (autonomo && !resposta.trim()) {
+      resposta =
+        "Oi! 😊 Recebi sua mensagem. Pode me contar com mais detalhes como posso te ajudar?";
+    }
+    const deveResponder =
+      resposta.trim().length > 0 && (autonomo || !escalar);
+
     propostas.push({
       conversation_id: c.conversation_id,
       cliente: c.to_name,
       pergunta: pergunta || "(sem texto — anexo/imagem)",
       categoria,
       confianca,
-      acao: escalar ? "escalar" : "responder",
+      acao: deveResponder ? "responder" : "escalar",
       resposta,
     });
 
     if (!enviar) continue; // modo revisão: não envia nem marca
 
     try {
-      if (escalar) {
+      if (!deveResponder) {
         await supabase
           .from("chat_conversas")
           .update({
