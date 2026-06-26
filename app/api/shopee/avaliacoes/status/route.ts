@@ -40,12 +40,21 @@ export async function GET() {
     const { data: estado } = await supabase
       .from("configuracoes")
       .select("chave, valor")
-      .in("chave", ["avaliacoes_cursor", "avaliacoes_backfill_done"]);
+      .in("chave", [
+        "avaliacoes_item_idx",
+        "avaliacoes_backfill_done",
+      ]);
 
     const cfg: Record<string, string> = {};
     (estado || []).forEach((r) => {
       cfg[r.chave] = r.valor;
     });
+
+    const { count: totalProdutos } = await supabase
+      .from("produtos")
+      .select("id", { count: "exact", head: true })
+      .eq("marketplace", "shopee")
+      .not("item_id", "is", null);
 
     return NextResponse.json({
       sucesso: true,
@@ -55,7 +64,8 @@ export async function GET() {
       respondidasUltimaHora: ultimaHora,
       respondidasUltimoDia: ultimoDia,
       backfill: {
-        cursor: cfg["avaliacoes_cursor"] ?? null,
+        produto_atual: Number(cfg["avaliacoes_item_idx"] || 0),
+        total_produtos: totalProdutos ?? 0,
         concluido: cfg["avaliacoes_backfill_done"] === "true",
       },
     });

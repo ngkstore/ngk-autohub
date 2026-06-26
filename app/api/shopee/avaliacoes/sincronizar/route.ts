@@ -100,6 +100,7 @@ export async function GET() {
       let cursor = estado[CHAVE_CURSOR] || "";
       let orcamento = PAGINAS_POR_RODADA;
       let processados = 0;
+      let pulados = 0;
 
       while (orcamento > 0 && idx < itens.length) {
         const r = await sincronizarAvaliacoesPagina({
@@ -108,16 +109,14 @@ export async function GET() {
           maxPaginas: orcamento,
         });
 
+        // Se um produto der erro, NÃO trava: pula para o próximo (antes ele
+        // ficava preso no mesmo produto pra sempre).
         if (r.erro) {
-          await setConfig(CHAVE_IDX, String(idx));
-          await setConfig(CHAVE_CURSOR, cursor);
-          return NextResponse.json({
-            sucesso: false,
-            fase: "historico",
-            produtoIndice: idx,
-            totalProdutos: itens.length,
-            ...r,
-          });
+          pulados++;
+          idx++;
+          cursor = "";
+          orcamento -= 1;
+          continue;
         }
 
         processados += r.processados;
@@ -140,6 +139,7 @@ export async function GET() {
         sucesso: true,
         fase: "historico",
         processados,
+        pulados,
         produtoIndice: idx,
         totalProdutos: itens.length,
         concluido: concluiu,
