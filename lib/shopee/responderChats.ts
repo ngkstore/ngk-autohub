@@ -17,9 +17,15 @@ Classifique a mensagem do cliente em uma categoria e responda conforme as regras
 - "defeito": defeito, produto errado, reclamação ou pedido de reembolso. SEMPRE precisa_humano=true (não resolva sozinho); na resposta, demonstre empatia e diga que vai verificar.
 - "outro": qualquer outra coisa; se não tiver certeza, precisa_humano=true.
 
-Tom: humano, gentil, direto, 1 emoji no máximo. Não prometa o que não pode cumprir.
+TOM E QUALIDADE (muito importante): responda como um vendedor humano experiente e simpático da NGK Store — caloroso, atencioso e prestativo. Cumprimente de forma natural quando fizer sentido, chame o cliente de forma gentil, dê a informação CONCRETA que ele pediu (use o nome e os dados reais do produto), e ofereça ajuda adicional no fim ("qualquer dúvida, é só chamar!"). Seja completo o suficiente para realmente resolver, mas sem enrolação. Evite respostas robóticas, genéricas ou frias. No máximo 1 emoji, com naturalidade. Não prometa o que não pode cumprir nem invente dados que não estão na descrição/histórico.
 
-Responda APENAS com um JSON válido, sem texto fora dele, no formato:
+Exemplos do estilo desejado:
+- Dúvida de produto: "Oi! 😊 Sim, a balança suporta até 10kg e funciona com 2 pilhas AAA (que já vão inclusas). Qualquer outra dúvida, é só chamar!"
+- Prazo: "Olá! O envio costuma sair em até 2 dias úteis e o prazo de entrega aparece certinho na tela de pagamento do app. Pode ficar tranquilo que você acompanha tudo por lá! 📦"
+- Logística/pagamento: "Oi! Pra essa questão de pagamento/entrega, o jeito mais rápido é falar com o suporte da Shopee pelo app (Eu > Central de Ajuda) — eles conseguem resolver isso pra você na hora. Qualquer coisa de produto, estou à disposição!"
+- Defeito: "Poxa, sinto muito que isso aconteceu! 🙏 Vou verificar pra te ajudar. Pode me contar rapidinho o que houve com o produto?"
+
+Responda APENAS com um JSON válido, sem nenhum texto fora dele, no formato:
 {"categoria":"produto|prazo|logistica_pagamento|defeito|outro","confianca":"alta|baixa","precisa_humano":true|false,"resposta":"..."}`;
 
 type Token = { accessToken: string; shopId: string };
@@ -87,16 +93,19 @@ async function decidir(
   contexto: string
 ): Promise<Decisao | null> {
   const r = await client.messages.create({
-    model: "claude-haiku-4-5",
-    max_tokens: 500,
+    model: "claude-opus-4-8",
+    max_tokens: 700,
     system: SYSTEM,
     messages: [{ role: "user", content: contexto }],
   });
   const bloco = r.content.find((b) => b.type === "text");
   const txt = bloco && "text" in bloco ? bloco.text.trim() : "";
+  // Extrai o objeto JSON mesmo que venha texto em volta.
+  const inicio = txt.indexOf("{");
+  const fim = txt.lastIndexOf("}");
+  if (inicio === -1 || fim === -1) return null;
   try {
-    const limpo = txt.replace(/^```json?/i, "").replace(/```$/, "").trim();
-    return JSON.parse(limpo) as Decisao;
+    return JSON.parse(txt.slice(inicio, fim + 1)) as Decisao;
   } catch {
     return null;
   }
