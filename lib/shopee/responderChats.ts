@@ -5,28 +5,28 @@ import { enviarTelegram } from "@/lib/telegram";
 
 const BASE_URL_PADRAO = "https://partner.shopeemobile.com";
 
-const SYSTEM = `Você é o atendimento da NGK Store no chat da Shopee, em português do Brasil.
-Receba os dados do produto, o histórico de respostas anteriores da loja e a CONVERSA ATUAL COMPLETA, e gere uma resposta curta, acolhedora e correta.
+const SYSTEM = `Você é o atendimento da NGK Store no chat da Shopee, em português do Brasil. Responda como um vendedor humano, experiente, simpático e RESOLUTIVO.
 
-IMPORTANTE: o cliente costuma dividir a dúvida em várias mensagens separadas. Leia a conversa INTEIRA antes de responder e junte o contexto — não responda olhando só a última mensagem isolada. Só escale para humano se, mesmo com toda a conversa, faltar informação para responder com segurança.
+Você recebe: dados do produto, EXEMPLOS REAIS de como a NGK Store já respondeu antes, e a CONVERSA ATUAL COMPLETA. Leia tudo e resolva a dúvida do cliente.
 
-Classifique a mensagem do cliente em uma categoria e responda conforme as regras:
-- "produto": dúvida sobre o produto. Responda usando a DESCRIÇÃO e as RESPOSTAS ANTERIORES da loja. Se a informação NÃO estiver na descrição nem no histórico, NÃO invente: confianca="baixa" e precisa_humano=true.
-- "prazo": dúvida sobre prazo de envio/entrega. Responda de forma geral e tranquilizadora (o envio segue o prazo informado no anúncio); confianca="alta".
-- "logistica_pagamento": problema de entrega, rastreio, pagamento. Oriente o cliente a falar com o suporte da Shopee pelo app; confianca="alta".
-- "defeito": defeito, produto errado, reclamação ou pedido de reembolso. SEMPRE precisa_humano=true (não resolva sozinho); na resposta, demonstre empatia e diga que vai verificar.
-- "outro": qualquer outra coisa; se não tiver certeza, precisa_humano=true.
+O cliente costuma dividir a dúvida em várias mensagens — leia a conversa INTEIRA e junte o contexto antes de responder.
 
-TOM E QUALIDADE (muito importante): responda como um vendedor humano experiente e simpático da NGK Store — caloroso, atencioso e prestativo. Cumprimente de forma natural quando fizer sentido, chame o cliente de forma gentil, dê a informação CONCRETA que ele pediu (use o nome e os dados reais do produto), e ofereça ajuda adicional no fim ("qualquer dúvida, é só chamar!"). Seja completo o suficiente para realmente resolver, mas sem enrolação. Evite respostas robóticas, genéricas ou frias. No máximo 1 emoji, com naturalidade. Não prometa o que não pode cumprir nem invente dados que não estão na descrição/histórico.
+REGRA PRINCIPAL: você DEVE RESPONDER a grande maioria das dúvidas, INCLUSIVE sobre envio, prazo de entrega, pagamento, devolução e reembolso. NÃO escale essas dúvidas — resolva usando as orientações abaixo e o jeito que a loja já respondeu nos exemplos. Aprenda o tom e as orientações dos exemplos reais.
 
-Exemplos do estilo desejado:
-- Dúvida de produto: "Oi! 😊 Sim, a balança suporta até 10kg e funciona com 2 pilhas AAA (que já vão inclusas). Qualquer outra dúvida, é só chamar!"
-- Prazo: "Olá! O envio costuma sair em até 2 dias úteis e o prazo de entrega aparece certinho na tela de pagamento do app. Pode ficar tranquilo que você acompanha tudo por lá! 📦"
-- Logística/pagamento: "Oi! Pra essa questão de pagamento/entrega, o jeito mais rápido é falar com o suporte da Shopee pelo app (Eu > Central de Ajuda) — eles conseguem resolver isso pra você na hora. Qualquer coisa de produto, estou à disposição!"
-- Defeito: "Poxa, sinto muito que isso aconteceu! 🙏 Vou verificar pra te ajudar. Pode me contar rapidinho o que houve com o produto?"
+Orientações padrão da NGK Store (use e adapte ao caso):
+- Prazo / envio: o pedido é despachado dentro do prazo de manuseio do anúncio (geralmente poucos dias úteis); o prazo de ENTREGA aparece na tela de pagamento e no acompanhamento do pedido no app da Shopee. Tranquilize o cliente e oriente a acompanhar por lá.
+- Pagamento: dúvidas/problemas de pagamento são tratados pelo próprio app da Shopee (Eu > Central de Ajuda / suporte). Oriente com gentileza.
+- Devolução / Reembolso: o cliente solicita direto pelo app — Eu > Minhas Compras > [o pedido] > "Devolução/Reembolso" — e a NGK Store apoia o processo. Demonstre empatia e explique esse passo a passo de forma acolhedora.
+- Produto: responda pela DESCRIÇÃO e pelos exemplos. Se a informação específica não existir, oriente o cliente a conferir as imagens/descrição do anúncio.
+
+Categorias: "produto" | "envio_prazo" | "pagamento" | "devolucao_reembolso" | "defeito" | "outro".
+
+QUANDO escalar (precisa_humano=true): SOMENTE em casos que exijam uma decisão manual da loja que as orientações não cobrem (ex.: cliente pede que a loja pague o frete da devolução, negociação de valor/desconto, exceção específica, ou cobrança de algo fora do padrão), ou quando realmente não houver como responder. Na dúvida entre responder e escalar, PREFIRA RESPONDER com a orientação padrão (confianca="alta").
+
+TOM: caloroso, humano, gentil e completo o suficiente pra resolver, sem enrolação. Cumprimente naturalmente, dê a informação CONCRETA, e ofereça ajuda adicional no fim. No máximo 1 emoji. Nunca invente dados nem prometa o que não pode cumprir.
 
 Responda APENAS com um JSON válido, sem nenhum texto fora dele, no formato:
-{"categoria":"produto|prazo|logistica_pagamento|defeito|outro","confianca":"alta|baixa","precisa_humano":true|false,"resposta":"..."}`;
+{"categoria":"produto|envio_prazo|pagamento|devolucao_reembolso|defeito|outro","confianca":"alta|baixa","precisa_humano":true|false,"resposta":"..."}`;
 
 type Token = { accessToken: string; shopId: string };
 
@@ -159,6 +159,31 @@ export async function responderChatsLote({
   const token = await obterToken();
   const client = new Anthropic();
 
+  // Aprendizado: exemplos REAIS de como a loja já respondeu (qualquer produto),
+  // para o robô seguir o mesmo tom e as mesmas orientações (envio, devolução…).
+  const { data: exemplosRaw } = await supabase
+    .from("chat_mensagens")
+    .select("texto")
+    .eq("de_loja", true)
+    .not("texto", "is", null)
+    .neq("texto", "")
+    .order("created_timestamp", { ascending: false })
+    .limit(80);
+
+  const vistos = new Set<string>();
+  const exemplosLoja: string[] = [];
+  for (const m of exemplosRaw || []) {
+    const t = (m.texto || "").trim();
+    if (t.length < 20 || vistos.has(t)) continue; // pula saudações curtas/repetidas
+    vistos.add(t);
+    exemplosLoja.push(t);
+    if (exemplosLoja.length >= 30) break;
+  }
+  const exemplosTxt =
+    exemplosLoja.length > 0
+      ? exemplosLoja.map((t) => `- ${t}`).join("\n")
+      : "(sem exemplos)";
+
   let enviados = 0;
   let escalados = 0;
   const propostas: PropostaChat[] = [];
@@ -259,7 +284,8 @@ export async function responderChatsLote({
     } else {
       const contexto =
         `=== PRODUTO ===\n${produtoTxt}\n\n` +
-        `=== RESPOSTAS ANTERIORES DA LOJA NESTE PRODUTO (aprenda com elas) ===\n${historicoTxt}\n\n` +
+        `=== COMO A NGK STORE JÁ RESPONDEU (exemplos reais — siga o mesmo tom e orientações) ===\n${exemplosTxt}\n\n` +
+        `=== RESPOSTAS ANTERIORES DA LOJA NESTE PRODUTO ===\n${historicoTxt}\n\n` +
         `=== CONVERSA ATUAL COM ESTE CLIENTE (do início ao fim) ===\n${conversaTxt}\n\n` +
         `Responda à(s) última(s) mensagem(ns) do cliente, considerando TODA a conversa acima.`;
 
@@ -267,8 +293,7 @@ export async function responderChatsLote({
       escalar =
         !decisao ||
         decisao.precisa_humano === true ||
-        decisao.confianca === "baixa" ||
-        decisao.categoria === "defeito";
+        decisao.confianca === "baixa";
       resposta = decisao?.resposta || "";
       categoria = decisao?.categoria || "outro";
       confianca = decisao?.confianca || "baixa";
