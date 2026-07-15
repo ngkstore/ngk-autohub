@@ -21,6 +21,8 @@ export async function POST(request: NextRequest) {
     const arquivo = String(body?.arquivo || "planilha");
     const colunas: string[] = Array.isArray(body?.colunas) ? body.colunas : [];
     const linhas: unknown[] = Array.isArray(body?.linhas) ? body.linhas : [];
+    const periodoInicio: string | null = body?.periodo_inicio || null;
+    const periodoFim: string | null = body?.periodo_fim || null;
     let lojaId: string | null = body?.loja_id || null;
 
     // Loja só pode ser uma das lojas do usuário (senão ignora).
@@ -47,6 +49,8 @@ export async function POST(request: NextRequest) {
         colunas,
         total_linhas: linhasLimitadas.length,
         linhas: linhasLimitadas,
+        periodo_inicio: periodoInicio,
+        periodo_fim: periodoFim,
       })
       .select("id")
       .single();

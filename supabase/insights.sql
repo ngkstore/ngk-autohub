@@ -11,8 +11,14 @@ create table if not exists insights_importacoes (
   colunas text[],              -- nomes das colunas detectadas
   total_linhas int,
   linhas jsonb,                -- todas as linhas (array de objetos)
+  periodo_inicio date,         -- p/ planilhas "total do período" (sem coluna de data)
+  periodo_fim date,
   importado_em timestamptz default now()
 );
+
+-- Se a tabela já existia sem as colunas de período, adiciona.
+alter table insights_importacoes add column if not exists periodo_inicio date;
+alter table insights_importacoes add column if not exists periodo_fim date;
 
 create index if not exists idx_insights_import_conta
   on insights_importacoes (conta_id, importado_em desc);

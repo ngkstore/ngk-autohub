@@ -9,7 +9,7 @@ export default async function InsightsPage() {
 
   let query = supabase
     .from("insights_importacoes")
-    .select("id, arquivo, colunas, total_linhas, loja_id, importado_em, lojas(apelido)")
+    .select("id, arquivo, colunas, total_linhas, loja_id, periodo_inicio, periodo_fim, importado_em, lojas(apelido)")
     .order("importado_em", { ascending: false })
     .limit(30);
   if (!escopo.admin) {
@@ -37,9 +37,10 @@ export default async function InsightsPage() {
               <tr>
                 <th className="p-3">Arquivo</th>
                 <th className="p-3">Loja</th>
+                <th className="p-3">Período</th>
                 <th className="p-3">Linhas</th>
                 <th className="p-3">Colunas detectadas</th>
-                <th className="p-3">Data</th>
+                <th className="p-3">Importado</th>
               </tr>
             </thead>
             <tbody>
@@ -50,16 +51,23 @@ export default async function InsightsPage() {
                     arquivo: string | null;
                     total_linhas: number | null;
                     colunas: string[] | null;
+                    periodo_inicio: string | null;
+                    periodo_fim: string | null;
                     importado_em: string | null;
                     lojas?: { apelido?: string }[] | { apelido?: string } | null;
                   }) => {
                     const apelido = Array.isArray(imp.lojas)
                       ? imp.lojas[0]?.apelido
                       : imp.lojas?.apelido;
+                    const periodo =
+                      imp.periodo_inicio || imp.periodo_fim
+                        ? `${imp.periodo_inicio || "?"} a ${imp.periodo_fim || "?"}`
+                        : "-";
                     return (
                     <tr key={imp.id} className="border-t border-slate-800 align-top">
                       <td className="p-3 font-semibold">{imp.arquivo || "-"}</td>
                       <td className="p-3 text-orange-300">{apelido || "-"}</td>
+                      <td className="p-3 text-slate-400">{periodo}</td>
                       <td className="p-3">{imp.total_linhas ?? 0}</td>
                       <td className="p-3 text-slate-400">
                         {(imp.colunas || []).join(" • ") || "-"}
@@ -75,7 +83,7 @@ export default async function InsightsPage() {
                 )
               ) : (
                 <tr>
-                  <td className="p-3 text-slate-400" colSpan={5}>
+                  <td className="p-3 text-slate-400" colSpan={6}>
                     Nenhuma planilha importada ainda.
                   </td>
                 </tr>

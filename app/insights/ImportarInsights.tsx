@@ -11,6 +11,8 @@ export default function ImportarInsights() {
   const router = useRouter();
   const [lojas, setLojas] = useState<Loja[]>([]);
   const [lojaId, setLojaId] = useState("");
+  const [periodoInicio, setPeriodoInicio] = useState("");
+  const [periodoFim, setPeriodoFim] = useState("");
   const [arquivo, setArquivo] = useState("");
   const [colunas, setColunas] = useState<string[]>([]);
   const [linhas, setLinhas] = useState<Linha[]>([]);
@@ -57,7 +59,14 @@ export default function ImportarInsights() {
       const r = await fetch("/api/insights/importar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ loja_id: lojaId || null, arquivo, colunas, linhas }),
+        body: JSON.stringify({
+          loja_id: lojaId || null,
+          periodo_inicio: periodoInicio || null,
+          periodo_fim: periodoFim || null,
+          arquivo,
+          colunas,
+          linhas,
+        }),
       });
       const d = await r.json();
       if (!d.sucesso) {
@@ -100,6 +109,23 @@ export default function ImportarInsights() {
             </option>
           ))}
         </select>
+
+        <label className="flex items-center gap-2 text-xs text-slate-400">
+          Período de
+          <input
+            type="date"
+            value={periodoInicio}
+            onChange={(e) => setPeriodoInicio(e.target.value)}
+            className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white"
+          />
+          até
+          <input
+            type="date"
+            value={periodoFim}
+            onChange={(e) => setPeriodoFim(e.target.value)}
+            className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white"
+          />
+        </label>
 
         <input
           type="file"
