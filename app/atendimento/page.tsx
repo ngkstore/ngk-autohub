@@ -1,14 +1,8 @@
 import { supabase } from "@/lib/supabase";
 import EscaladoAcoes from "../components/EscaladoAcoes";
+import { escopoDoUsuario, filtroLojas } from "@/lib/conta";
 
 export const dynamic = "force-dynamic";
-
-const mapaLojas: Record<string, string> = {
-  "ngk-shopee": "NGK Shopee",
-  "pitibiribas-shopee": "Pitibiribas Shopee",
-  "ngk-tiktok": "NGK TikTok",
-  "pitibiribas-tiktok": "Pitibiribas TikTok",
-};
 
 type Conversa = {
   conversation_id: string;
@@ -27,18 +21,9 @@ type AtendimentoProps = {
 export default async function AtendimentoPage({
   searchParams,
 }: AtendimentoProps) {
-  const { loja: lojaSlug } = await searchParams;
-  const apelidoLoja = lojaSlug ? mapaLojas[lojaSlug] : null;
-
-  let lojaId: string | null = null;
-  if (apelidoLoja) {
-    const { data: loja } = await supabase
-      .from("lojas")
-      .select("id")
-      .eq("apelido", apelidoLoja)
-      .maybeSingle();
-    lojaId = loja?.id || null;
-  }
+  const { loja: lojaParam } = await searchParams;
+  const escopo = await escopoDoUsuario();
+  const lojas = filtroLojas(escopo, lojaParam);
 
   // Chats escalados que precisam de você (filtrados pela loja selecionada).
   let escaladosQuery = supabase
@@ -50,7 +35,7 @@ export default async function AtendimentoPage({
     .order("ultima_mensagem_ts", { ascending: false })
     .limit(50);
 
-  if (lojaId) escaladosQuery = escaladosQuery.eq("loja_id", lojaId);
+  if (lojas) escaladosQuery = escaladosQuery.in("loja_id", lojas);
 
   const { data: escaladosRaw } = await escaladosQuery;
 
@@ -64,7 +49,7 @@ export default async function AtendimentoPage({
       .from("produtos")
       .select("item_id, nome")
       .in("item_id", itemIds as number[]);
-    if (lojaId) prodQuery = prodQuery.eq("loja_id", lojaId);
+    if (lojas) prodQuery = prodQuery.in("loja_id", lojas);
     const { data: prods } = await prodQuery;
     (prods || []).forEach((p) => {
       if (p.item_id) mapaProdutos.set(String(p.item_id), p.nome as string);

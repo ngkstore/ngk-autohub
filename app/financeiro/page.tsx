@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { escopoDoUsuario, filtroLojas } from "@/lib/conta";
 
 export const dynamic = "force-dynamic";
 
@@ -18,13 +19,6 @@ type ResumoFinanceiro = {
   frete: number;
   desconto_vendedor: number;
   pendentes_conciliacao: number;
-};
-
-const mapaLojas: Record<string, string> = {
-  "ngk-shopee": "NGK Shopee",
-  "pitibiribas-shopee": "Pitibiribas Shopee",
-  "ngk-tiktok": "NGK TikTok",
-  "pitibiribas-tiktok": "Pitibiribas TikTok",
 };
 
 function diaBRT(date: Date) {
@@ -85,21 +79,12 @@ function dataHora(d: string) {
 
 export default async function FinanceiroPage({ searchParams }: FinanceiroPageProps) {
   const params = await searchParams;
-  const apelido = params.loja ? mapaLojas[params.loja] : null;
   const periodo = getPeriodoFiltro(params.periodo);
-
-  let lojaId: string | null = null;
-  if (apelido) {
-    const { data: loja } = await supabase
-      .from("lojas")
-      .select("id")
-      .eq("apelido", apelido)
-      .single();
-    lojaId = loja?.id || null;
-  }
+  const escopo = await escopoDoUsuario();
+  const lojas = filtroLojas(escopo, params.loja);
 
   const { data: resumoRpc } = await supabase.rpc("resumo_financeiro", {
-    p_loja_id: lojaId,
+    p_loja_ids: lojas,
     p_inicio: periodo?.inicio ?? null,
     p_fim: periodo?.fim ?? null,
   });
@@ -132,7 +117,7 @@ export default async function FinanceiroPage({ searchParams }: FinanceiroPagePro
     .order("data_pagamento", { ascending: false, nullsFirst: false })
     .limit(20);
 
-  if (lojaId) recentesQuery = recentesQuery.eq("loja_id", lojaId);
+  if (lojas) recentesQuery = recentesQuery.in("loja_id", lojas);
   if (periodo) {
     recentesQuery = recentesQuery
       .gte("data_pagamento", periodo.inicio)

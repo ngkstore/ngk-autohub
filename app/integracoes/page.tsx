@@ -2,6 +2,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import SyncButton from "../components/SyncButton";
 import SyncAllButton from "../components/SyncAllButton";
+import { escopoDoUsuario } from "@/lib/conta";
 
 export const dynamic = "force-dynamic";
 
@@ -20,20 +21,34 @@ function normalizarMarketplace(marketplace?: string) {
 }
 
 export default async function IntegracoesPage() {
-  const { data: lojas } = await supabase
+  const escopo = await escopoDoUsuario();
+
+  // Só as lojas da conta do usuário (todas, se admin).
+  let lojasQuery = supabase
     .from("lojas")
     .select("*")
     .order("criado_em", { ascending: false });
+  if (!escopo.admin) {
+    lojasQuery = lojasQuery.in(
+      "conta_id",
+      escopo.contaId ? [escopo.contaId] : []
+    );
+  }
+  const { data: lojas } = await lojasQuery;
 
-  const { data: sincronizacoes } = await supabase
+  const lojaIds = (lojas || []).map((l) => l.id);
+
+  let sincQuery = supabase
     .from("sincronizacoes")
     .select("*, lojas(apelido)")
     .order("iniciado_em", { ascending: false })
     .limit(20);
+  if (!escopo.admin) sincQuery = sincQuery.in("loja_id", lojaIds);
+  const { data: sincronizacoes } = await sincQuery;
 
-  const { data: tokens } = await supabase
-    .from("marketplace_tokens")
-    .select("*");
+  let tokensQuery = supabase.from("marketplace_tokens").select("*");
+  if (!escopo.admin) tokensQuery = tokensQuery.in("loja_id", lojaIds);
+  const { data: tokens } = await tokensQuery;
 
   return (
     <div className="p-8 text-white">

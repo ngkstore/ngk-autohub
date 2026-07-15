@@ -1,13 +1,7 @@
 import { supabase } from "@/lib/supabase";
+import { escopoDoUsuario, filtroLojas } from "@/lib/conta";
 
 export const dynamic = "force-dynamic";
-
-const mapaLojas: Record<string, string> = {
-  "ngk-shopee": "NGK Shopee",
-  "pitibiribas-shopee": "Pitibiribas Shopee",
-  "ngk-tiktok": "NGK TikTok",
-  "pitibiribas-tiktok": "Pitibiribas TikTok",
-};
 
 type AnalyticsPageProps = {
   searchParams: Promise<{
@@ -57,20 +51,9 @@ export default async function AnalyticsPage({
   searchParams,
 }: AnalyticsPageProps) {
   const params = await searchParams;
-  const apelidoLoja = params.loja ? mapaLojas[params.loja] : null;
   const periodoFiltro = getPeriodoFiltro(params.periodo);
-
-  let lojaId: string | null = null;
-
-  if (apelidoLoja) {
-    const { data: loja } = await supabase
-      .from("lojas")
-      .select("id")
-      .eq("apelido", apelidoLoja)
-      .maybeSingle();
-
-    lojaId = loja?.id || null;
-  }
+  const escopo = await escopoDoUsuario();
+  const lojas = filtroLojas(escopo, params.loja);
 
   let avaliacoesCountQuery = supabase
     .from("avaliacoes")
@@ -94,12 +77,12 @@ export default async function AnalyticsPage({
     .order("criado_em", { ascending: false })
     .limit(100);
 
-  if (lojaId) {
-    avaliacoesCountQuery = avaliacoesCountQuery.eq("loja_id", lojaId);
-    produtosCountQuery = produtosCountQuery.eq("loja_id", lojaId);
-    pedidosCountQuery = pedidosCountQuery.eq("loja_id", lojaId);
-    chatsCountQuery = chatsCountQuery.eq("loja_id", lojaId);
-    avaliacoesQuery = avaliacoesQuery.eq("loja_id", lojaId);
+  if (lojas) {
+    avaliacoesCountQuery = avaliacoesCountQuery.in("loja_id", lojas);
+    produtosCountQuery = produtosCountQuery.in("loja_id", lojas);
+    pedidosCountQuery = pedidosCountQuery.in("loja_id", lojas);
+    chatsCountQuery = chatsCountQuery.in("loja_id", lojas);
+    avaliacoesQuery = avaliacoesQuery.in("loja_id", lojas);
   }
 
   if (periodoFiltro) {

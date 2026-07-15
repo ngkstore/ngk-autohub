@@ -1,13 +1,7 @@
 import { supabase } from "@/lib/supabase";
+import { escopoDoUsuario, filtroLojas } from "@/lib/conta";
 
 export const dynamic = "force-dynamic";
-
-const mapaLojas: Record<string, string> = {
-  "ngk-shopee": "NGK Shopee",
-  "pitibiribas-shopee": "Pitibiribas Shopee",
-  "ngk-tiktok": "NGK TikTok",
-  "pitibiribas-tiktok": "Pitibiribas TikTok",
-};
 
 type ProdutosPageProps = {
   searchParams: Promise<{
@@ -57,20 +51,9 @@ export default async function ProdutosPage({
   searchParams,
 }: ProdutosPageProps) {
   const params = await searchParams;
-  const apelidoLoja = params.loja ? mapaLojas[params.loja] : null;
   const periodoFiltro = getPeriodoFiltro(params.periodo);
-
-  let lojaId: string | null = null;
-
-  if (apelidoLoja) {
-    const { data: loja } = await supabase
-      .from("lojas")
-      .select("id")
-      .eq("apelido", apelidoLoja)
-      .maybeSingle();
-
-    lojaId = loja?.id || null;
-  }
+  const escopo = await escopoDoUsuario();
+  const lojas = filtroLojas(escopo, params.loja);
 
   let totalProdutosQuery = supabase
     .from("produtos")
@@ -87,10 +70,10 @@ export default async function ProdutosPage({
     .order("criado_em", { ascending: false })
     .limit(20);
 
-  if (lojaId) {
-    totalProdutosQuery = totalProdutosQuery.eq("loja_id", lojaId);
-    produtosAtivosQuery = produtosAtivosQuery.eq("loja_id", lojaId);
-    produtosQuery = produtosQuery.eq("loja_id", lojaId);
+  if (lojas) {
+    totalProdutosQuery = totalProdutosQuery.in("loja_id", lojas);
+    produtosAtivosQuery = produtosAtivosQuery.in("loja_id", lojas);
+    produtosQuery = produtosQuery.in("loja_id", lojas);
   }
 
   if (periodoFiltro) {

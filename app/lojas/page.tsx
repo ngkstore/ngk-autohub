@@ -1,10 +1,22 @@
 import { supabase } from "@/lib/supabase";
+import { escopoDoUsuario } from "@/lib/conta";
+
+export const dynamic = "force-dynamic";
 
 export default async function LojasPage() {
-  const { data: lojas } = await supabase
+  const escopo = await escopoDoUsuario();
+
+  let lojasQuery = supabase
     .from("lojas")
     .select("*")
     .order("criado_em", { ascending: false });
+  if (!escopo.admin) {
+    lojasQuery = lojasQuery.in(
+      "conta_id",
+      escopo.contaId ? [escopo.contaId] : []
+    );
+  }
+  const { data: lojas } = await lojasQuery;
 
   return (
     <div className="p-8 text-white">

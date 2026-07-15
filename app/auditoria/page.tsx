@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { escopoDoUsuario, filtroLojas } from "@/lib/conta";
 
 export const dynamic = "force-dynamic";
 
@@ -15,13 +16,6 @@ type Resumo = {
   diferenca_total: number;
   cobrado_a_mais: number;
   cobrado_a_menos: number;
-};
-
-const mapaLojas: Record<string, string> = {
-  "ngk-shopee": "NGK Shopee",
-  "pitibiribas-shopee": "Pitibiribas Shopee",
-  "ngk-tiktok": "NGK TikTok",
-  "pitibiribas-tiktok": "Pitibiribas TikTok",
 };
 
 function diaBRT(date: Date) {
@@ -61,17 +55,12 @@ function moeda(v: number) {
 
 export default async function AuditoriaPage({ searchParams }: AuditoriaPageProps) {
   const params = await searchParams;
-  const apelido = params.loja ? mapaLojas[params.loja] : null;
   const periodo = getPeriodo(params.periodo);
-
-  let lojaId: string | null = null;
-  if (apelido) {
-    const { data: loja } = await supabase.from("lojas").select("id").eq("apelido", apelido).single();
-    lojaId = loja?.id || null;
-  }
+  const escopo = await escopoDoUsuario();
+  const lojas = filtroLojas(escopo, params.loja);
 
   const { data: resumoRpc } = await supabase.rpc("auditoria_resumo", {
-    p_loja_id: lojaId,
+    p_loja_ids: lojas,
     p_inicio: periodo?.inicio ?? null,
     p_fim: periodo?.fim ?? null,
   });
@@ -86,7 +75,7 @@ export default async function AuditoriaPage({ searchParams }: AuditoriaPageProps
     .or("taxa_diferenca.gt.0.5,taxa_diferenca.lt.-0.5")
     .order("taxa_diferenca", { ascending: false })
     .limit(100);
-  if (lojaId) q = q.eq("loja_id", lojaId);
+  if (lojas) q = q.in("loja_id", lojas);
   if (periodo) {
     q = q.gte("data_pagamento", periodo.inicio).lt("data_pagamento", periodo.fim);
   }

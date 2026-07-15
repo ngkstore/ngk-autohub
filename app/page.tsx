@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import DashboardCharts from "./components/DashboardCharts";
 import GerarRankingButton from "./components/GerarRankingButton";
+import { escopoDoUsuario, filtroLojas } from "@/lib/conta";
 
 export const dynamic = "force-dynamic";
 
@@ -34,13 +35,6 @@ type ResumoPedidos = {
   por_status: { status: string; quantidade: number }[];
   por_marketplace: { marketplace: string; faturamento: number }[];
   vendas_por_dia: { dia: string; faturamento: number }[];
-};
-
-const mapaLojas: Record<string, string> = {
-  "ngk-shopee": "NGK Shopee",
-  "pitibiribas-shopee": "Pitibiribas Shopee",
-  "ngk-tiktok": "NGK TikTok",
-  "pitibiribas-tiktok": "Pitibiribas TikTok",
 };
 
 // Tradução dos status da Shopee para exibição.
@@ -148,7 +142,7 @@ function formatarDiaCurto(dia: string) {
 type Periodo = { inicio: string; fim: string } | null;
 
 async function buscarTodosPedidos(
-  lojaId: string | null,
+  lojaIds: string[] | null,
   periodo: Periodo
 ): Promise<PedidoRow[]> {
   const pageSize = 1000;
@@ -166,7 +160,7 @@ async function buscarTodosPedidos(
       .order("data_pedido", { ascending: false, nullsFirst: false })
       .range(de, de + pageSize - 1);
 
-    if (lojaId) query = query.eq("loja_id", lojaId);
+    if (lojaIds) query = query.in("loja_id", lojaIds);
     if (periodo) {
       query = query
         .gte("data_pedido", periodo.inicio)
@@ -201,11 +195,11 @@ type ResumoCalculado = {
 // Calcula o resumo: tenta a função SQL (rápida e ilimitada) e, se ela ainda
 // não existir, cai no fallback paginado no app.
 async function calcularResumoPedidos(
-  lojaId: string | null,
+  lojaIds: string[] | null,
   periodo: Periodo
 ): Promise<ResumoCalculado> {
   const { data: resumoRpc } = await supabase.rpc("resumo_pedidos", {
-    p_loja_id: lojaId,
+    p_loja_ids: lojaIds,
     p_inicio: periodo?.inicio ?? null,
     p_fim: periodo?.fim ?? null,
   });
@@ -237,7 +231,7 @@ async function calcularResumoPedidos(
   }
 
   // ---- Fallback paginado ----
-  const pedidos = await buscarTodosPedidos(lojaId, periodo);
+  const pedidos = await buscarTodosPedidos(lojaIds, periodo);
 
   const efetivados = pedidos.filter((p) => p.pedido_efetivado);
   const faturados = pedidos.filter((p) => p.entra_faturamento);
@@ -290,21 +284,9 @@ async function calcularResumoPedidos(
 export default async function Dashboard({ searchParams }: DashboardProps) {
   const params = await searchParams;
 
-  const lojaSlug = params.loja;
   const periodo = getPeriodoFiltro(params.periodo);
-  const apelidoLoja = lojaSlug ? mapaLojas[lojaSlug] : null;
-
-  let lojaId: string | null = null;
-
-  if (apelidoLoja) {
-    const { data: loja } = await supabase
-      .from("lojas")
-      .select("id")
-      .eq("apelido", apelidoLoja)
-      .single();
-
-    lojaId = loja?.id || null;
-  }
+  const escopo = await escopoDoUsuario();
+  const lojas = filtroLojas(escopo, params.loja);
 
   let avaliacoesQuery = supabase
     .from("avaliacoes")
@@ -344,14 +326,14 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
     .order("data_pedido", { ascending: false })
     .limit(20);
 
-  if (lojaId) {
-    avaliacoesQuery = avaliacoesQuery.eq("loja_id", lojaId);
-    avaliacoesMediaQuery = avaliacoesMediaQuery.eq("loja_id", lojaId);
-    ultimasQuery = ultimasQuery.eq("loja_id", lojaId);
-    produtosSemEstoqueQuery = produtosSemEstoqueQuery.eq("loja_id", lojaId);
-    financeiroQuery = financeiroQuery.eq("loja_id", lojaId);
-    rankingQuery = rankingQuery.eq("loja_id", lojaId);
-    recentesQuery = recentesQuery.eq("loja_id", lojaId);
+  if (lojas) {
+    avaliacoesQuery = avaliacoesQuery.in("loja_id", lojas);
+    avaliacoesMediaQuery = avaliacoesMediaQuery.in("loja_id", lojas);
+    ultimasQuery = ultimasQuery.in("loja_id", lojas);
+    produtosSemEstoqueQuery = produtosSemEstoqueQuery.in("loja_id", lojas);
+    financeiroQuery = financeiroQuery.in("loja_id", lojas);
+    rankingQuery = rankingQuery.in("loja_id", lojas);
+    recentesQuery = recentesQuery.in("loja_id", lojas);
   }
 
   if (periodo) {
@@ -375,7 +357,7 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
       .lt("data_pedido", periodo.fim);
   }
 
-  const resumo = await calcularResumoPedidos(lojaId, periodo);
+  const resumo = await calcularResumoPedidos(lojas, periodo);
 
   const { count: totalAvaliacoes } = await avaliacoesQuery;
   const { data: avaliacoesMedia } = await avaliacoesMediaQuery;
@@ -394,8 +376,8 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
       head: true,
     });
 
-  if (lojaId) {
-    respostasQuery = respostasQuery.eq("avaliacoes.loja_id", lojaId);
+  if (lojas) {
+    respostasQuery = respostasQuery.in("avaliacoes.loja_id", lojas);
   }
 
   if (periodo) {
@@ -469,9 +451,7 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
       <h1 className="text-4xl font-bold">Dashboard</h1>
 
       <p className="mt-2 text-slate-400">
-        {apelidoLoja
-          ? `Visão geral da loja ${apelidoLoja}.`
-          : "Visão geral das operações da NGK Store."}
+        Visão geral das operações. Use o seletor de loja no topo para filtrar.
       </p>
 
       {/* Destaque: faturamento */}

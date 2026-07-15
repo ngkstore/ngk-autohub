@@ -1,15 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import AuthStatus from "./AuthStatus";
 
-const lojas = [
-  { id: "todas", nome: "Todas as lojas" },
-  { id: "ngk-shopee", nome: "NGK Shopee" },
-  { id: "pitibiribas-shopee", nome: "Pitibiribas Shopee" },
-  { id: "ngk-tiktok", nome: "NGK TikTok" },
-  { id: "pitibiribas-tiktok", nome: "Pitibiribas TikTok" },
-];
+type Loja = { id: string; apelido: string };
 
 const periodos = [
   { id: "todos", nome: "Todos" },
@@ -25,6 +20,15 @@ export default function Topbar() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
+  const [lojas, setLojas] = useState<Loja[]>([]);
+
+  useEffect(() => {
+    fetch("/api/minhas-lojas")
+      .then((r) => r.json())
+      .then((d) => setLojas(d.lojas || []))
+      .catch(() => setLojas([]));
+  }, []);
 
   const lojaSelecionada = searchParams.get("loja") || "todas";
   // Sem parâmetro na URL, as páginas mostram TODO o período — então o seletor
@@ -56,9 +60,12 @@ export default function Topbar() {
               onChange={(e) => atualizarFiltro("loja", e.target.value)}
               className="mt-1 rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-sm text-white"
             >
+              <option value="todas">
+                {lojas.length > 1 ? "Todas as minhas lojas" : "Todas as lojas"}
+              </option>
               {lojas.map((loja) => (
                 <option key={loja.id} value={loja.id}>
-                  {loja.nome}
+                  {loja.apelido}
                 </option>
               ))}
             </select>

@@ -1,13 +1,7 @@
 import { supabase } from "@/lib/supabase";
+import { escopoDoUsuario, filtroLojas } from "@/lib/conta";
 
 export const dynamic = "force-dynamic";
-
-const mapaLojas: Record<string, string> = {
-  "ngk-shopee": "NGK Shopee",
-  "pitibiribas-shopee": "Pitibiribas Shopee",
-  "ngk-tiktok": "NGK TikTok",
-  "pitibiribas-tiktok": "Pitibiribas TikTok",
-};
 
 function obterIntervaloPeriodo(periodo?: string) {
   const agora = new Date();
@@ -58,21 +52,9 @@ export default async function PedidosPage({
 }) {
   const params = await searchParams;
 
-  const lojaSlug = params.loja;
-  const periodo = params.periodo || "mes";
-  const apelidoLoja = lojaSlug ? mapaLojas[lojaSlug] : null;
-
-  let lojaId: string | null = null;
-
-  if (apelidoLoja) {
-    const { data: loja } = await supabase
-      .from("lojas")
-      .select("id")
-      .eq("apelido", apelidoLoja)
-      .single();
-
-    lojaId = loja?.id || null;
-  }
+  const periodo = params.periodo;
+  const escopo = await escopoDoUsuario();
+  const lojas = filtroLojas(escopo, params.loja);
 
   const intervalo = obterIntervaloPeriodo(periodo);
 
@@ -82,8 +64,8 @@ export default async function PedidosPage({
     .order("criado_em", { ascending: false })
     .limit(50);
 
-  if (lojaId) {
-    pedidosQuery = pedidosQuery.eq("loja_id", lojaId);
+  if (lojas) {
+    pedidosQuery = pedidosQuery.in("loja_id", lojas);
   }
 
   if (intervalo) {
@@ -110,9 +92,7 @@ export default async function PedidosPage({
       <h1 className="text-4xl font-bold">Pedidos</h1>
 
       <p className="mt-2 text-slate-400">
-        {apelidoLoja
-          ? `Pedidos da ${apelidoLoja}`
-          : "Acompanhe pedidos, status, clientes e valores por loja."}
+        Acompanhe pedidos, status, clientes e valores. Filtre pela loja no topo.
       </p>
 
       <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">

@@ -1,15 +1,9 @@
 import { supabase } from "@/lib/supabase";
 import GerarRespostaButton from "../components/GerarRespostaButton";
 import GerarTodasButton from "../components/GerarTodasButton";
+import { escopoDoUsuario, filtroLojas } from "@/lib/conta";
 
 export const dynamic = "force-dynamic";
-
-const mapaLojas: Record<string, string> = {
-  "ngk-shopee": "NGK Shopee",
-  "pitibiribas-shopee": "Pitibiribas Shopee",
-  "ngk-tiktok": "NGK TikTok",
-  "pitibiribas-tiktok": "Pitibiribas TikTok",
-};
 
 function obterIntervaloPeriodo(periodo?: string) {
   const agora = new Date();
@@ -61,22 +55,9 @@ export default async function AvaliacoesPage({
 }) {
   const params = await searchParams;
 
-  const lojaSlug = params.loja;
-  const periodo = params.periodo || "mes";
-
-  const apelidoLoja = lojaSlug ? mapaLojas[lojaSlug] : null;
-
-  let lojaId: string | null = null;
-
-  if (apelidoLoja) {
-    const { data: loja } = await supabase
-      .from("lojas")
-      .select("id")
-      .eq("apelido", apelidoLoja)
-      .single();
-
-    lojaId = loja?.id || null;
-  }
+  const periodo = params.periodo;
+  const escopo = await escopoDoUsuario();
+  const lojas = filtroLojas(escopo, params.loja);
 
   const intervalo = obterIntervaloPeriodo(periodo);
 
@@ -93,8 +74,8 @@ export default async function AvaliacoesPage({
     `)
     .order("criado_em", { ascending: false });
 
-  if (lojaId) {
-    avaliacoesQuery = avaliacoesQuery.eq("loja_id", lojaId);
+  if (lojas) {
+    avaliacoesQuery = avaliacoesQuery.in("loja_id", lojas);
   }
 
   if (intervalo) {
@@ -116,9 +97,7 @@ export default async function AvaliacoesPage({
           <h1 className="text-4xl font-bold">Avaliações</h1>
 
           <p className="mt-2 text-slate-400">
-            {apelidoLoja
-              ? `Exibindo avaliações da ${apelidoLoja}`
-              : "Exibindo avaliações de todas as lojas"}
+            Filtre pela loja no seletor do topo.
           </p>
         </div>
 
