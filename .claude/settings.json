@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git commit -q -m ' *)"
+      "Bash(git commit -q -m ' *)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }
