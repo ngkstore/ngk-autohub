@@ -3,6 +3,8 @@ import { supabase } from "@/lib/supabase";
 import SyncButton from "../components/SyncButton";
 import SyncAllButton from "../components/SyncAllButton";
 
+export const dynamic = "force-dynamic";
+
 function normalizarMarketplace(marketplace?: string) {
   const valor = marketplace?.toLowerCase() || "";
 

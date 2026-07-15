@@ -1,5 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
+import { supabase } from "@/lib/supabase";
+
+const CHAVE_PENDENTE = "oauth_loja_pendente";
+
+async function salvarLojaPendente(lojaId: string) {
+  const { data } = await supabase
+    .from("configuracoes")
+    .select("chave")
+    .eq("chave", CHAVE_PENDENTE)
+    .maybeSingle();
+  const linha = {
+    chave: CHAVE_PENDENTE,
+    valor: lojaId,
+    atualizado_em: new Date().toISOString(),
+  };
+  if (data) {
+    await supabase.from("configuracoes").update(linha).eq("chave", CHAVE_PENDENTE);
+  } else {
+    await supabase.from("configuracoes").insert(linha);
+  }
+}
 
 function gerarAssinatura(
   partnerId: string,
@@ -47,9 +68,11 @@ export async function GET(request: NextRequest) {
     const baseUrl =
       process.env.SHOPEE_API_BASE_URL || "https://partner.shopeemobile.com";
 
-    // Anexa ?loja=<id> ao redirect: a Shopee preserva a query e devolve no callback.
+    // Guarda no banco qual loja está sendo conectada (fonte confiável no callback,
+    // caso a Shopee não preserve a query do redirect). Também anexa ?loja= como reforço.
     let redirect = redirectUrl;
     if (lojaId) {
+      await salvarLojaPendente(lojaId);
       const u = new URL(redirectUrl);
       u.searchParams.set("loja", lojaId);
       redirect = u.toString();

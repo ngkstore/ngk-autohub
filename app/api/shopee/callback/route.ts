@@ -52,10 +52,22 @@ export async function GET(request: NextRequest) {
 
     // A qual loja pertence este token? Resolve nesta ordem:
     // 1) ?loja=<id> repassado pelo fluxo de autorização;
-    // 2) loja já marcada com este shop_id;
-    // 3) token existente com este shop_id (reconexão);
-    // 4) legado: a loja com "NGK" no apelido.
+    // 2) loja pendente salva no banco ao iniciar o fluxo (fonte confiável);
+    // 3) loja já marcada com este shop_id;
+    // 4) token existente com este shop_id (reconexão);
+    // 5) legado: a loja com "NGK" no apelido.
     let lojaId: string | null = searchParams.get("loja");
+    let usouPendente = false;
+
+    if (!lojaId) {
+      const { data } = await supabase
+        .from("configuracoes")
+        .select("valor")
+        .eq("chave", "oauth_loja_pendente")
+        .maybeSingle();
+      lojaId = data?.valor ?? null;
+      usouPendente = !!lojaId;
+    }
 
     if (!lojaId) {
       const { data } = await supabase
@@ -161,6 +173,14 @@ export async function GET(request: NextRequest) {
       .from("lojas")
       .update({ shop_id: shopIdStr })
       .eq("id", lojaId);
+
+    // Consumiu a loja pendente: limpa para não vazar para a próxima conexão.
+    if (usouPendente) {
+      await supabase
+        .from("configuracoes")
+        .update({ valor: "", atualizado_em: new Date().toISOString() })
+        .eq("chave", "oauth_loja_pendente");
+    }
 
     await supabase.from("sincronizacoes").insert({
       loja_id: lojaId,
