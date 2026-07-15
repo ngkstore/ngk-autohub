@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { responderChatsLote } from "@/lib/shopee/responderChats";
+import { responderChatsLote, type ResultadoChat } from "@/lib/shopee/responderChats";
+import { listarLojasShopeeAtivas } from "@/lib/shopee/lojas";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -8,7 +9,21 @@ export const maxDuration = 300;
 const CHAVE_ATIVO = "responder_chat_ativo";
 const CHAVE_AUTONOMO = "responder_chat_autonomo";
 
+// Soma os resultados por loja num único objeto (mantém a UI de revisão simples).
+function agregar(resultados: ResultadoChat[]) {
+  return resultados.reduce(
+    (acc, r) => ({
+      processados: acc.processados + r.processados,
+      enviados: acc.enviados + r.enviados,
+      escalados: acc.escalados + r.escalados,
+      propostas: [...acc.propostas, ...r.propostas],
+    }),
+    { processados: 0, enviados: 0, escalados: 0, propostas: [] as ResultadoChat["propostas"] }
+  );
+}
+
 // POST: manual. { limite, enviar, autonomo }. enviar=false = só gera p/ revisão.
+// Roda em todas as lojas Shopee ativas.
 export async function POST(request: NextRequest) {
   let limite = 5;
   let enviar = false;
@@ -23,8 +38,14 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const r = await responderChatsLote({ limite, enviar, autonomo });
-    return NextResponse.json({ sucesso: !r.erro, enviar, autonomo, ...r });
+    const lojas = await listarLojasShopeeAtivas();
+    const resultados: ResultadoChat[] = [];
+    for (const loja of lojas) {
+      resultados.push(
+        await responderChatsLote({ lojaId: loja.lojaId, limite, enviar, autonomo })
+      );
+    }
+    return NextResponse.json({ sucesso: true, enviar, autonomo, ...agregar(resultados) });
   } catch (error) {
     return NextResponse.json(
       {
@@ -54,8 +75,14 @@ export async function GET() {
     }
 
     const autonomo = mapa[CHAVE_AUTONOMO] === "true";
-    const r = await responderChatsLote({ limite: 15, enviar: true, autonomo });
-    return NextResponse.json({ sucesso: !r.erro, autonomo, ...r });
+    const lojas = await listarLojasShopeeAtivas();
+    const resultados: ResultadoChat[] = [];
+    for (const loja of lojas) {
+      resultados.push(
+        await responderChatsLote({ lojaId: loja.lojaId, limite: 15, enviar: true, autonomo })
+      );
+    }
+    return NextResponse.json({ sucesso: true, autonomo, ...agregar(resultados) });
   } catch (error) {
     return NextResponse.json(
       {

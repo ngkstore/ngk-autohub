@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { supabase } from "@/lib/supabase";
+import type { LojaShopee } from "@/lib/shopee/lojas";
 
 const BASE_URL_PADRAO = "https://partner.shopeemobile.com";
 
@@ -53,21 +54,6 @@ async function chamar(
   return response.json();
 }
 
-async function obterToken(): Promise<Token> {
-  const { data: token } = await supabase
-    .from("marketplace_tokens")
-    .select("access_token, shop_id")
-    .eq("marketplace", "shopee")
-    .eq("status", "ativo")
-    .limit(1)
-    .single();
-
-  if (!token?.access_token || !token?.shop_id) {
-    throw new Error("Nenhuma loja Shopee com token ativo.");
-  }
-  return { accessToken: token.access_token, shopId: String(token.shop_id) };
-}
-
 type MensagemShopee = {
   message_id: string;
   from_shop_id?: number;
@@ -87,15 +73,17 @@ export type ResultadoSyncChat = {
 // Sincroniza uma página de conversas e, para cada uma, as mensagens recentes.
 // Guarda quem falou por último (precisa_resposta) e o item da conversa.
 export async function sincronizarChatsPagina({
+  loja,
   nextTimestamp = "",
   maxConversas = 25,
   direction = "older",
 }: {
+  loja: LojaShopee;
   nextTimestamp?: string;
   maxConversas?: number;
   direction?: "latest" | "older";
 }): Promise<ResultadoSyncChat> {
-  const token = await obterToken();
+  const token: Token = { accessToken: loja.accessToken, shopId: loja.shopId };
 
   const params: Record<string, string> = {
     type: "all",
@@ -147,6 +135,7 @@ export async function sincronizarChatsPagina({
           return {
             message_id: String(m.message_id),
             conversation_id: conversationId,
+            loja_id: loja.lojaId,
             de_loja: String(m.from_shop_id) === token.shopId,
             texto: m.content?.text ?? "",
             item_id: itemId,
@@ -164,6 +153,7 @@ export async function sincronizarChatsPagina({
     await supabase.from("chat_conversas").upsert(
       {
         conversation_id: conversationId,
+        loja_id: loja.lojaId,
         to_id: toId,
         to_name: c.to_name ?? null,
         item_id: itemIdConversa,

@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { supabase } from "@/lib/supabase";
+import type { LojaShopee } from "@/lib/shopee/lojas";
 
 const BASE_URL_PADRAO = "https://partner.shopeemobile.com";
 const TAMANHO_LOTE = 50; // get_item_base_info aceita até 50 item_id por chamada
@@ -33,8 +34,9 @@ export type ResultadoDescricoes = {
 // Busca a descrição de produtos que ainda não têm (get_item_base_info, em
 // lotes de 50) e grava em produtos.descricao.
 export async function enriquecerDescricoesPendentes({
+  loja,
   limite = 200,
-}: { limite?: number } = {}): Promise<ResultadoDescricoes> {
+}: { loja: LojaShopee; limite?: number }): Promise<ResultadoDescricoes> {
   const partnerId = process.env.SHOPEE_PARTNER_ID;
   const partnerKey = process.env.SHOPEE_PARTNER_KEY;
   const baseUrl = process.env.SHOPEE_API_BASE_URL || BASE_URL_PADRAO;
@@ -43,26 +45,15 @@ export async function enriquecerDescricoesPendentes({
     throw new Error("Credenciais da Shopee não configuradas.");
   }
 
-  const { data: token } = await supabase
-    .from("marketplace_tokens")
-    .select("access_token, shop_id")
-    .eq("marketplace", "shopee")
-    .eq("status", "ativo")
-    .limit(1)
-    .single();
-
-  if (!token?.access_token || !token?.shop_id) {
-    throw new Error("Nenhuma loja Shopee com token ativo.");
-  }
-
-  const accessToken = token.access_token;
-  const shopId = String(token.shop_id);
+  const accessToken = loja.accessToken;
+  const shopId = loja.shopId;
   const path = "/api/v2/product/get_item_base_info";
 
   const { data: produtos } = await supabase
     .from("produtos")
     .select("id, item_id")
     .eq("marketplace", "shopee")
+    .eq("loja_id", loja.lojaId)
     .not("item_id", "is", null)
     .is("descricao", null)
     .limit(limite);
@@ -129,6 +120,7 @@ export async function enriquecerDescricoesPendentes({
     .from("produtos")
     .select("id", { count: "exact", head: true })
     .eq("marketplace", "shopee")
+    .eq("loja_id", loja.lojaId)
     .not("item_id", "is", null)
     .is("descricao", null);
 

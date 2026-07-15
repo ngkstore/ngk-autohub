@@ -30,16 +30,17 @@ Responda APENAS com um JSON válido, sem nenhum texto fora dele, no formato:
 
 type Token = { accessToken: string; shopId: string };
 
-async function obterToken(): Promise<Token> {
+async function obterToken(lojaId: string): Promise<Token> {
   const { data: token } = await supabase
     .from("marketplace_tokens")
     .select("access_token, shop_id")
     .eq("marketplace", "shopee")
     .eq("status", "ativo")
+    .eq("loja_id", lojaId)
     .limit(1)
     .single();
   if (!token?.access_token || !token?.shop_id) {
-    throw new Error("Nenhuma loja Shopee com token ativo.");
+    throw new Error("Loja Shopee sem token ativo.");
   }
   return { accessToken: token.access_token, shopId: String(token.shop_id) };
 }
@@ -132,19 +133,22 @@ export type ResultadoChat = {
 // Processa conversas pendentes (cliente foi o último a falar). Se enviar=false,
 // apenas gera as respostas propostas (sem enviar nem marcar) — modo de revisão.
 export async function responderChatsLote({
+  lojaId,
   limite = 10,
   enviar = false,
   autonomo = false,
 }: {
+  lojaId: string;
   limite?: number;
   enviar?: boolean;
   autonomo?: boolean;
-} = {}): Promise<ResultadoChat> {
+}): Promise<ResultadoChat> {
   const { data: conversas } = await supabase
     .from("chat_conversas")
     .select(
       "conversation_id, to_id, to_name, item_id, ultima_mensagem, latest_message_id, ultimo_tratado_msg_id"
     )
+    .eq("loja_id", lojaId)
     .eq("precisa_resposta", true)
     .order("ultima_mensagem_ts", { ascending: false })
     .limit(limite * 3);
@@ -161,7 +165,7 @@ export async function responderChatsLote({
     return { processados: 0, enviados: 0, escalados: 0, propostas: [] };
   }
 
-  const token = await obterToken();
+  const token = await obterToken(lojaId);
   const client = new Anthropic();
 
   // Aprendizado: exemplos REAIS de como a loja já respondeu (qualquer produto),
@@ -169,6 +173,7 @@ export async function responderChatsLote({
   const { data: exemplosRaw } = await supabase
     .from("chat_mensagens")
     .select("texto")
+    .eq("loja_id", lojaId)
     .eq("de_loja", true)
     .not("texto", "is", null)
     .neq("texto", "")
@@ -201,6 +206,7 @@ export async function responderChatsLote({
         .from("pedidos")
         .select("dados_pedido")
         .eq("marketplace", "shopee")
+        .eq("loja_id", lojaId)
         .eq("cliente_nome", c.to_name)
         .order("data_pedido", { ascending: false })
         .limit(1)
@@ -236,6 +242,7 @@ export async function responderChatsLote({
       const { data: msgs } = await supabase
         .from("chat_mensagens")
         .select("de_loja, texto, created_timestamp")
+        .eq("loja_id", lojaId)
         .eq("item_id", itemId)
         .not("texto", "is", null)
         .order("created_timestamp", { ascending: false })

@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { sincronizarChatsPagina } from "@/lib/shopee/sincronizarChats";
+import { listarLojasShopeeAtivas } from "@/lib/shopee/lojas";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-const CHAVE_TS = "chat_next_timestamp";
-const CHAVE_DONE = "chat_backfill_done";
+// Chaves de estado do backfill, por loja (ex.: "chat_next_timestamp:<lojaId>").
+const chaveTs = (lojaId: string) => `chat_next_timestamp:${lojaId}`;
+const chaveDone = (lojaId: string) => `chat_backfill_done:${lojaId}`;
 
 async function setConfig(chave: string, valor: string) {
   const { data } = await supabase
@@ -27,11 +29,20 @@ async function setConfig(chave: string, valor: string) {
   }
 }
 
-// POST: sincroniza AGORA as conversas mais novas (usado pelo botão).
+// POST: sincroniza AGORA as conversas mais novas de todas as lojas (botão).
 export async function POST() {
   try {
-    const r = await sincronizarChatsPagina({ direction: "latest" });
-    return NextResponse.json({ sucesso: !r.erro, fase: "novas", ...r });
+    const lojas = await listarLojasShopeeAtivas();
+    const resultados = [];
+    for (const loja of lojas) {
+      const r = await sincronizarChatsPagina({ loja, direction: "latest" });
+      resultados.push({ lojaId: loja.lojaId, ...r });
+    }
+    return NextResponse.json({
+      sucesso: resultados.every((r) => !r.erro),
+      fase: "novas",
+      lojas: resultados,
+    });
   } catch (error) {
     return NextResponse.json(
       {
@@ -43,40 +54,47 @@ export async function POST() {
   }
 }
 
-// GET: cron. SEMPRE puxa as conversas novas primeiro (responsivo); e, se o
-// histórico ainda não terminou, avança uma página antiga em paralelo.
+// GET: cron. Para CADA loja: puxa as conversas novas primeiro (responsivo) e,
+// se o histórico ainda não terminou, avança uma página antiga (cursor por loja).
 export async function GET() {
   try {
-    // 1) Conversas novas (mais recentes) — para o chat ficar responsivo.
-    const novas = await sincronizarChatsPagina({ direction: "latest" });
+    const lojas = await listarLojasShopeeAtivas();
+    const resultados = [];
 
-    // 2) Backfill do histórico (em paralelo, sem atrapalhar as novas).
-    const { data: rows } = await supabase
-      .from("configuracoes")
-      .select("chave, valor")
-      .in("chave", [CHAVE_TS, CHAVE_DONE]);
+    for (const loja of lojas) {
+      // 1) Conversas novas (mais recentes).
+      const novas = await sincronizarChatsPagina({ loja, direction: "latest" });
 
-    const estado: Record<string, string> = {};
-    (rows || []).forEach((r) => {
-      estado[r.chave] = r.valor;
-    });
+      // 2) Backfill do histórico (cursor por loja).
+      const { data: rows } = await supabase
+        .from("configuracoes")
+        .select("chave, valor")
+        .in("chave", [chaveTs(loja.lojaId), chaveDone(loja.lojaId)]);
 
-    let historico = null;
-    if (estado[CHAVE_DONE] !== "true") {
-      historico = await sincronizarChatsPagina({
-        direction: "older",
-        nextTimestamp: estado[CHAVE_TS] || "",
+      const estado: Record<string, string> = {};
+      (rows || []).forEach((r) => {
+        estado[r.chave] = r.valor;
       });
-      if (!historico.erro) {
-        await setConfig(CHAVE_TS, historico.nextTimestamp);
-        if (historico.done) await setConfig(CHAVE_DONE, "true");
+
+      let historico = null;
+      if (estado[chaveDone(loja.lojaId)] !== "true") {
+        historico = await sincronizarChatsPagina({
+          loja,
+          direction: "older",
+          nextTimestamp: estado[chaveTs(loja.lojaId)] || "",
+        });
+        if (!historico.erro) {
+          await setConfig(chaveTs(loja.lojaId), historico.nextTimestamp);
+          if (historico.done) await setConfig(chaveDone(loja.lojaId), "true");
+        }
       }
+
+      resultados.push({ lojaId: loja.lojaId, novas, historico });
     }
 
     return NextResponse.json({
-      sucesso: !novas.erro,
-      novas,
-      historico,
+      sucesso: resultados.every((r) => !r.novas.erro),
+      lojas: resultados,
     });
   } catch (error) {
     return NextResponse.json(

@@ -47,17 +47,18 @@ type AvaliacaoRow = {
 
 type TokenLoja = { accessToken: string; shopId: string; lojaId: string | null };
 
-async function obterToken(): Promise<TokenLoja> {
+async function obterToken(lojaId: string): Promise<TokenLoja> {
   const { data: token } = await supabase
     .from("marketplace_tokens")
     .select("access_token, shop_id, loja_id")
     .eq("marketplace", "shopee")
     .eq("status", "ativo")
+    .eq("loja_id", lojaId)
     .limit(1)
     .single();
 
   if (!token?.access_token || !token?.shop_id) {
-    throw new Error("Nenhuma loja Shopee com token ativo.");
+    throw new Error("Loja Shopee sem token ativo.");
   }
   return {
     accessToken: token.access_token,
@@ -139,13 +140,15 @@ export type ResultadoResponder = {
 // Processa um lote de avaliações pendentes: gera a resposta (modelo p/ 5★,
 // IA Haiku p/ 1-4★), publica na Shopee e marca como respondida.
 export async function responderAvaliacoesLote({
+  lojaId,
   limite = 20,
   notaMax,
-}: { limite?: number; notaMax?: number } = {}): Promise<ResultadoResponder> {
+}: { lojaId: string; limite?: number; notaMax?: number }): Promise<ResultadoResponder> {
   let query = supabase
     .from("avaliacoes")
     .select("id, comment_id, avaliacao, comentario, nome_produto")
     .eq("marketplace", "shopee")
+    .eq("loja_id", lojaId)
     .eq("ja_respondida", false)
     .not("comment_id", "is", null);
 
@@ -168,7 +171,7 @@ export async function responderAvaliacoesLote({
     };
   }
 
-  const token = await obterToken();
+  const token = await obterToken(lojaId);
   const client = new Anthropic(); // lê ANTHROPIC_API_KEY do ambiente
 
   const aPublicar: { comment_id: number; comment: string; id: string }[] = [];
@@ -248,6 +251,7 @@ export async function responderAvaliacoesLote({
     .from("avaliacoes")
     .select("id", { count: "exact", head: true })
     .eq("marketplace", "shopee")
+    .eq("loja_id", lojaId)
     .eq("ja_respondida", false)
     .not("comment_id", "is", null);
 

@@ -1,19 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { enriquecerDescricoesPendentes } from "@/lib/shopee/enriquecerProdutos";
+import { listarLojasShopeeAtivas } from "@/lib/shopee/lojas";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 async function rodar(limite: number) {
   try {
-    const resultado = await enriquecerDescricoesPendentes({ limite });
+    const lojas = await listarLojasShopeeAtivas();
+    const resultados = [];
+    for (const loja of lojas) {
+      resultados.push({
+        lojaId: loja.lojaId,
+        ...(await enriquecerDescricoesPendentes({ loja, limite })),
+      });
+    }
+    const restantes = resultados.reduce((s, r) => s + (r.restantes || 0), 0);
+    const atualizados = resultados.reduce((s, r) => s + (r.atualizados || 0), 0);
     return NextResponse.json({
-      sucesso: !resultado.erro,
-      mensagem:
-        resultado.processados === 0
-          ? "Nenhum produto pendente de descrição."
-          : `${resultado.atualizados} descrição(ões) atualizada(s). Faltam ${resultado.restantes}.`,
-      ...resultado,
+      sucesso: true,
+      mensagem: `${atualizados} descrição(ões) atualizada(s). Faltam ${restantes}.`,
+      lojas: resultados,
     });
   } catch (error) {
     return NextResponse.json(

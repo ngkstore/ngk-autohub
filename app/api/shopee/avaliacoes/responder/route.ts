@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { responderAvaliacoesLote } from "@/lib/shopee/responderAvaliacoes";
+import { listarLojasShopeeAtivas } from "@/lib/shopee/lojas";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 const CHAVE_ATIVO = "responder_avaliacoes_ativo";
-const POR_MINUTO = 20; // avaliações por minuto na janela ativa
+const POR_MINUTO = 20; // avaliações por minuto por loja na janela ativa
 const FIM_JANELA_ATIVA = 30; // minutos 0-29 = sprint; 30-59 = pausa
 
-// POST: execução manual (teste). Body opcional { limite }.
+// POST: execução manual (teste), em todas as lojas. Body opcional { limite, notaMax }.
 export async function POST(request: NextRequest) {
   let limite = 5;
   let notaMax: number | undefined;
@@ -22,8 +23,15 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const resultado = await responderAvaliacoesLote({ limite, notaMax });
-    return NextResponse.json({ sucesso: !resultado.erro, ...resultado });
+    const lojas = await listarLojasShopeeAtivas();
+    const resultados = [];
+    for (const loja of lojas) {
+      resultados.push({
+        lojaId: loja.lojaId,
+        ...(await responderAvaliacoesLote({ lojaId: loja.lojaId, limite, notaMax })),
+      });
+    }
+    return NextResponse.json({ sucesso: true, lojas: resultados });
   } catch (error) {
     return NextResponse.json(
       {
@@ -65,8 +73,15 @@ export async function GET() {
       });
     }
 
-    const resultado = await responderAvaliacoesLote({ limite: POR_MINUTO });
-    return NextResponse.json({ sucesso: !resultado.erro, ...resultado });
+    const lojas = await listarLojasShopeeAtivas();
+    const resultados = [];
+    for (const loja of lojas) {
+      resultados.push({
+        lojaId: loja.lojaId,
+        ...(await responderAvaliacoesLote({ lojaId: loja.lojaId, limite: POR_MINUTO })),
+      });
+    }
+    return NextResponse.json({ sucesso: true, lojas: resultados });
   } catch (error) {
     return NextResponse.json(
       {

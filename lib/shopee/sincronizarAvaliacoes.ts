@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { supabase } from "@/lib/supabase";
+import type { LojaShopee } from "@/lib/shopee/lojas";
 
 const BASE_URL_PADRAO = "https://partner.shopeemobile.com";
 
@@ -42,10 +43,12 @@ export type ResultadoSyncAvaliacoes = {
 // Se `itemId` for informado, busca os comentários daquele produto (necessário
 // para alcançar o histórico completo — a consulta da loja inteira tem teto).
 export async function sincronizarAvaliacoesPagina({
+  loja,
   cursor = "",
   maxPaginas = 40,
   itemId,
 }: {
+  loja: LojaShopee;
   cursor?: string;
   maxPaginas?: number;
   itemId?: number;
@@ -58,21 +61,9 @@ export async function sincronizarAvaliacoesPagina({
     throw new Error("Credenciais da Shopee não configuradas.");
   }
 
-  const { data: token } = await supabase
-    .from("marketplace_tokens")
-    .select("*")
-    .eq("marketplace", "shopee")
-    .eq("status", "ativo")
-    .limit(1)
-    .single();
-
-  if (!token?.access_token || !token?.shop_id) {
-    throw new Error("Nenhuma loja Shopee com token ativo.");
-  }
-
-  const lojaId = token.loja_id;
-  const shopId = String(token.shop_id);
-  const accessToken = token.access_token;
+  const lojaId = loja.lojaId;
+  const shopId = loja.shopId;
+  const accessToken = loja.accessToken;
   const path = "/api/v2/product/get_comment";
 
   // Mapa item_id -> nome do produto (para preencher nome_produto).
