@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 
 function gerarAssinatura(
@@ -15,11 +15,15 @@ function gerarAssinatura(
     .digest("hex");
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const partnerId = process.env.SHOPEE_PARTNER_ID;
     const partnerKey = process.env.SHOPEE_PARTNER_KEY;
     const redirectUrl = process.env.NEXT_PUBLIC_SHOPEE_REDIRECT_URL;
+
+    // Qual loja estamos conectando? Vem de /api/shopee/auth?loja=<id>.
+    // Repassamos no redirect para o callback amarrar o token à loja certa.
+    const lojaId = request.nextUrl.searchParams.get("loja");
 
     if (!partnerId || !partnerKey || !redirectUrl) {
       return NextResponse.json(
@@ -43,12 +47,20 @@ export async function GET() {
     const baseUrl =
       process.env.SHOPEE_API_BASE_URL || "https://partner.shopeemobile.com";
 
+    // Anexa ?loja=<id> ao redirect: a Shopee preserva a query e devolve no callback.
+    let redirect = redirectUrl;
+    if (lojaId) {
+      const u = new URL(redirectUrl);
+      u.searchParams.set("loja", lojaId);
+      redirect = u.toString();
+    }
+
     const authUrl = new URL(`${baseUrl}${path}`);
 
     authUrl.searchParams.set("partner_id", partnerId);
     authUrl.searchParams.set("timestamp", String(timestamp));
     authUrl.searchParams.set("sign", sign);
-    authUrl.searchParams.set("redirect", redirectUrl);
+    authUrl.searchParams.set("redirect", redirect);
 
     return NextResponse.redirect(authUrl.toString());
   } catch (error) {

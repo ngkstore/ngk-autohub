@@ -43,14 +43,13 @@ export default async function IntegracoesPage() {
 
       <div className="mt-6 flex flex-wrap gap-3">
         <SyncAllButton lojas={lojas || []} />
-
-        <Link
-          href="/api/shopee/auth"
-          className="rounded-lg bg-orange-600 px-5 py-3 text-sm font-semibold text-white hover:bg-orange-500"
-        >
-          Conectar Shopee
-        </Link>
       </div>
+
+      <p className="mt-3 text-sm text-slate-400">
+        Para conectar uma loja Shopee, use o botão{" "}
+        <span className="font-semibold text-orange-300">Conectar</span> no card
+        dela abaixo — estando logado na conta Shopee daquela loja.
+      </p>
 
       <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
         <section className="rounded-2xl bg-slate-900 p-6">
@@ -112,13 +111,25 @@ export default async function IntegracoesPage() {
                         : "Aguardando conexão"}
                     </span>
 
-                    <div className="mt-4">
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
                       <SyncButton
                         lojaId={loja.id}
                         marketplace={
                           marketplaceNormalizado
                         }
                       />
+
+                      {marketplaceNormalizado ===
+                        "shopee" && (
+                        <Link
+                          href={`/api/shopee/auth?loja=${loja.id}`}
+                          className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-500"
+                        >
+                          {conectado
+                            ? "Reconectar"
+                            : "Conectar"}
+                        </Link>
+                      )}
                     </div>
                   </div>
                 );

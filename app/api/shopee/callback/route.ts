@@ -48,19 +48,48 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { data: lojaNgk, error: lojaError } = await supabase
-      .from("lojas")
-      .select("id")
-      .ilike("apelido", "%NGK%")
-      .ilike("marketplace", "%shopee%")
-      .single();
+    const shopIdStr = String(shopId);
 
-    if (lojaError || !lojaNgk) {
+    // A qual loja pertence este token? Resolve nesta ordem:
+    // 1) ?loja=<id> repassado pelo fluxo de autorização;
+    // 2) loja já marcada com este shop_id;
+    // 3) token existente com este shop_id (reconexão);
+    // 4) legado: a loja com "NGK" no apelido.
+    let lojaId: string | null = searchParams.get("loja");
+
+    if (!lojaId) {
+      const { data } = await supabase
+        .from("lojas")
+        .select("id")
+        .eq("shop_id", shopIdStr)
+        .maybeSingle();
+      lojaId = data?.id ?? null;
+    }
+
+    if (!lojaId) {
+      const { data } = await supabase
+        .from("marketplace_tokens")
+        .select("loja_id")
+        .eq("shop_id", shopIdStr)
+        .maybeSingle();
+      lojaId = data?.loja_id ?? null;
+    }
+
+    if (!lojaId) {
+      const { data } = await supabase
+        .from("lojas")
+        .select("id")
+        .ilike("apelido", "%NGK%")
+        .ilike("marketplace", "%shopee%")
+        .maybeSingle();
+      lojaId = data?.id ?? null;
+    }
+
+    if (!lojaId) {
       return NextResponse.json(
         {
           sucesso: false,
-          erro: "Loja NGK Shopee não encontrada.",
-          detalhe: lojaError?.message,
+          erro: "Não foi possível identificar a loja para este token. Conecte pela aba Integrações (botão da loja).",
         },
         { status: 404 }
       );
@@ -100,12 +129,12 @@ export async function GET(request: NextRequest) {
     await supabase
       .from("marketplace_tokens")
       .delete()
-      .eq("loja_id", lojaNgk.id);
+      .eq("loja_id", lojaId);
 
     const { error: tokenError } = await supabase
       .from("marketplace_tokens")
       .insert({
-        loja_id: lojaNgk.id,
+        loja_id: lojaId,
         marketplace: "shopee",
         access_token: tokenData.access_token,
         refresh_token: tokenData.refresh_token,
@@ -127,8 +156,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Marca a loja com o shop_id (permite reconexão sem depender do ?loja=).
+    await supabase
+      .from("lojas")
+      .update({ shop_id: shopIdStr })
+      .eq("id", lojaId);
+
     await supabase.from("sincronizacoes").insert({
-      loja_id: lojaNgk.id,
+      loja_id: lojaId,
       marketplace: "shopee",
       tipo: "oauth",
       status: "sucesso",
