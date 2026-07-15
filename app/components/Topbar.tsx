@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import AuthStatus from "./AuthStatus";
 
 const lojas = [
   { id: "todas", nome: "Todas as lojas" },
@@ -80,10 +81,7 @@ export default function Topbar() {
           </div>
         </div>
 
-        <div className="text-right">
-          <p className="text-sm font-semibold">Gabriel</p>
-          <p className="text-xs text-slate-400">Administrador</p>
-        </div>
+        <AuthStatus />
       </div>
     </header>
   );
