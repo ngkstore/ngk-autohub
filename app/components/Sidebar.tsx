@@ -9,6 +9,7 @@ const menuItems = [
   { name: "Financeiro", href: "/financeiro" },
   { name: "Auditoria", href: "/auditoria" },
   { name: "Analytics", href: "/analytics" },
+  { name: "Insights (planilhas)", href: "/insights" },
 
   { name: "Integrações", href: "/integracoes" },
   { name: "Sincronização", href: "/sincronizacao" },
