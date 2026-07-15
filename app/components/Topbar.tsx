@@ -26,7 +26,9 @@ export default function Topbar() {
   const searchParams = useSearchParams();
 
   const lojaSelecionada = searchParams.get("loja") || "todas";
-  const periodoSelecionado = searchParams.get("periodo") || "mes";
+  // Sem parâmetro na URL, as páginas mostram TODO o período — então o seletor
+  // precisa refletir "Todos" (antes exibia "Este mês" sem filtrar de fato).
+  const periodoSelecionado = searchParams.get("periodo") || "todos";
 
   function atualizarFiltro(chave: string, valor: string) {
     const params = new URLSearchParams(searchParams.toString());

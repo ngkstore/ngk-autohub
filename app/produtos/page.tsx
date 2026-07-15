@@ -1,10 +1,19 @@
 import { supabase } from "@/lib/supabase";
 
+export const dynamic = "force-dynamic";
+
+const mapaLojas: Record<string, string> = {
+  "ngk-shopee": "NGK Shopee",
+  "pitibiribas-shopee": "Pitibiribas Shopee",
+  "ngk-tiktok": "NGK TikTok",
+  "pitibiribas-tiktok": "Pitibiribas TikTok",
+};
+
 type ProdutosPageProps = {
-  searchParams: {
+  searchParams: Promise<{
     loja?: string;
     periodo?: string;
-  };
+  }>;
 };
 
 function getPeriodoFiltro(periodo?: string) {
@@ -47,17 +56,18 @@ function getPeriodoFiltro(periodo?: string) {
 export default async function ProdutosPage({
   searchParams,
 }: ProdutosPageProps) {
-  const lojaFiltro = searchParams?.loja;
-  const periodoFiltro = getPeriodoFiltro(searchParams?.periodo);
+  const params = await searchParams;
+  const apelidoLoja = params.loja ? mapaLojas[params.loja] : null;
+  const periodoFiltro = getPeriodoFiltro(params.periodo);
 
   let lojaId: string | null = null;
 
-  if (lojaFiltro && lojaFiltro !== "todas") {
+  if (apelidoLoja) {
     const { data: loja } = await supabase
       .from("lojas")
       .select("id")
-      .eq("apelido", lojaFiltro)
-      .single();
+      .eq("apelido", apelidoLoja)
+      .maybeSingle();
 
     lojaId = loja?.id || null;
   }

@@ -3,6 +3,13 @@ import EscaladoAcoes from "../components/EscaladoAcoes";
 
 export const dynamic = "force-dynamic";
 
+const mapaLojas: Record<string, string> = {
+  "ngk-shopee": "NGK Shopee",
+  "pitibiribas-shopee": "Pitibiribas Shopee",
+  "ngk-tiktok": "NGK TikTok",
+  "pitibiribas-tiktok": "Pitibiribas TikTok",
+};
+
 type Conversa = {
   conversation_id: string;
   to_name: string | null;
@@ -13,9 +20,28 @@ type Conversa = {
   resposta_ia: string | null;
 };
 
-export default async function AtendimentoPage() {
-  // Chats escalados que precisam de você.
-  const { data: escaladosRaw } = await supabase
+type AtendimentoProps = {
+  searchParams: Promise<{ loja?: string }>;
+};
+
+export default async function AtendimentoPage({
+  searchParams,
+}: AtendimentoProps) {
+  const { loja: lojaSlug } = await searchParams;
+  const apelidoLoja = lojaSlug ? mapaLojas[lojaSlug] : null;
+
+  let lojaId: string | null = null;
+  if (apelidoLoja) {
+    const { data: loja } = await supabase
+      .from("lojas")
+      .select("id")
+      .eq("apelido", apelidoLoja)
+      .maybeSingle();
+    lojaId = loja?.id || null;
+  }
+
+  // Chats escalados que precisam de você (filtrados pela loja selecionada).
+  let escaladosQuery = supabase
     .from("chat_conversas")
     .select(
       "conversation_id, to_name, item_id, ultima_mensagem, categoria, motivo_escala, resposta_ia"
@@ -24,16 +50,22 @@ export default async function AtendimentoPage() {
     .order("ultima_mensagem_ts", { ascending: false })
     .limit(50);
 
+  if (lojaId) escaladosQuery = escaladosQuery.eq("loja_id", lojaId);
+
+  const { data: escaladosRaw } = await escaladosQuery;
+
   const escalados = (escaladosRaw || []) as Conversa[];
 
   // Nome dos produtos
   const itemIds = [...new Set(escalados.map((c) => c.item_id).filter(Boolean))];
   const mapaProdutos = new Map<string, string>();
   if (itemIds.length > 0) {
-    const { data: prods } = await supabase
+    let prodQuery = supabase
       .from("produtos")
       .select("item_id, nome")
       .in("item_id", itemIds as number[]);
+    if (lojaId) prodQuery = prodQuery.eq("loja_id", lojaId);
+    const { data: prods } = await prodQuery;
     (prods || []).forEach((p) => {
       if (p.item_id) mapaProdutos.set(String(p.item_id), p.nome as string);
     });

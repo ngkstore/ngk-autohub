@@ -1,5 +1,7 @@
 import { supabase } from "@/lib/supabase";
 
+export const dynamic = "force-dynamic";
+
 const mapaLojas: Record<string, string> = {
   "ngk-shopee": "NGK Shopee",
   "pitibiribas-shopee": "Pitibiribas Shopee",

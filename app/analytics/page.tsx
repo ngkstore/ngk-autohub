@@ -1,10 +1,19 @@
 import { supabase } from "@/lib/supabase";
 
+export const dynamic = "force-dynamic";
+
+const mapaLojas: Record<string, string> = {
+  "ngk-shopee": "NGK Shopee",
+  "pitibiribas-shopee": "Pitibiribas Shopee",
+  "ngk-tiktok": "NGK TikTok",
+  "pitibiribas-tiktok": "Pitibiribas TikTok",
+};
+
 type AnalyticsPageProps = {
-  searchParams: {
+  searchParams: Promise<{
     loja?: string;
     periodo?: string;
-  };
+  }>;
 };
 
 function getPeriodoFiltro(periodo?: string) {
@@ -47,17 +56,18 @@ function getPeriodoFiltro(periodo?: string) {
 export default async function AnalyticsPage({
   searchParams,
 }: AnalyticsPageProps) {
-  const lojaFiltro = searchParams?.loja;
-  const periodoFiltro = getPeriodoFiltro(searchParams?.periodo);
+  const params = await searchParams;
+  const apelidoLoja = params.loja ? mapaLojas[params.loja] : null;
+  const periodoFiltro = getPeriodoFiltro(params.periodo);
 
   let lojaId: string | null = null;
 
-  if (lojaFiltro && lojaFiltro !== "todas") {
+  if (apelidoLoja) {
     const { data: loja } = await supabase
       .from("lojas")
       .select("id")
-      .eq("apelido", lojaFiltro)
-      .single();
+      .eq("apelido", apelidoLoja)
+      .maybeSingle();
 
     lojaId = loja?.id || null;
   }
@@ -75,7 +85,7 @@ export default async function AnalyticsPage({
     .select("*", { count: "exact", head: true });
 
   let chatsCountQuery = supabase
-    .from("chats")
+    .from("chat_conversas")
     .select("*", { count: "exact", head: true });
 
   let avaliacoesQuery = supabase
@@ -96,7 +106,7 @@ export default async function AnalyticsPage({
     avaliacoesCountQuery = avaliacoesCountQuery.gte("criado_em", periodoFiltro);
     produtosCountQuery = produtosCountQuery.gte("criado_em", periodoFiltro);
     pedidosCountQuery = pedidosCountQuery.gte("data_pedido", periodoFiltro);
-    chatsCountQuery = chatsCountQuery.gte("criado_em", periodoFiltro);
+    // chat_conversas não tem coluna de data ISO (só atualizado_em/ts) — sem filtro.
     avaliacoesQuery = avaliacoesQuery.gte("criado_em", periodoFiltro);
   }
 

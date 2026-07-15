@@ -2,6 +2,8 @@ import { supabase } from "@/lib/supabase";
 import GerarRespostaButton from "../components/GerarRespostaButton";
 import GerarTodasButton from "../components/GerarTodasButton";
 
+export const dynamic = "force-dynamic";
+
 const mapaLojas: Record<string, string> = {
   "ngk-shopee": "NGK Shopee",
   "pitibiribas-shopee": "Pitibiribas Shopee",

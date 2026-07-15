@@ -2,6 +2,8 @@ import { supabase } from "@/lib/supabase";
 import DashboardCharts from "./components/DashboardCharts";
 import GerarRankingButton from "./components/GerarRankingButton";
 
+export const dynamic = "force-dynamic";
+
 type DashboardProps = {
   searchParams: Promise<{
     loja?: string;
