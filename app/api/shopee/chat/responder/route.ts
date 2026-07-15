@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
-import { responderChatsLote, type ResultadoChat } from "@/lib/shopee/responderChats";
-import { listarLojasShopeeAtivas } from "@/lib/shopee/lojas";
+import {
+  responderChatsLote,
+  type ResultadoChat,
+} from "@/lib/shopee/responderChats";
+import {
+  listarLojasShopeeAtivas,
+  lojasShopeeDoEscopo,
+} from "@/lib/shopee/lojas";
+import { escopoDoUsuario } from "@/lib/conta";
+import { flagsPorConta } from "@/lib/flags";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -9,7 +16,6 @@ export const maxDuration = 300;
 const CHAVE_ATIVO = "responder_chat_ativo";
 const CHAVE_AUTONOMO = "responder_chat_autonomo";
 
-// Soma os resultados por loja num único objeto (mantém a UI de revisão simples).
 function agregar(resultados: ResultadoChat[]) {
   return resultados.reduce(
     (acc, r) => ({
@@ -22,8 +28,7 @@ function agregar(resultados: ResultadoChat[]) {
   );
 }
 
-// POST: manual. { limite, enviar, autonomo }. enviar=false = só gera p/ revisão.
-// Roda em todas as lojas Shopee ativas.
+// POST: manual, só nas lojas da conta do usuário logado.
 export async function POST(request: NextRequest) {
   let limite = 5;
   let enviar = false;
@@ -38,7 +43,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const lojas = await listarLojasShopeeAtivas();
+    const escopo = await escopoDoUsuario();
+    const lojas = await lojasShopeeDoEscopo(escopo);
     const resultados: ResultadoChat[] = [];
     for (const loja of lojas) {
       resultados.push(
@@ -57,32 +63,29 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET: cron. Só responde de verdade se o robô estiver ligado.
+// GET: cron. Processa TODAS as lojas, mas só age nas cujas CONTAS têm o robô
+// ligado (flag por conta). O modo autônomo também é por conta.
 export async function GET() {
   try {
-    const { data: cfgs } = await supabase
-      .from("configuracoes")
-      .select("chave, valor")
-      .in("chave", [CHAVE_ATIVO, CHAVE_AUTONOMO]);
-
-    const mapa: Record<string, string> = {};
-    (cfgs || []).forEach((c) => {
-      mapa[c.chave] = c.valor;
-    });
-
-    if (mapa[CHAVE_ATIVO] !== "true") {
-      return NextResponse.json({ sucesso: true, idle: true, motivo: "robô desligado" });
-    }
-
-    const autonomo = mapa[CHAVE_AUTONOMO] === "true";
     const lojas = await listarLojasShopeeAtivas();
+    const [ativos, autonomos] = await Promise.all([
+      flagsPorConta(CHAVE_ATIVO),
+      flagsPorConta(CHAVE_AUTONOMO),
+    ]);
+
     const resultados: ResultadoChat[] = [];
     for (const loja of lojas) {
+      if (!loja.contaId || !ativos[loja.contaId]) continue;
       resultados.push(
-        await responderChatsLote({ lojaId: loja.lojaId, limite: 15, enviar: true, autonomo })
+        await responderChatsLote({
+          lojaId: loja.lojaId,
+          limite: 15,
+          enviar: true,
+          autonomo: !!autonomos[loja.contaId],
+        })
       );
     }
-    return NextResponse.json({ sucesso: true, autonomo, ...agregar(resultados) });
+    return NextResponse.json({ sucesso: true, ...agregar(resultados) });
   } catch (error) {
     return NextResponse.json(
       {

@@ -1,22 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { supabase } from "@/lib/supabase";
+import { escopoDoUsuario } from "@/lib/conta";
 
-const CHAVE_PENDENTE = "oauth_loja_pendente";
+const CHAVE_LOJA_PENDENTE = "oauth_loja_pendente";
+const CHAVE_CONTA_PENDENTE = "oauth_conta_pendente";
 
-async function salvarLojaPendente(lojaId: string) {
+async function salvarConfig(chave: string, valor: string) {
   const { data } = await supabase
     .from("configuracoes")
     .select("chave")
-    .eq("chave", CHAVE_PENDENTE)
+    .eq("chave", chave)
     .maybeSingle();
-  const linha = {
-    chave: CHAVE_PENDENTE,
-    valor: lojaId,
-    atualizado_em: new Date().toISOString(),
-  };
+  const linha = { chave, valor, atualizado_em: new Date().toISOString() };
   if (data) {
-    await supabase.from("configuracoes").update(linha).eq("chave", CHAVE_PENDENTE);
+    await supabase.from("configuracoes").update(linha).eq("chave", chave);
   } else {
     await supabase.from("configuracoes").insert(linha);
   }
@@ -68,14 +66,20 @@ export async function GET(request: NextRequest) {
     const baseUrl =
       process.env.SHOPEE_API_BASE_URL || "https://partner.shopeemobile.com";
 
-    // Guarda no banco qual loja está sendo conectada (fonte confiável no callback,
-    // caso a Shopee não preserve a query do redirect). Também anexa ?loja= como reforço.
+    // Guarda a conta de quem está conectando (para o callback criar a loja nova
+    // sob a conta certa) e, se for reconexão, a loja pendente.
+    const escopo = await escopoDoUsuario();
+    await salvarConfig(CHAVE_CONTA_PENDENTE, escopo.contaId || "");
+
     let redirect = redirectUrl;
     if (lojaId) {
-      await salvarLojaPendente(lojaId);
+      await salvarConfig(CHAVE_LOJA_PENDENTE, lojaId);
       const u = new URL(redirectUrl);
       u.searchParams.set("loja", lojaId);
       redirect = u.toString();
+    } else {
+      // Conexão de loja NOVA: limpa a loja pendente antiga.
+      await salvarConfig(CHAVE_LOJA_PENDENTE, "");
     }
 
     const authUrl = new URL(`${baseUrl}${path}`);

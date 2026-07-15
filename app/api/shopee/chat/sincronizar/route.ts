@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { sincronizarChatsPagina } from "@/lib/shopee/sincronizarChats";
-import { listarLojasShopeeAtivas } from "@/lib/shopee/lojas";
+import {
+  listarLojasShopeeAtivas,
+  lojasShopeeDoEscopo,
+} from "@/lib/shopee/lojas";
+import { escopoDoUsuario } from "@/lib/conta";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -29,10 +33,11 @@ async function setConfig(chave: string, valor: string) {
   }
 }
 
-// POST: sincroniza AGORA as conversas mais novas de todas as lojas (botão).
+// POST: sincroniza AGORA as conversas mais novas das lojas do usuário (botão).
 export async function POST() {
   try {
-    const lojas = await listarLojasShopeeAtivas();
+    const escopo = await escopoDoUsuario();
+    const lojas = await lojasShopeeDoEscopo(escopo);
     const resultados = [];
     for (const loja of lojas) {
       const r = await sincronizarChatsPagina({ loja, direction: "latest" });

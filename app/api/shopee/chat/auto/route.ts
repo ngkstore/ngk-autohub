@@ -1,68 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { escopoDoUsuario } from "@/lib/conta";
+import { getFlagConta, setFlagConta } from "@/lib/flags";
 
 export const dynamic = "force-dynamic";
 
 const CHAVE_ATIVO = "responder_chat_ativo";
 const CHAVE_AUTONOMO = "responder_chat_autonomo";
 
-async function setConfig(chave: string, valor: string) {
-  const { data } = await supabase
-    .from("configuracoes")
-    .select("chave")
-    .eq("chave", chave)
-    .maybeSingle();
-  if (data) {
-    await supabase
-      .from("configuracoes")
-      .update({ valor, atualizado_em: new Date().toISOString() })
-      .eq("chave", chave);
-  } else {
-    await supabase
-      .from("configuracoes")
-      .insert({ chave, valor, atualizado_em: new Date().toISOString() });
-  }
-}
-
 export async function GET() {
-  const { data } = await supabase
-    .from("configuracoes")
-    .select("chave, valor")
-    .in("chave", [CHAVE_ATIVO, CHAVE_AUTONOMO]);
-  const mapa: Record<string, string> = {};
-  (data || []).forEach((c) => {
-    mapa[c.chave] = c.valor;
-  });
-  return NextResponse.json({
-    ativo: mapa[CHAVE_ATIVO] === "true",
-    autonomo: mapa[CHAVE_AUTONOMO] === "true",
-  });
+  const escopo = await escopoDoUsuario();
+  if (!escopo.contaId) {
+    return NextResponse.json({ ativo: false, autonomo: false });
+  }
+  const [ativo, autonomo] = await Promise.all([
+    getFlagConta(CHAVE_ATIVO, escopo.contaId),
+    getFlagConta(CHAVE_AUTONOMO, escopo.contaId),
+  ]);
+  return NextResponse.json({ ativo, autonomo });
 }
 
 export async function POST(request: NextRequest) {
   try {
+    const escopo = await escopoDoUsuario();
+    if (!escopo.contaId) {
+      return NextResponse.json(
+        { sucesso: false, erro: "Usuário sem conta." },
+        { status: 400 }
+      );
+    }
+
     const body = await request.json();
     if (typeof body?.ativo === "boolean") {
-      await setConfig(CHAVE_ATIVO, body.ativo ? "true" : "false");
+      await setFlagConta(CHAVE_ATIVO, escopo.contaId, body.ativo);
     }
     if (typeof body?.autonomo === "boolean") {
-      await setConfig(CHAVE_AUTONOMO, body.autonomo ? "true" : "false");
+      await setFlagConta(CHAVE_AUTONOMO, escopo.contaId, body.autonomo);
     }
 
-    const { data } = await supabase
-      .from("configuracoes")
-      .select("chave, valor")
-      .in("chave", [CHAVE_ATIVO, CHAVE_AUTONOMO]);
-    const mapa: Record<string, string> = {};
-    (data || []).forEach((c) => {
-      mapa[c.chave] = c.valor;
-    });
-
-    return NextResponse.json({
-      sucesso: true,
-      ativo: mapa[CHAVE_ATIVO] === "true",
-      autonomo: mapa[CHAVE_AUTONOMO] === "true",
-    });
+    const [ativo, autonomo] = await Promise.all([
+      getFlagConta(CHAVE_ATIVO, escopo.contaId),
+      getFlagConta(CHAVE_AUTONOMO, escopo.contaId),
+    ]);
+    return NextResponse.json({ sucesso: true, ativo, autonomo });
   } catch (error) {
     return NextResponse.json(
       {

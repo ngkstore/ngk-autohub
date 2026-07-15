@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
 import { responderAvaliacoesLote } from "@/lib/shopee/responderAvaliacoes";
-import { listarLojasShopeeAtivas } from "@/lib/shopee/lojas";
+import {
+  listarLojasShopeeAtivas,
+  lojasShopeeDoEscopo,
+} from "@/lib/shopee/lojas";
+import { escopoDoUsuario } from "@/lib/conta";
+import { flagsPorConta } from "@/lib/flags";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -10,7 +14,7 @@ const CHAVE_ATIVO = "responder_avaliacoes_ativo";
 const POR_MINUTO = 20; // avaliações por minuto por loja na janela ativa
 const FIM_JANELA_ATIVA = 30; // minutos 0-29 = sprint; 30-59 = pausa
 
-// POST: execução manual (teste), em todas as lojas. Body opcional { limite, notaMax }.
+// POST: execução manual (teste), só nas lojas da conta do usuário logado.
 export async function POST(request: NextRequest) {
   let limite = 5;
   let notaMax: number | undefined;
@@ -23,7 +27,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const lojas = await listarLojasShopeeAtivas();
+    const escopo = await escopoDoUsuario();
+    const lojas = await lojasShopeeDoEscopo(escopo);
     const resultados = [];
     for (const loja of lojas) {
       resultados.push({
@@ -50,20 +55,6 @@ export async function POST(request: NextRequest) {
 // dentro da janela de sprint (primeiros 30 min de cada hora).
 export async function GET() {
   try {
-    const { data: cfg } = await supabase
-      .from("configuracoes")
-      .select("valor")
-      .eq("chave", CHAVE_ATIVO)
-      .maybeSingle();
-
-    if (cfg?.valor !== "true") {
-      return NextResponse.json({
-        sucesso: true,
-        idle: true,
-        motivo: "robô desligado",
-      });
-    }
-
     const minuto = new Date().getUTCMinutes();
     if (minuto >= FIM_JANELA_ATIVA) {
       return NextResponse.json({
@@ -73,9 +64,13 @@ export async function GET() {
       });
     }
 
+    // Processa todas as lojas, mas só as cujas CONTAS têm o robô ligado.
     const lojas = await listarLojasShopeeAtivas();
+    const ativos = await flagsPorConta(CHAVE_ATIVO);
+
     const resultados = [];
     for (const loja of lojas) {
+      if (!loja.contaId || !ativos[loja.contaId]) continue;
       resultados.push({
         lojaId: loja.lojaId,
         ...(await responderAvaliacoesLote({ lojaId: loja.lojaId, limite: POR_MINUTO })),

@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { enriquecerDescricoesPendentes } from "@/lib/shopee/enriquecerProdutos";
-import { listarLojasShopeeAtivas } from "@/lib/shopee/lojas";
+import {
+  listarLojasShopeeAtivas,
+  lojasShopeeDoEscopo,
+  type LojaShopee,
+} from "@/lib/shopee/lojas";
+import { escopoDoUsuario } from "@/lib/conta";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-async function rodar(limite: number) {
+async function rodar(limite: number, lojas: LojaShopee[]) {
   try {
-    const lojas = await listarLojasShopeeAtivas();
     const resultados = [];
     for (const loja of lojas) {
       resultados.push({
@@ -36,11 +40,13 @@ async function rodar(limite: number) {
   }
 }
 
+// GET: cron -> todas as lojas.
 export async function GET(request: NextRequest) {
   const limite = Number(request.nextUrl.searchParams.get("limite")) || 200;
-  return rodar(limite);
+  return rodar(limite, await listarLojasShopeeAtivas());
 }
 
+// POST: manual -> só as lojas da conta do usuário.
 export async function POST(request: NextRequest) {
   let limite = 200;
   try {
@@ -49,5 +55,6 @@ export async function POST(request: NextRequest) {
   } catch {
     // padrão
   }
-  return rodar(limite);
+  const escopo = await escopoDoUsuario();
+  return rodar(limite, await lojasShopeeDoEscopo(escopo));
 }

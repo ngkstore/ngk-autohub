@@ -52,11 +52,12 @@ export async function GET(request: NextRequest) {
 
     // A qual loja pertence este token? Resolve nesta ordem:
     // 1) ?loja=<id> repassado pelo fluxo de autorização;
-    // 2) loja pendente salva no banco ao iniciar o fluxo (fonte confiável);
+    // 2) loja pendente salva no banco ao iniciar o fluxo (reconexão);
     // 3) loja já marcada com este shop_id;
     // 4) token existente com este shop_id (reconexão);
-    // 5) legado: a loja com "NGK" no apelido.
-    let lojaId: string | null = searchParams.get("loja");
+    // 5) loja NOVA: cria sob a conta de quem iniciou a conexão;
+    // 6) legado: a loja com "NGK" no apelido.
+    let lojaId: string | null = searchParams.get("loja") || null;
     let usouPendente = false;
 
     if (!lojaId) {
@@ -65,7 +66,7 @@ export async function GET(request: NextRequest) {
         .select("valor")
         .eq("chave", "oauth_loja_pendente")
         .maybeSingle();
-      lojaId = data?.valor ?? null;
+      lojaId = data?.valor || null;
       usouPendente = !!lojaId;
     }
 
@@ -85,6 +86,31 @@ export async function GET(request: NextRequest) {
         .eq("shop_id", shopIdStr)
         .maybeSingle();
       lojaId = data?.loja_id ?? null;
+    }
+
+    // Loja NOVA (amigo conectando a Shopee dele): cria sob a conta pendente.
+    if (!lojaId) {
+      const { data: contaPend } = await supabase
+        .from("configuracoes")
+        .select("valor")
+        .eq("chave", "oauth_conta_pendente")
+        .maybeSingle();
+      const contaId = contaPend?.valor || null;
+      if (contaId) {
+        const { data: nova } = await supabase
+          .from("lojas")
+          .insert({
+            apelido: `Loja Shopee ${shopIdStr}`,
+            nome: `Loja Shopee ${shopIdStr}`,
+            marketplace: "shopee",
+            conta_id: contaId,
+            shop_id: shopIdStr,
+            status: "ativo",
+          })
+          .select("id")
+          .single();
+        lojaId = nova?.id ?? null;
+      }
     }
 
     if (!lojaId) {
@@ -174,13 +200,17 @@ export async function GET(request: NextRequest) {
       .update({ shop_id: shopIdStr })
       .eq("id", lojaId);
 
-    // Consumiu a loja pendente: limpa para não vazar para a próxima conexão.
+    // Consumiu as pendências: limpa para não vazar para a próxima conexão.
     if (usouPendente) {
       await supabase
         .from("configuracoes")
         .update({ valor: "", atualizado_em: new Date().toISOString() })
         .eq("chave", "oauth_loja_pendente");
     }
+    await supabase
+      .from("configuracoes")
+      .update({ valor: "", atualizado_em: new Date().toISOString() })
+      .eq("chave", "oauth_conta_pendente");
 
     await supabase.from("sincronizacoes").insert({
       loja_id: lojaId,

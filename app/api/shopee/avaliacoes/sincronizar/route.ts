@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { sincronizarAvaliacoesPagina } from "@/lib/shopee/sincronizarAvaliacoes";
-import { listarLojasShopeeAtivas, type LojaShopee } from "@/lib/shopee/lojas";
+import {
+  listarLojasShopeeAtivas,
+  lojasShopeeDoEscopo,
+  type LojaShopee,
+} from "@/lib/shopee/lojas";
+import { escopoDoUsuario } from "@/lib/conta";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -43,7 +48,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const lojas = await listarLojasShopeeAtivas();
+    const escopo = await escopoDoUsuario();
+    const lojas = await lojasShopeeDoEscopo(escopo);
     const resultados = [];
     for (const loja of lojas) {
       const r = await sincronizarAvaliacoesPagina({ loja, cursor: "", maxPaginas });

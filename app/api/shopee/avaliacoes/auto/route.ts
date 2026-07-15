@@ -1,45 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { escopoDoUsuario } from "@/lib/conta";
+import { getFlagConta, setFlagConta } from "@/lib/flags";
 
 export const dynamic = "force-dynamic";
 
 const CHAVE = "responder_avaliacoes_ativo";
 
 export async function GET() {
-  const { data } = await supabase
-    .from("configuracoes")
-    .select("valor")
-    .eq("chave", CHAVE)
-    .maybeSingle();
-
-  return NextResponse.json({ ativo: data?.valor === "true" });
+  const escopo = await escopoDoUsuario();
+  if (!escopo.contaId) return NextResponse.json({ ativo: false });
+  const ativo = await getFlagConta(CHAVE, escopo.contaId);
+  return NextResponse.json({ ativo });
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const ativo = !!body?.ativo;
-    const valor = ativo ? "true" : "false";
-
-    const { data: existente } = await supabase
-      .from("configuracoes")
-      .select("chave")
-      .eq("chave", CHAVE)
-      .maybeSingle();
-
-    if (existente) {
-      await supabase
-        .from("configuracoes")
-        .update({ valor, atualizado_em: new Date().toISOString() })
-        .eq("chave", CHAVE);
-    } else {
-      await supabase.from("configuracoes").insert({
-        chave: CHAVE,
-        valor,
-        atualizado_em: new Date().toISOString(),
-      });
+    const escopo = await escopoDoUsuario();
+    if (!escopo.contaId) {
+      return NextResponse.json(
+        { sucesso: false, erro: "Usuário sem conta." },
+        { status: 400 }
+      );
     }
-
+    const body = await request.json();
+    if (typeof body?.ativo === "boolean") {
+      await setFlagConta(CHAVE, escopo.contaId, body.ativo);
+    }
+    const ativo = await getFlagConta(CHAVE, escopo.contaId);
     return NextResponse.json({ sucesso: true, ativo });
   } catch (error) {
     return NextResponse.json(
