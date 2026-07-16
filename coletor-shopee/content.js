@@ -53,32 +53,30 @@
       return;
     }
     var lote = fila.splice(0, 20);
-    fetch(AUTOHUB + "/api/insights/coletor", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + SEGREDO,
-      },
-      body: JSON.stringify({ capturas: lote }),
-    })
-      .then(function (r) {
-        return r.json();
-      })
-      .then(function (d) {
-        if (d && d.sucesso) {
+    // Vai pelo service worker (bg.js): daqui a chamada seria bloqueada por CORS.
+    chrome.runtime.sendMessage(
+      { tipo: "NGK_ENVIAR", autohub: AUTOHUB, segredo: SEGREDO, capturas: lote },
+      function (resp) {
+        if (chrome.runtime.lastError) {
+          erro = chrome.runtime.lastError.message || "erro na extensão";
+          fila = lote.concat(fila);
+          mostrarSelo();
+          return;
+        }
+        var d = resp && resp.dados;
+        if (resp && resp.ok && d && d.sucesso) {
           enviadas += d.guardadas || lote.length;
           erro = "";
         } else {
-          erro = (d && d.erro) || "falha ao enviar";
+          erro =
+            (d && d.erro) ||
+            (resp && resp.erro) ||
+            "falha ao enviar (HTTP " + (resp && resp.status) + ")";
           fila = lote.concat(fila); // devolve pra tentar de novo
         }
         mostrarSelo();
-      })
-      .catch(function (e) {
-        erro = String(e && e.message ? e.message : e);
-        fila = lote.concat(fila);
-        mostrarSelo();
-      });
+      }
+    );
   }
 
   setInterval(enviar, 4000);
