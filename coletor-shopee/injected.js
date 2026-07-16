@@ -52,6 +52,42 @@
     return promessa;
   };
 
+  /* ---- Ponte: o content.js pede, a PÁGINA busca ----
+     Precisa ser aqui: só no contexto da página a chamada leva os cookies e
+     cabeçalhos que o Seller Center usa. Só liberamos as APIs internas. */
+  window.addEventListener("NGK_PEDIR", function (ev) {
+    var req;
+    try {
+      req = JSON.parse(ev.detail);
+    } catch (e) {
+      return;
+    }
+    if (!req || !req.url) return;
+
+    var permitido =
+      /^\/api\/(pas|mydata)\//.test(req.url) ||
+      /^https:\/\/seller\.shopee\.com\.br\/api\/(pas|mydata)\//.test(req.url);
+    if (!permitido) {
+      emitir({ url: req.url, erro: "url não permitida", replay: true });
+      return;
+    }
+
+    fetchOriginal(req.url, {
+      method: "GET",
+      credentials: "include",
+      headers: { accept: "application/json" },
+    })
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (data) {
+        emitir({ url: req.url, metodo: "GET", data: data, ts: Date.now(), replay: true });
+      })
+      .catch(function () {
+        /* noop */
+      });
+  });
+
   /* ---- XHR ---- */
   var abrirOriginal = XMLHttpRequest.prototype.open;
   var enviarOriginal = XMLHttpRequest.prototype.send;

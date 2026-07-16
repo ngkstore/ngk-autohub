@@ -36,14 +36,103 @@
   }
 
   /* ---- recebe do injected ---- */
-  window.addEventListener("NGK_CAPTURA", function (ev) {
+  // endpoint -> última URL vista (molde pro replay). Fica salvo no navegador:
+  // aprendendo UMA vez, replica pra sempre, sem você visitar a tela de novo.
+  var modelos = {};
+  var spcCds = null;
+
+  chrome.storage.local.get(["ngk_modelos"], function (r) {
+    if (r && r.ngk_modelos) modelos = Object.assign({}, r.ngk_modelos, modelos);
+  });
+
+  function salvarModelos() {
     try {
-      fila.push(JSON.parse(ev.detail));
-      mostrarSelo();
+      chrome.storage.local.set({ ngk_modelos: modelos });
     } catch (e) {
       /* noop */
     }
+  }
+
+  window.addEventListener("NGK_CAPTURA", function (ev) {
+    var c;
+    try {
+      c = JSON.parse(ev.detail);
+    } catch (e) {
+      return;
+    }
+    if (c.erro) return;
+    fila.push(c);
+
+    if (c.url) {
+      // O token da sessão muda; sempre usa o mais novo.
+      var m = String(c.url).match(/[?&]SPC_CDS=([^&]+)/);
+      if (m) spcCds = m[1];
+      // Guarda o molde (só das chamadas do PAINEL, não das nossas).
+      if (!c.replay) {
+        var base = String(c.url).split("?")[0];
+        if (modelos[base] !== c.url) {
+          modelos[base] = c.url;
+          salvarModelos();
+        }
+      }
+    }
+    mostrarSelo();
   });
+
+  /* ---- REPLAY: pede sozinho as janelas que faltam ----
+     Reaproveita a URL que o painel acabou de usar e troca só as datas e o
+     tamanho da página — assim não preciso adivinhar os parâmetros. */
+  function trocarParam(url, chave, valor) {
+    var re = new RegExp("([?&]" + chave + "=)[^&]*");
+    return re.test(url)
+      ? url.replace(re, "$1" + valor)
+      : url + (url.indexOf("?") >= 0 ? "&" : "?") + chave + "=" + valor;
+  }
+
+  function pedir(url) {
+    window.dispatchEvent(
+      new CustomEvent("NGK_PEDIR", { detail: JSON.stringify({ url: url }) })
+    );
+  }
+
+  var ALVOS = [
+    "/api/mydata/v3/dashboard/product-rankings/",
+    "/api/mydata/v1/dashboard/traffic-sources/product-contribution/",
+    "/api/pas/v1/report/get_time_graph/",
+  ];
+  var JANELAS = [7, 15, 30]; // dias
+  var jaReplicou = {};
+
+  function replicar() {
+    var agora = Math.floor(Date.now() / 1000);
+    ALVOS.forEach(function (base) {
+      var molde = modelos[base];
+      if (!molde) return; // ainda não vi essa chamada
+
+      JANELAS.forEach(function (dias, i) {
+        var chave = base + ":" + dias;
+        if (jaReplicou[chave]) return;
+        jaReplicou[chave] = true;
+
+        var url = molde;
+        // molde salvo de outra sessão: atualiza o token pro atual
+        if (spcCds) url = trocarParam(url, "SPC_CDS", spcCds);
+        url = trocarParam(url, "start_time", agora - dias * 86400);
+        url = trocarParam(url, "end_time", agora);
+        // pega todos os produtos, não só os 5 da tela
+        if (/page_size=/.test(url)) url = trocarParam(url, "page_size", 100);
+
+        // espaça as chamadas: nada de rajada
+        setTimeout(function () {
+          pedir(url);
+        }, 1500 * (i + 1) + Math.random() * 800);
+      });
+    });
+  }
+
+  // Dá tempo do painel carregar (e nos dar os moldes), depois replica.
+  setTimeout(replicar, 6000);
+  setInterval(replicar, 30000);
 
   /* ---- envia em lote ---- */
   function enviar() {

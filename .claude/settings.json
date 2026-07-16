@@ -13,7 +13,8 @@
       "Read(//c/Users/krupa/Desktop/himmel-copilot-shopee-20260716T014356Z-1-001/himmel-copilot-shopee/**)",
       "Bash(printf '\\\\n# Segredo local do coletor \\(nunca versionar\\)\\\\ncoletor-shopee/config.js\\\\n')",
       "Bash(git check-ignore *)",
-      "Bash(explorer.exe \"C:\\\\Users\\\\krupa\\\\Desktop\\\\ngk-autohub\\\\coletor-shopee\")"
+      "Bash(explorer.exe \"C:\\\\Users\\\\krupa\\\\Desktop\\\\ngk-autohub\\\\coletor-shopee\")",
+      "Bash(node -e ' *)"
     ]
   }
 }
