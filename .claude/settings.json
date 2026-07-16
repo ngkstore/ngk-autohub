@@ -14,7 +14,8 @@
       "Bash(printf '\\\\n# Segredo local do coletor \\(nunca versionar\\)\\\\ncoletor-shopee/config.js\\\\n')",
       "Bash(git check-ignore *)",
       "Bash(explorer.exe \"C:\\\\Users\\\\krupa\\\\Desktop\\\\ngk-autohub\\\\coletor-shopee\")",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(node -e \"new Function\\(require\\('fs'\\).readFileSync\\('coletor-shopee/content.js','utf8'\\)\\); console.log\\('OK sintaxe content.js'\\)\")"
     ]
   }
 }

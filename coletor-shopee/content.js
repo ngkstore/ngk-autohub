@@ -95,37 +95,51 @@
     );
   }
 
+  // paginas: a loja tem ~123 produtos, então 100 por página x 2-3 páginas.
   var ALVOS = [
-    "/api/mydata/v3/dashboard/product-rankings/",
-    "/api/mydata/v1/dashboard/traffic-sources/product-contribution/",
-    "/api/pas/v1/report/get_time_graph/",
+    { base: "/api/mydata/v3/dashboard/product-rankings/", paginas: 3 },
+    { base: "/api/mydata/v1/dashboard/traffic-sources/product-contribution/", paginas: 3 },
+    { base: "/api/pas/v1/report/get_time_graph/", paginas: 1 },
+    // por item DENTRO da campanha (traz a posição) — aprendido ao entrar numa campanha
+    { base: "/api/pas/v1/report/list_report/", paginas: 3 },
+    { base: "/api/pas/v1/product/list_product_report/", paginas: 3 },
   ];
   var JANELAS = [7, 15, 30]; // dias
   var jaReplicou = {};
 
   function replicar() {
     var agora = Math.floor(Date.now() / 1000);
-    ALVOS.forEach(function (base) {
-      var molde = modelos[base];
+    var atraso = 0;
+
+    ALVOS.forEach(function (alvo) {
+      var molde = modelos[alvo.base];
       if (!molde) return; // ainda não vi essa chamada
 
-      JANELAS.forEach(function (dias, i) {
-        var chave = base + ":" + dias;
-        if (jaReplicou[chave]) return;
-        jaReplicou[chave] = true;
+      JANELAS.forEach(function (dias) {
+        for (var p = 1; p <= alvo.paginas; p++) {
+          var chave = alvo.base + ":" + dias + ":" + p;
+          if (jaReplicou[chave]) continue;
+          jaReplicou[chave] = true;
 
-        var url = molde;
-        // molde salvo de outra sessão: atualiza o token pro atual
-        if (spcCds) url = trocarParam(url, "SPC_CDS", spcCds);
-        url = trocarParam(url, "start_time", agora - dias * 86400);
-        url = trocarParam(url, "end_time", agora);
-        // pega todos os produtos, não só os 5 da tela
-        if (/page_size=/.test(url)) url = trocarParam(url, "page_size", 100);
+          var url = molde;
+          // molde salvo de outra sessão: atualiza o token pro atual
+          if (spcCds) url = trocarParam(url, "SPC_CDS", spcCds);
+          url = trocarParam(url, "start_time", agora - dias * 86400);
+          url = trocarParam(url, "end_time", agora);
+          // todos os produtos, não só os da tela
+          if (/page_size=/.test(url)) url = trocarParam(url, "page_size", 100);
+          if (/page_num=/.test(url)) url = trocarParam(url, "page_num", p);
+          if (/offset=/.test(url)) url = trocarParam(url, "offset", (p - 1) * 100);
+          if (/limit=/.test(url)) url = trocarParam(url, "limit", 100);
 
-        // espaça as chamadas: nada de rajada
-        setTimeout(function () {
-          pedir(url);
-        }, 1500 * (i + 1) + Math.random() * 800);
+          // espaça: nada de rajada
+          atraso += 1500 + Math.floor(Math.random() * 700);
+          (function (u, d) {
+            setTimeout(function () {
+              pedir(u);
+            }, d);
+          })(url, atraso);
+        }
       });
     });
   }
