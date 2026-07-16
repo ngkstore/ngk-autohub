@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 3) Config da campanha: será que traz o item_id do produto anunciado?
+    // 3) Config da campanha: traz item_id + palavras-chave + lance.
     let config = null;
     if (ids.length > 0) {
       config = await chamar("/api/v2/ads/get_product_level_campaign_setting_info", {
@@ -119,6 +119,17 @@ export async function GET(request: NextRequest) {
         info_type_list: "1,2,3,4",
       });
     }
+
+    // 4) GMS = provavelmente o GMV Max (as campanhas ATIVAS). É aqui que
+    //    deveríamos achar a performance POR ITEM das campanhas de verdade.
+    const gmsCampanha = await chamar("/api/v2/ads/get_gms_campaign_performance", {
+      start_date: dia,
+      end_date: dia,
+    });
+    const gmsItem = await chamar("/api/v2/ads/get_gms_item_performance", {
+      start_date: dia,
+      end_date: dia,
+    });
 
     return NextResponse.json({
       sucesso: true,
@@ -137,9 +148,18 @@ export async function GET(request: NextRequest) {
         resposta: config?.response ?? null,
         erro: config?.error ? `${config.error} | ${config.message}` : null,
       },
+      // A aposta: GMS = GMV Max (as campanhas ativas de verdade).
+      gms_campanha: {
+        resposta: gmsCampanha?.response ?? null,
+        erro: gmsCampanha?.error ? `${gmsCampanha.error} | ${gmsCampanha.message}` : null,
+      },
+      gms_item: {
+        resposta: gmsItem?.response ?? null,
+        erro: gmsItem?.error ? `${gmsItem.error} | ${gmsItem.message}` : null,
+      },
       leitura:
-        "1) 'por_tipo' mostra quantas campanhas de cada tipo (manual vs GMV Max). " +
-        "2) Em 'config_campanha', procure item_id/product_id: se vier, amarramos campanha->produto sem planilha.",
+        "Se 'gms_item' vier com dados por item_id (impressão/clique/gasto/ROAS), " +
+        "o Raio-X roda 100% por API, sem planilha. Se der erro de parâmetro, o erro diz o que falta.",
     });
   } catch (error) {
     return NextResponse.json(
