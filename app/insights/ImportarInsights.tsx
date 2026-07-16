@@ -14,6 +14,7 @@ export default function ImportarInsights() {
   const [periodoInicio, setPeriodoInicio] = useState("");
   const [periodoFim, setPeriodoFim] = useState("");
   const [arquivo, setArquivo] = useState("");
+  const [cabecalhoLinha, setCabecalhoLinha] = useState(0);
   const [colunas, setColunas] = useState<string[]>([]);
   const [linhas, setLinhas] = useState<Linha[]>([]);
   const [erro, setErro] = useState("");
@@ -35,15 +36,39 @@ export default function ImportarInsights() {
     setArquivo(file.name);
     try {
       const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array" });
+      // codepage 65001 = UTF-8 (evita acento quebrado nos CSV da Shopee).
+      const wb = XLSX.read(buf, { type: "array", codepage: 65001 });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<Linha>(ws, { defval: "" });
+
+      // Os exports da Shopee têm várias linhas de título antes da tabela.
+      // Acha o cabeçalho real: a linha com mais células preenchidas.
+      const cruas = XLSX.utils.sheet_to_json<unknown[]>(ws, {
+        header: 1,
+        defval: "",
+      });
+      let idxCabecalho = 0;
+      let maisCelulas = 0;
+      for (let i = 0; i < Math.min(20, cruas.length); i++) {
+        const qtd = (cruas[i] || []).filter(
+          (c) => String(c ?? "").trim() !== ""
+        ).length;
+        if (qtd > maisCelulas) {
+          maisCelulas = qtd;
+          idxCabecalho = i;
+        }
+      }
+
+      const rows = XLSX.utils.sheet_to_json<Linha>(ws, {
+        range: idxCabecalho,
+        defval: "",
+      });
       if (rows.length === 0) {
-        setErro("Não encontrei linhas na planilha (confira a 1ª aba/cabeçalho).");
+        setErro("Não encontrei linhas de dados na planilha.");
         setColunas([]);
         setLinhas([]);
         return;
       }
+      setCabecalhoLinha(idxCabecalho + 1);
       setColunas(Object.keys(rows[0]));
       setLinhas(rows);
     } catch {
@@ -158,7 +183,8 @@ export default function ImportarInsights() {
         <div className="mt-6">
           <p className="text-sm text-slate-300">
             <strong>{colunas.length} coluna(s)</strong> detectada(s) •{" "}
-            {linhas.length} linha(s):
+            {linhas.length} linha(s) • cabeçalho achado na linha{" "}
+            <strong>{cabecalhoLinha}</strong> do arquivo:
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             {colunas.map((c) => (
