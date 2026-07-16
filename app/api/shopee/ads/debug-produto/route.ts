@@ -74,26 +74,34 @@ export async function GET(request: NextRequest) {
     ontem.setDate(ontem.getDate() - 1);
     const dia = ddmmyyyy(ontem);
 
-    // 1) Lista de campanhas por produto.
-    const lista = await chamar("/api/v2/ads/get_product_level_campaign_id_list", {
-      offset: "0",
-      limit: "10",
+    // 1) Lista TODAS as campanhas (paginando) p/ achar as GMV Max ativas.
+    type Camp = { ad_type?: string; campaign_id?: number };
+    const todas: Camp[] = [];
+    for (let pagina = 0; pagina < 10; pagina++) {
+      const r = await chamar("/api/v2/ads/get_product_level_campaign_id_list", {
+        offset: String(pagina * 100),
+        limit: "100",
+      });
+      const bloco: Camp[] = r?.response?.campaign_list || [];
+      todas.push(...bloco);
+      if (!r?.response?.has_next_page || bloco.length === 0) break;
+    }
+
+    const porTipo: Record<string, number> = {};
+    todas.forEach((c) => {
+      const t = c.ad_type || "?";
+      porTipo[t] = (porTipo[t] || 0) + 1;
     });
 
-    // Tenta achar os ids de campanha na resposta (formato pode variar).
-    const resp = lista?.response ?? {};
-    const brutos: unknown[] =
-      resp.campaign_list || resp.campaign_id_list || resp.list || [];
-    const ids = (Array.isArray(brutos) ? brutos : [])
-      .map((c: unknown) =>
-        typeof c === "object" && c !== null
-          ? (c as { campaign_id?: number | string }).campaign_id
-          : c
-      )
-      .filter(Boolean)
-      .slice(0, 5);
+    // Prioriza campanhas que NÃO são "manual" (as GMV Max ativas).
+    const naoManual = todas.filter((c) => c.ad_type && c.ad_type !== "manual");
+    const alvo = (naoManual.length > 0 ? naoManual : todas).slice(0, 5);
+    const ids = alvo.map((c) => c.campaign_id).filter(Boolean);
 
-    // 2) Performance diária dessas campanhas (é aqui que veríamos add_to_cart).
+    const lista = { response: { total: todas.length, por_tipo: porTipo }, error: null };
+    const resp = lista.response;
+
+    // 2) Performance diária dessas campanhas.
     let performance = null;
     if (ids.length > 0) {
       performance = await chamar("/api/v2/ads/get_product_campaign_daily_performance", {
@@ -103,29 +111,35 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // 3) Config da campanha: será que traz o item_id do produto anunciado?
+    let config = null;
+    if (ids.length > 0) {
+      config = await chamar("/api/v2/ads/get_product_level_campaign_setting_info", {
+        campaign_id_list: String(ids[0]),
+        info_type_list: "1,2,3,4",
+      });
+    }
+
     return NextResponse.json({
       sucesso: true,
       shop_id: shopId,
       dia,
       campanhas: {
-        resposta: lista?.response ?? null,
-        erro: lista?.error ? `${lista.error} | ${lista.message}` : null,
-        ids_encontrados: ids,
+        total: resp.total,
+        por_tipo: resp.por_tipo, // manual vs gmv max (auto)
+        ids_testados: ids,
       },
       performance_por_campanha: {
         resposta: performance?.response ?? null,
         erro: performance?.error ? `${performance.error} | ${performance.message}` : null,
-        campos: performance?.response
-          ? Object.keys(
-              (Array.isArray(performance.response)
-                ? performance.response[0]
-                : performance.response) || {}
-            )
-          : null,
+      },
+      config_campanha: {
+        resposta: config?.response ?? null,
+        erro: config?.error ? `${config.error} | ${config.message}` : null,
       },
       leitura:
-        "Procure por: campaign_id/item_id ligando a campanha ao produto, e se vem 'add_to_cart'. " +
-        "Se vier, o Raio-X roda 100% por API (sem planilha).",
+        "1) 'por_tipo' mostra quantas campanhas de cada tipo (manual vs GMV Max). " +
+        "2) Em 'config_campanha', procure item_id/product_id: se vier, amarramos campanha->produto sem planilha.",
     });
   } catch (error) {
     return NextResponse.json(
