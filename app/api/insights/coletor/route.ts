@@ -54,22 +54,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ sucesso: true, guardadas: 0 });
     }
 
-    // Mapa shop_id -> loja (para amarrar à conta certa).
+    // Todas as lojas (p/ resolver por shop_id ou pelo loja_id da config).
     const { data: lojas } = await supabase
       .from("lojas")
-      .select("id, shop_id, conta_id")
-      .not("shop_id", "is", null);
+      .select("id, shop_id, conta_id");
     const porShop = new Map(
-      (lojas || []).map((l) => [String(l.shop_id), l])
+      (lojas || [])
+        .filter((l) => l.shop_id)
+        .map((l) => [String(l.shop_id), l])
     );
+    const porId = new Map((lojas || []).map((l) => [String(l.id), l]));
+
+    // Loja informada pela extensão (config.js) — fallback confiável.
+    const lojaConfig = body?.loja_id ? porId.get(String(body.loja_id)) : undefined;
 
     const linhas = capturas.slice(0, 200).map((c) => {
       const shopId = acharShopId(c.data) || String(body?.shop_id || "") || null;
-      const loja = shopId ? porShop.get(shopId) : undefined;
+      const loja = (shopId ? porShop.get(shopId) : undefined) || lojaConfig;
       return {
         conta_id: loja?.conta_id ?? null,
         loja_id: loja?.id ?? null,
-        shop_id: shopId,
+        shop_id: shopId ?? (loja?.shop_id ? String(loja.shop_id) : null),
         url: String(c.url || "").slice(0, 500),
         metodo: String(c.metodo || "GET"),
         payload: c.data ?? null,

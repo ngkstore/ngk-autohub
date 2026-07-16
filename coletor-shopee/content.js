@@ -10,6 +10,7 @@
   var cfg = typeof NGK_CONFIG !== "undefined" ? NGK_CONFIG : null;
   var AUTOHUB = (cfg && cfg.AUTOHUB) || "https://ngk-autohub.vercel.app";
   var SEGREDO = (cfg && cfg.SEGREDO) || "";
+  var LOJA_ID = (cfg && cfg.LOJA_ID) || "";
 
   var fila = [];
   var enviadas = 0;
@@ -55,7 +56,13 @@
     var lote = fila.splice(0, 20);
     // Vai pelo service worker (bg.js): daqui a chamada seria bloqueada por CORS.
     chrome.runtime.sendMessage(
-      { tipo: "NGK_ENVIAR", autohub: AUTOHUB, segredo: SEGREDO, capturas: lote },
+      {
+        tipo: "NGK_ENVIAR",
+        autohub: AUTOHUB,
+        segredo: SEGREDO,
+        lojaId: LOJA_ID,
+        capturas: lote,
+      },
       function (resp) {
         if (chrome.runtime.lastError) {
           erro = chrome.runtime.lastError.message || "erro na extensão";

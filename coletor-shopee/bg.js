@@ -14,7 +14,7 @@ chrome.runtime.onMessage.addListener(function (msg, sender, responder) {
       "Content-Type": "application/json",
       Authorization: "Bearer " + msg.segredo,
     },
-    body: JSON.stringify({ capturas: msg.capturas }),
+    body: JSON.stringify({ capturas: msg.capturas, loja_id: msg.lojaId }),
   })
     .then(function (r) {
       return r.json().then(function (d) {
