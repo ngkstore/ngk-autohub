@@ -35,8 +35,14 @@ async function ultimaCaptura(
     .ilike("url", `%${contem}%`)
     .order("capturado_em", { ascending: false })
     .limit(1);
-  if (!admin) q = q.in("conta_id", contaId ? [contaId] : []);
-  if (lojas) q = q.in("loja_id", lojas);
+  // Capturas antigas vieram sem loja/conta (antes do LOJA_ID no config).
+  // Aceita também as sem dono, senão o painel fica vazio à toa.
+  if (!admin) {
+    q = q.or(`conta_id.eq.${contaId ?? "00000000-0000-0000-0000-000000000000"},conta_id.is.null`);
+  }
+  if (lojas && lojas.length > 0) {
+    q = q.or(`loja_id.in.(${lojas.join(",")}),loja_id.is.null`);
+  }
   const { data } = await q;
   return data?.[0] ?? null;
 }
@@ -55,6 +61,15 @@ export default async function RaioXPage({ searchParams }: Props) {
   const itens: ItemPainel[] = capRanking ? lerProductRankings(capRanking.payload) : [];
   const vereditosShopee = capVerdict ? lerVerdict(capVerdict.payload) : [];
   const serie = capTempo ? lerTimeGraph(capTempo.payload) : [];
+
+  // Diagnóstico: quantas capturas existem de cada tipo (p/ saber o que falta).
+  const { count: totalCapturas } = await supabase
+    .from("coletor_capturas")
+    .select("id", { count: "exact", head: true });
+  const { count: temRanking } = await supabase
+    .from("coletor_capturas")
+    .select("id", { count: "exact", head: true })
+    .ilike("url", "%dashboard/product-rankings%");
 
   // Posição média e CPC (da conta) — o que o concorrente cobra pra mostrar.
   const pontos = serie.filter((p) => p.avgRank > 0);
@@ -104,14 +119,46 @@ export default async function RaioXPage({ searchParams }: Props) {
 
       {itens.length === 0 ? (
         <div className="mt-8 rounded-2xl bg-yellow-900/40 p-6 text-yellow-200">
-          <p className="font-semibold">Ainda não capturei o funil por produto.</p>
-          <p className="mt-2 text-sm">
-            Com a extensão ligada, abra o Seller Center →{" "}
-            <strong>Informações Gerenciais</strong> → role até o ranking de
-            produtos. O coletor pega sozinho. Depois recarregue esta página.
+          <p className="font-semibold">Ainda não montei o funil por produto.</p>
+
+          <div className="mt-4 rounded-xl bg-slate-900/60 p-4 text-sm">
+            <p className="font-semibold text-slate-200">Diagnóstico:</p>
+            <ul className="mt-2 space-y-1 text-slate-300">
+              <li>
+                Capturas no banco: <strong>{totalCapturas ?? 0}</strong>
+              </li>
+              <li>
+                Capturas de <code>product-rankings</code>:{" "}
+                <strong>{temRanking ?? 0}</strong>
+              </li>
+              <li>
+                Achei a captura pro seu filtro:{" "}
+                <strong>{capRanking ? "sim" : "não"}</strong>
+              </li>
+              <li>
+                Produtos lidos do payload: <strong>{itens.length}</strong>
+              </li>
+            </ul>
+          </div>
+
+          <p className="mt-4 text-sm">
+            {(temRanking ?? 0) === 0 ? (
+              <>
+                <strong>O que fazer:</strong> com a extensão ligada, abra o
+                Seller Center → <strong>Informações Gerenciais</strong> e role
+                até o <strong>ranking de produtos</strong>. É essa tela que
+                carrega o funil. Depois recarregue aqui.
+              </>
+            ) : (
+              <>
+                <strong>Capturei, mas não consegui usar.</strong> Pode ser
+                filtro de loja (capturas antigas vieram sem loja) ou formato do
+                payload. Tente escolher <em>Todas as lojas</em> no topo.
+              </>
+            )}
           </p>
           <p className="mt-2 text-xs">
-            (Você também pode importar planilhas em{" "}
+            (Alternativa: importar planilhas em{" "}
             <Link href="/insights" className="underline">Insights</Link>.)
           </p>
         </div>
