@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Coletor NGK AutoHub (Shopee)",
+  "version": "0.1.0",
+  "description": "Envia pro NGK AutoHub os dados que o painel do Seller Center já carrega (Ads e Informações Gerenciais).",
+  "permissions": [],
+  "host_permissions": [
+    "https://seller.shopee.com.br/*",
+    "https://ngk-autohub.vercel.app/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://seller.shopee.com.br/*"],
+      "js": ["injected.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://seller.shopee.com.br/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

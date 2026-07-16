@@ -17,8 +17,9 @@ const ROTAS_CRON = [
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // 1) Webhook do Telegram: já se protege pelo secret no header. Deixa passar.
-  if (pathname === "/api/telegram/webhook") {
+  // 1) Webhook do Telegram e coletor da extensão: já se protegem por segredo
+  //    próprio no header (não têm sessão de usuário). Deixa passar.
+  if (pathname === "/api/telegram/webhook" || pathname === "/api/insights/coletor") {
     return NextResponse.next();
   }
 
