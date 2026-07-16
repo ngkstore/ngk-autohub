@@ -3,6 +3,37 @@
 //   cost: 1014929            -> R$ 10,15
 //   suggested_roi_two_target -> 750000 = ROAS 7,5
 
+/* A URL da captura carrega o período que estava na tela:
+   ...?start_time=1784170800&end_time=1784210400&period=real_time
+   É assim que sabemos se aquela captura é de hoje, 7, 15 ou 30 dias. */
+export type PeriodoCaptura = {
+  inicio: Date | null;
+  fim: Date | null;
+  dias: number;
+  rotulo: string;
+};
+
+export function periodoDaUrl(url: string): PeriodoCaptura {
+  const pegar = (chave: string) => {
+    const m = url.match(new RegExp(`[?&]${chave}=(\\d+)`));
+    return m ? Number(m[1]) : 0;
+  };
+  const ini = pegar("start_time");
+  const fim = pegar("end_time");
+  if (!ini || !fim) {
+    return { inicio: null, fim: null, dias: 0, rotulo: "período desconhecido" };
+  }
+  const dias = Math.max(1, Math.round((fim - ini) / 86400));
+  const rotulo =
+    dias <= 1 ? "hoje" : dias <= 8 ? "7 dias" : dias <= 16 ? "15 dias" : `${dias} dias`;
+  return {
+    inicio: new Date(ini * 1000),
+    fim: new Date(fim * 1000),
+    dias,
+    rotulo,
+  };
+}
+
 export const MICRO = 100000;
 export function deMicro(v: unknown): number {
   const n = Number(v ?? 0);

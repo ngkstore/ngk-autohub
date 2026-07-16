@@ -9,7 +9,7 @@ import {
   diagnosticar,
   type AnuncioAds,
 } from "@/lib/insights/planilhas";
-import { lerVerdict, lerTimeGraph } from "@/lib/insights/painel";
+import { lerVerdict, lerTimeGraph, periodoDaUrl } from "@/lib/insights/painel";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +23,7 @@ function moeda(v: number) {
 async function ultimaCaptura(contem: string, admin: boolean, contaId: string | null) {
   let q = supabase
     .from("coletor_capturas")
-    .select("payload, capturado_em")
+    .select("url, payload, capturado_em")
     .ilike("url", `%${contem}%`)
     .order("capturado_em", { ascending: false })
     .limit(1);
@@ -34,6 +34,25 @@ async function ultimaCaptura(contem: string, admin: boolean, contaId: string | n
   }
   const { data } = await q;
   return data?.[0] ?? null;
+}
+
+// Quais janelas (hoje / 7 / 15 / 30 dias) o coletor já capturou.
+async function janelasCapturadas(admin: boolean, contaId: string | null) {
+  let q = supabase
+    .from("coletor_capturas")
+    .select("url")
+    .ilike("url", "%dashboard/product-rankings%")
+    .order("capturado_em", { ascending: false })
+    .limit(50);
+  if (!admin) {
+    q = q.or(
+      `conta_id.eq.${contaId ?? "00000000-0000-0000-0000-000000000000"},conta_id.is.null`
+    );
+  }
+  const { data } = await q;
+  const rotulos = new Set<string>();
+  (data || []).forEach((c) => rotulos.add(periodoDaUrl(String(c.url)).rotulo));
+  return Array.from(rotulos);
 }
 
 export default async function RaioXPage({ searchParams }: Props) {
@@ -63,9 +82,10 @@ export default async function RaioXPage({ searchParams }: Props) {
   }
 
   /* ---------- 2) Extras do painel (coletor): posição, CPC, sugestão -------- */
-  const [capVerdict, capTempo] = await Promise.all([
+  const [capVerdict, capTempo, janelas] = await Promise.all([
     ultimaCaptura("diagnosis/homepage_batch_list_verdict", escopo.admin, escopo.contaId),
     ultimaCaptura("report/get_time_graph", escopo.admin, escopo.contaId),
+    janelasCapturadas(escopo.admin, escopo.contaId),
   ]);
   const vereditosShopee = capVerdict ? lerVerdict(capVerdict.payload) : [];
   const serie = capTempo ? lerTimeGraph(capTempo.payload) : [];
@@ -114,6 +134,31 @@ export default async function RaioXPage({ searchParams }: Props) {
         Diagnóstico por anúncio: onde o funil vaza e o que fazer. Compara cada
         anúncio com os <strong>pares do mesmo ticket</strong>.
       </p>
+
+      {/* Escada 7/15/30: quais janelas o coletor já pegou */}
+      <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+        <p className="text-sm text-slate-300">
+          📅 <strong>Janelas capturadas pelo coletor:</strong>{" "}
+          {janelas.length > 0 ? (
+            janelas.map((j) => (
+              <span
+                key={j}
+                className="mr-2 rounded-full bg-slate-700 px-3 py-1 text-xs text-slate-200"
+              >
+                {j}
+              </span>
+            ))
+          ) : (
+            <span className="text-slate-500">nenhuma ainda</span>
+          )}
+        </p>
+        <p className="mt-2 text-xs text-slate-500">
+          O coletor guarda <strong>o período que você está vendo no painel</strong>.
+          Para montar a escada 7/15/30: abra <strong>Informações Gerenciais →
+          ranking de produtos</strong> e troque o período (7 dias → 15 → 30),
+          esperando carregar. Cada troca vira uma janela aqui.
+        </p>
+      </div>
 
       {/* Extras que vêm do coletor (o painel) */}
       {(rankMedio > 0 || sugestoes.length > 0) && (
