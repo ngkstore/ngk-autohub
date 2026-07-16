@@ -3,7 +3,12 @@
     "allow": [
       "Bash(git commit -q -m ' *)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:himmelmarketing.com)",
+      "WebFetch(domain:docs.supermetrics.com)",
+      "WebFetch(domain:chrome-stats.com)",
+      "WebFetch(domain:avantpro.com.br)",
+      "WebFetch(domain:chromewebstore.google.com)"
     ]
   }
 }
