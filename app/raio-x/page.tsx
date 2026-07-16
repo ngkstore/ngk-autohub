@@ -33,13 +33,22 @@ export default async function RaioXPage({ searchParams }: Props) {
   if (lojas) q = q.in("loja_id", lojas);
   const { data: imports } = await q;
 
-  const importAds = (imports || []).find(
+  // Pode haver várias planilhas de Ads (Dados Gerais, GMV Max Detail...).
+  // Escolhe a que REALMENTE rende anúncios — não a mais recente.
+  const candidatos = (imports || []).filter(
     (i) => tipoDaPlanilha(i.colunas) === "ads"
   );
-
-  const anuncios: AnuncioAds[] = importAds?.linhas
-    ? lerAds(importAds.linhas as Record<string, unknown>[])
-    : [];
+  let importAds: (typeof candidatos)[number] | null = null;
+  let anuncios: AnuncioAds[] = [];
+  for (const c of candidatos) {
+    const lidos = lerAds((c.linhas || []) as Record<string, unknown>[]);
+    if (lidos.length > anuncios.length) {
+      anuncios = lidos;
+      importAds = c;
+    }
+  }
+  // Nenhuma rendeu nada: mostra a 1ª só p/ diagnóstico das colunas.
+  if (!importAds && candidatos.length > 0) importAds = candidatos[0];
 
   // Medianas por faixa de ticket (comparar igual com igual).
   const porFaixa = new Map<string, AnuncioAds[]>();
@@ -92,7 +101,31 @@ export default async function RaioXPage({ searchParams }: Props) {
           <p className="mt-2 text-xs text-slate-500">
             Fonte: {importAds.arquivo} • período {importAds.periodo_inicio || "?"} a{" "}
             {importAds.periodo_fim || "?"} • {anuncios.length} anúncios
+            {candidatos.length > 1 && ` • (${candidatos.length} planilhas de Ads; usei a com mais anúncios)`}
           </p>
+
+          {anuncios.length === 0 && (
+            <div className="mt-6 rounded-2xl bg-red-900/40 p-6 text-red-200">
+              <p className="font-semibold">
+                Li a planilha mas não consegui extrair os anúncios.
+              </p>
+              <p className="mt-2 text-sm">
+                Provavelmente os nomes das colunas são diferentes do esperado.
+                Colunas que esta planilha tem:
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {(importAds.colunas || []).map((c: string) => (
+                  <span key={c} className="rounded-full bg-slate-800 px-3 py-1 text-xs">
+                    {c}
+                  </span>
+                ))}
+              </div>
+              <p className="mt-3 text-xs">
+                Preciso de uma coluna com o <strong>ID do produto</strong>. Manda
+                essa lista pro chat que eu ajusto o leitor.
+              </p>
+            </div>
+          )}
 
           <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-3">
             <div className="rounded-2xl border border-red-800 bg-slate-900 p-6">

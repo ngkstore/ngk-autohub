@@ -86,23 +86,28 @@ export type AnuncioAds = {
 export function lerAds(linhas: Record<string, unknown>[]): AnuncioAds[] {
   return linhas
     .map((l) => {
-      const itemId = String(campo(l, "ID do produto") ?? "").trim();
-      const gmv = numeroPlanilha(campo(l, "GMV"));
-      const itens = numeroPlanilha(campo(l, "Itens Vendidos"));
+      // aceita variações de nome entre os relatórios (CPC, GMV Max, produtos)
+      const itemId = String(
+        campo(l, "ID do produto", "ID do Produto", "ID do Item", "Product ID", "item_id") ?? ""
+      ).trim();
+      const gmv = numeroPlanilha(campo(l, "GMV", "Receita", "Vendas"));
+      const itens = numeroPlanilha(campo(l, "Itens Vendidos", "Unidades", "Itens"));
       return {
         itemId,
-        nome: String(campo(l, "Nome do Anúncio") ?? "").trim(),
+        nome: String(campo(l, "Nome do Anúncio", "Produto", "Nome do Produto") ?? "").trim(),
         status: String(campo(l, "Status") ?? "").trim(),
-        impressoes: numeroPlanilha(campo(l, "Impressões")),
-        cliques: numeroPlanilha(campo(l, "Cliques")),
+        impressoes: numeroPlanilha(campo(l, "Impressões", "Impressão", "Impressoes")),
+        cliques: numeroPlanilha(campo(l, "Cliques", "Clicks")),
         ctr: numeroPlanilha(campo(l, "CTR")),
-        addCarrinho: numeroPlanilha(campo(l, "Add to Cart")),
-        taxaCarrinho: numeroPlanilha(campo(l, "Add to Cart Rate")),
-        conversoes: numeroPlanilha(campo(l, "Conversões")),
-        taxaConversao: numeroPlanilha(campo(l, "Taxa de Conversão")),
+        addCarrinho: numeroPlanilha(campo(l, "Add to Cart", "Adicionar ao Carrinho")),
+        taxaCarrinho: numeroPlanilha(
+          campo(l, "Add to Cart Rate", "Taxa de Adição ao Carrinho", "Taxa de Conversão (adicionar ao carrinho)")
+        ),
+        conversoes: numeroPlanilha(campo(l, "Conversões", "Conversoes", "Pedidos")),
+        taxaConversao: numeroPlanilha(campo(l, "Taxa de Conversão", "Taxa de Conversao")),
         itensVendidos: itens,
         gmv,
-        despesas: numeroPlanilha(campo(l, "Despesas")),
+        despesas: numeroPlanilha(campo(l, "Despesas", "Investimento", "Custo", "Expense")),
         roas: numeroPlanilha(campo(l, "ROAS")),
         ticket: itens > 0 ? gmv / itens : 0,
       };
