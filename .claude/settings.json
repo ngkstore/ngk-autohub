@@ -8,7 +8,9 @@
       "WebFetch(domain:docs.supermetrics.com)",
       "WebFetch(domain:chrome-stats.com)",
       "WebFetch(domain:avantpro.com.br)",
-      "WebFetch(domain:chromewebstore.google.com)"
+      "WebFetch(domain:chromewebstore.google.com)",
+      "Read(//c/Users/krupa/Desktop/**)",
+      "Read(//c/Users/krupa/Desktop/himmel-copilot-shopee-20260716T014356Z-1-001/himmel-copilot-shopee/**)"
     ]
   }
 }
