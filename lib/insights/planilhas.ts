@@ -32,6 +32,16 @@ export function numeroPlanilha(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+// Taxas (CTR, carrinho, conversão) chegam de dois jeitos:
+//  - como texto "5.10%"  -> o SheetJS devolve 0.051 (fração)
+//  - como número 5.10    -> já em porcentagem
+// Regra: valor <= 1 é fração -> multiplica por 100. Uma taxa real de 0,05%
+// seria implausível; 5% é o caso real.
+export function taxaPlanilha(v: unknown): number {
+  const n = numeroPlanilha(v);
+  return n > 0 && n <= 1 ? n * 100 : n;
+}
+
 export type TipoPlanilha = "ads" | "produto" | "trafego" | "desconhecida";
 
 // Descobre que planilha é, pelas colunas.
@@ -98,13 +108,13 @@ export function lerAds(linhas: Record<string, unknown>[]): AnuncioAds[] {
         status: String(campo(l, "Status") ?? "").trim(),
         impressoes: numeroPlanilha(campo(l, "Impressões", "Impressão", "Impressoes")),
         cliques: numeroPlanilha(campo(l, "Cliques", "Clicks")),
-        ctr: numeroPlanilha(campo(l, "CTR")),
+        ctr: taxaPlanilha(campo(l, "CTR")),
         addCarrinho: numeroPlanilha(campo(l, "Add to Cart", "Adicionar ao Carrinho")),
-        taxaCarrinho: numeroPlanilha(
+        taxaCarrinho: taxaPlanilha(
           campo(l, "Add to Cart Rate", "Taxa de Adição ao Carrinho", "Taxa de Conversão (adicionar ao carrinho)")
         ),
         conversoes: numeroPlanilha(campo(l, "Conversões", "Conversoes", "Pedidos")),
-        taxaConversao: numeroPlanilha(campo(l, "Taxa de Conversão", "Taxa de Conversao")),
+        taxaConversao: taxaPlanilha(campo(l, "Taxa de Conversão", "Taxa de Conversao")),
         itensVendidos: itens,
         gmv,
         despesas: numeroPlanilha(campo(l, "Despesas", "Investimento", "Custo", "Expense")),
