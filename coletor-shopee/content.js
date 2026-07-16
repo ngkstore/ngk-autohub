@@ -6,10 +6,10 @@
 (function () {
   "use strict";
 
-  // ======= CONFIGURE AQUI (1x) =======
-  var AUTOHUB = "https://ngk-autohub.vercel.app";
-  var SEGREDO = "COLE_AQUI_O_SEU_COLETOR_SECRET";
-  // ===================================
+  // Config vem do config.js (que NÃO vai pro git). Veja config.exemplo.js.
+  var cfg = typeof NGK_CONFIG !== "undefined" ? NGK_CONFIG : null;
+  var AUTOHUB = (cfg && cfg.AUTOHUB) || "https://ngk-autohub.vercel.app";
+  var SEGREDO = (cfg && cfg.SEGREDO) || "";
 
   var fila = [];
   var enviadas = 0;
@@ -47,8 +47,8 @@
   /* ---- envia em lote ---- */
   function enviar() {
     if (fila.length === 0) return;
-    if (SEGREDO.indexOf("COLE_AQUI") === 0) {
-      erro = "configure o SEGREDO no content.js";
+    if (!SEGREDO || SEGREDO.indexOf("COLE_AQUI") === 0) {
+      erro = "falta o config.js (copie de config.exemplo.js)";
       mostrarSelo();
       return;
     }
