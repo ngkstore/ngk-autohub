@@ -77,16 +77,18 @@ export async function sincronizarChatsPagina({
   nextTimestamp = "",
   maxConversas = 25,
   direction = "older",
+  tipo = "all",
 }: {
   loja: LojaShopee;
   nextTimestamp?: string;
   maxConversas?: number;
   direction?: "latest" | "older";
+  tipo?: "all" | "unread";
 }): Promise<ResultadoSyncChat> {
   const token: Token = { accessToken: loja.accessToken, shopId: loja.shopId };
 
   const params: Record<string, string> = {
-    type: "all",
+    type: tipo,
     direction,
     page_size: String(maxConversas),
   };

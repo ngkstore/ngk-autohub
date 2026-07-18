@@ -14,6 +14,34 @@ export const maxDuration = 300;
 const chaveTs = (lojaId: string) => `chat_next_timestamp:${lojaId}`;
 const chaveDone = (lojaId: string) => `chat_backfill_done:${lojaId}`;
 
+// A Shopee mudou o comportamento: `direction=latest` sem next_timestamp passou
+// a devolver conversas ANTIGAS (2024). O jeito certo de pegar as recentes é
+// `direction=older` a partir de AGORA. Também puxamos as NÃO-LIDAS (type=unread),
+// que são exatamente os clientes esperando resposta.
+async function sincronizarRecentes(
+  loja: Parameters<typeof sincronizarChatsPagina>[0]["loja"]
+) {
+  const agoraNano = String(Date.now() * 1_000_000);
+  const recentes = await sincronizarChatsPagina({
+    loja,
+    direction: "older",
+    nextTimestamp: agoraNano,
+    maxConversas: 30,
+  });
+  const naoLidas = await sincronizarChatsPagina({
+    loja,
+    direction: "older",
+    nextTimestamp: agoraNano,
+    tipo: "unread",
+    maxConversas: 30,
+  });
+  return {
+    conversas: recentes.conversas + naoLidas.conversas,
+    mensagens: recentes.mensagens + naoLidas.mensagens,
+    erro: recentes.erro || naoLidas.erro,
+  };
+}
+
 async function setConfig(chave: string, valor: string) {
   const { data } = await supabase
     .from("configuracoes")
@@ -40,7 +68,7 @@ export async function POST() {
     const lojas = await lojasShopeeDoEscopo(escopo);
     const resultados = [];
     for (const loja of lojas) {
-      const r = await sincronizarChatsPagina({ loja, direction: "latest" });
+      const r = await sincronizarRecentes(loja);
       resultados.push({ lojaId: loja.lojaId, ...r });
     }
     return NextResponse.json({
@@ -67,8 +95,8 @@ export async function GET() {
     const resultados = [];
 
     for (const loja of lojas) {
-      // 1) Conversas novas (mais recentes).
-      const novas = await sincronizarChatsPagina({ loja, direction: "latest" });
+      // 1) Conversas novas (recentes + não-lidas), a partir de agora.
+      const novas = await sincronizarRecentes(loja);
 
       // 2) Backfill do histórico (cursor por loja).
       const { data: rows } = await supabase
