@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import { supabase } from "@/lib/supabase";
 import { escopoDoUsuario } from "@/lib/conta";
 import { lojasShopeeDoEscopo } from "@/lib/shopee/lojas";
 
