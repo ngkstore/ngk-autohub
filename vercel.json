@@ -35,6 +35,10 @@
     {
       "path": "/api/shopee/chat/responder",
       "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/tiktok/pedidos/sincronizar",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

@@ -12,6 +12,7 @@ const ROTAS_CRON = [
   "/api/shopee/chat/sincronizar",
   "/api/shopee/chat/responder",
   "/api/shopee/produtos/descricoes",
+  "/api/tiktok/pedidos/sincronizar",
 ];
 
 export async function middleware(request: NextRequest) {
