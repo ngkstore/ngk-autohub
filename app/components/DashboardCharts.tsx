@@ -185,7 +185,7 @@ export default function DashboardCharts({
 
       <div className="rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-lg">
         <h2 className="mb-6 text-2xl font-bold text-white">
-          🛒 Faturamento por Marketplace
+          🛒 Faturamento por Loja
         </h2>
 
         {temDados(faturamentoPorMarketplace) ? (
