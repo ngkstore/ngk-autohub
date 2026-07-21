@@ -155,6 +155,18 @@ export default async function IntegracoesPage() {
                             : "Conectar"}
                         </Link>
                       )}
+
+                      {marketplaceNormalizado ===
+                        "tiktok" && (
+                        <Link
+                          href={`/api/tiktok/auth?loja=${loja.id}`}
+                          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white ring-1 ring-slate-600 hover:bg-slate-800"
+                        >
+                          {conectado
+                            ? "Reconectar TikTok"
+                            : "Conectar TikTok"}
+                        </Link>
+                      )}
                     </div>
                   </div>
                 );
