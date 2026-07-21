@@ -34,15 +34,14 @@ export async function GET(request: NextRequest) {
       seller_name,
     } = tk.data;
 
-    // 2) Descobre a loja autorizada (shop_id + shop_cipher).
+    // 2) Tenta descobrir a loja autorizada (shop_id + shop_cipher). Se o app
+    //    ainda não tem escopo, NÃO perde o token — salva sem cipher e avisa.
     const shopsResp = await listarLojasAutorizadas(access_token);
-    const shop = shopsResp?.data?.shops?.[0];
-    if (!shop) {
-      return NextResponse.json(
-        { sucesso: false, erro: "Token ok, mas não achei a loja autorizada.", detalhe: shopsResp },
-        { status: 500 }
-      );
-    }
+    const shop = shopsResp?.data?.shops?.[0] ?? null;
+    const avisoEscopo =
+      shopsResp?.code && shopsResp.code !== 0
+        ? `Token salvo, mas falta permissão de API (${shopsResp.code}): ${shopsResp.message}`
+        : null;
 
     // 3) Resolve a loja no nosso banco: state, ou a loja TikTok "NGK".
     if (!lojaId) {
@@ -73,8 +72,8 @@ export async function GET(request: NextRequest) {
       marketplace: "tiktok_shop",
       access_token,
       refresh_token,
-      shop_id: String(shop.id),
-      shop_cipher: shop.cipher,
+      shop_id: shop ? String(shop.id) : null,
+      shop_cipher: shop?.cipher ?? null,
       expire_in: access_token_expire_in,
       status: "ativo",
       atualizado_em: new Date().toISOString(),
@@ -87,10 +86,23 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    await supabase
-      .from("lojas")
-      .update({ shop_id: String(shop.id) })
-      .eq("id", lojaId);
+    if (shop) {
+      await supabase
+        .from("lojas")
+        .update({ shop_id: String(shop.id) })
+        .eq("id", lojaId);
+    }
+
+    // Se faltou escopo, mostra o aviso em vez de redirecionar (pra você ver).
+    if (avisoEscopo) {
+      return NextResponse.json({
+        sucesso: true,
+        conectado_parcial: true,
+        aviso: avisoEscopo,
+        proximo_passo:
+          "Adicione as permissões de API no app (Customer Service, Order, Product), publique e reconecte.",
+      });
+    }
 
     await supabase.from("sincronizacoes").insert({
       loja_id: lojaId,
@@ -98,7 +110,7 @@ export async function GET(request: NextRequest) {
       tipo: "oauth",
       status: "sucesso",
       registros_importados: 1,
-      mensagem: `TikTok conectado: ${shop.name || seller_name} (${shop.region}).`,
+      mensagem: `TikTok conectado: ${shop?.name || seller_name || "loja"} (${shop?.region || "?"}).`,
       iniciado_em: new Date().toISOString(),
       finalizado_em: new Date().toISOString(),
     });
