@@ -30,12 +30,18 @@ function mapear(o: Pedido, lojaId: string) {
   const recipient = (o.recipient_address as Record<string, unknown>) || {};
   // "Vendas" = subtotal dos itens (sem frete), p/ alinhar com a Shopee.
   const valorItens = num(pay.sub_total) || num(pay.total_amount);
+  // O nome real vem no cpf_name (recipient.name costuma vir mascarado/vazio).
+  const nome =
+    (o.cpf_name as string) ||
+    (recipient.name as string) ||
+    (o.buyer_email as string) ||
+    null;
 
   return {
     loja_id: lojaId,
     marketplace: "tiktok_shop",
     pedido_externo_id: String(o.id),
-    cliente_nome: (recipient.name as string) || (o.buyer_email as string) || null,
+    cliente_nome: nome,
     valor_total: valorItens,
     status,
     data_pedido: iso(o.create_time),
@@ -47,16 +53,31 @@ function mapear(o: Pedido, lojaId: string) {
   };
 }
 
-// Busca uma página de pedidos do TikTok (page_size vai na QUERY).
-async function buscarPagina(loja: LojaTikTok, pageToken: string, pageSize = 50) {
+// Busca uma página de pedidos do TikTok. page_size/sort vão na QUERY; o TikTok
+// devolve do mais ANTIGO pro mais novo por padrão, então pedimos DESC (recentes
+// primeiro). Filtro opcional por data de criação (create_time_ge) no body.
+async function buscarPagina(
+  loja: LojaTikTok,
+  pageToken: string,
+  desdeUnix?: number,
+  pageSize = 50
+) {
+  const query: Record<string, string> = {
+    page_size: String(pageSize),
+    sort_field: "create_time",
+    sort_order: "DESC",
+  };
+  if (pageToken) query.page_token = pageToken;
+
+  const body: Record<string, unknown> = {};
+  if (desdeUnix) body.create_time_ge = desdeUnix;
+
   return chamarTikTok("/order/202309/orders/search", {
     method: "POST",
     accessToken: loja.accessToken,
     shopCipher: loja.shopCipher,
-    query: pageToken
-      ? { page_size: String(pageSize), page_token: pageToken }
-      : { page_size: String(pageSize) },
-    body: {},
+    query,
+    body,
   });
 }
 
@@ -72,7 +93,8 @@ export type ResultadoTikTokPedidos = {
 // Sincroniza os pedidos de UMA loja TikTok (pagina até acabar ou o teto).
 export async function sincronizarPedidosTikTokLoja(
   loja: LojaTikTok,
-  maxPaginas = 20
+  maxPaginas = 20,
+  desdeUnix?: number
 ): Promise<ResultadoTikTokPedidos> {
   let pageToken = "";
   let novos = 0;
@@ -81,7 +103,7 @@ export async function sincronizarPedidosTikTokLoja(
   let amostra: unknown = undefined;
 
   for (let p = 0; p < maxPaginas; p++) {
-    const resp = await buscarPagina(loja, pageToken);
+    const resp = await buscarPagina(loja, pageToken, desdeUnix);
     if (resp?.code !== 0) {
       return {
         loja: loja.lojaId,
@@ -136,11 +158,12 @@ export async function sincronizarPedidosTikTokLoja(
   return { loja: loja.lojaId, novos, atualizados, total_lidos: lidos, amostra };
 }
 
-export async function sincronizarPedidosTikTok() {
+// maxPaginas menor no cron (só os recentes, rápido); maior no manual/backfill.
+export async function sincronizarPedidosTikTok(maxPaginas = 20, desdeUnix?: number) {
   const lojas = await lojasTikTokAtivas();
   const resultados: ResultadoTikTokPedidos[] = [];
   for (const loja of lojas) {
-    resultados.push(await sincronizarPedidosTikTokLoja(loja));
+    resultados.push(await sincronizarPedidosTikTokLoja(loja, maxPaginas, desdeUnix));
   }
   return resultados;
 }
