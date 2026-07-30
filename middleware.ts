@@ -24,15 +24,18 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2) Crons da Vercel: a Vercel envia "Authorization: Bearer $CRON_SECRET".
-  //    Enquanto CRON_SECRET não estiver configurado, libera por caminho para
-  //    não parar a automação; depois de configurado, passa a exigir o segredo.
+  // 2) Rotas de cron: são acionadas de DUAS formas.
+  //    a) Pela Vercel (cron): manda "Authorization: Bearer $CRON_SECRET" -> passa.
+  //    b) Por um usuário logado, pelos botões da tela de Sincronização (POST):
+  //       não manda o Bearer -> cai na verificação de sessão (atualizarSessao),
+  //       que deixa passar se estiver logado (e a rota escopa por conta).
+  //    Enquanto CRON_SECRET não estiver configurado, libera por caminho.
   if (ROTAS_CRON.includes(pathname)) {
     const segredo = process.env.CRON_SECRET;
     if (!segredo) return NextResponse.next();
     const auth = request.headers.get("authorization");
-    if (auth === `Bearer ${segredo}`) return NextResponse.next();
-    return NextResponse.json({ erro: "cron não autorizado" }, { status: 401 });
+    if (auth === `Bearer ${segredo}`) return NextResponse.next(); // cron Vercel
+    return atualizarSessao(request); // usuário logado acionando pela tela
   }
 
   // 3) Todo o resto exige usuário logado.

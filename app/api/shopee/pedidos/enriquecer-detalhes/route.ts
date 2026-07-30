@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { enriquecerPedidosPendentes } from "@/lib/shopee/enriquecerPedidos";
+import { escopoDoUsuario } from "@/lib/conta";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-async function enriquecer(limite: number) {
+// lojaIds null = todas as lojas (cron). [...] = só as lojas da conta (usuário).
+async function enriquecer(limite: number, lojaIds: string[] | null) {
   try {
-    const resultado = await enriquecerPedidosPendentes({ limite });
+    const resultado = await enriquecerPedidosPendentes({ limite, lojaIds });
 
     return NextResponse.json({
       sucesso: true,
@@ -31,9 +33,9 @@ async function enriquecer(limite: number) {
 }
 
 export async function GET(request: NextRequest) {
-  // Padrão maior no GET (usado pelo cron) para dar vazão ao volume.
+  // Cron da Vercel: processa TODAS as lojas (lojaIds = null).
   const limite = Number(request.nextUrl.searchParams.get("limite")) || 1000;
-  return enriquecer(limite);
+  return enriquecer(limite, null);
 }
 
 export async function POST(request: NextRequest) {
@@ -44,5 +46,8 @@ export async function POST(request: NextRequest) {
   } catch {
     // sem corpo — usa o padrão
   }
-  return enriquecer(limite);
+  // Usuário pela tela: só as lojas da conta dele (admin = todas).
+  const escopo = await escopoDoUsuario();
+  const lojaIds = escopo.admin ? null : escopo.lojaIds;
+  return enriquecer(limite, lojaIds);
 }

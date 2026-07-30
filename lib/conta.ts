@@ -70,3 +70,11 @@ export function filtroLojas(
   if (escopo.admin) return null; // admin sem seleção válida -> todas
   return escopo.lojaIds; // conta do usuário (vazio = nenhuma)
 }
+
+// O usuário pode operar/ver esta loja? Admin vê tudo; senão só as da conta.
+// Use nas rotas que recebem um lojaId do cliente, para não deixar um usuário
+// acionar ações em loja de outra conta.
+export function podeVerLoja(escopo: Escopo, lojaId?: string | null): boolean {
+  if (!lojaId) return false;
+  return escopo.admin || escopo.lojaIds.includes(lojaId);
+}

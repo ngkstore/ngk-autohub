@@ -2,12 +2,20 @@
 
 import { useState } from "react";
 
-export default function SincronizarTodosProdutosButton() {
+export default function SincronizarTodosProdutosButton({
+  lojaId,
+}: {
+  lojaId?: string;
+}) {
   const [loading, setLoading] = useState(false);
   const [progresso, setProgresso] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
   async function sincronizar() {
+    if (!lojaId) {
+      setErro("Selecione uma loja no topo antes de sincronizar.");
+      return;
+    }
     setLoading(true);
     setErro(null);
     setProgresso("Iniciando...");
@@ -21,7 +29,7 @@ export default function SincronizarTodosProdutosButton() {
         const r = await fetch("/api/shopee/produtos/sincronizar-todos", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ statusIdx, offset }),
+          body: JSON.stringify({ statusIdx, offset, lojaId }),
         });
         const texto = await r.text();
         let d: {

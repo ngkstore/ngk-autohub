@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { escopoDoUsuario, filtroLojas } from "@/lib/conta";
 import SyncTipoButton from "../components/SyncTipoButton";
 import SincronizarPedidosButton from "../components/SincronizarPedidosButton";
 import EnriquecerPedidosButton from "../components/EnriquecerPedidosButton";
@@ -9,6 +10,8 @@ import ResponderChatControl from "../components/ResponderChatControl";
 import SincronizarChatButton from "../components/SincronizarChatButton";
 import SincronizarTodosProdutosButton from "../components/SincronizarTodosProdutosButton";
 
+export const dynamic = "force-dynamic";
+
 function normalizarTexto(valor?: string) {
   return valor
     ?.toLowerCase()
@@ -17,24 +20,54 @@ function normalizarTexto(valor?: string) {
     .trim();
 }
 
-export default async function SincronizacaoPage() {
-  const { data: lojas } = await supabase
+export default async function SincronizacaoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ loja?: string }>;
+}) {
+  const params = await searchParams;
+  const escopo = await escopoDoUsuario();
+
+  // Lojas vis\u00edveis para o usu\u00e1rio logado (admin = todas; sen\u00e3o s\u00f3 as da conta).
+  let lojasQuery = supabase
     .from("lojas")
     .select("*")
     .order("criado_em", { ascending: false });
+  if (!escopo.admin) {
+    lojasQuery = lojasQuery.in(
+      "id",
+      escopo.lojaIds.length
+        ? escopo.lojaIds
+        : ["00000000-0000-0000-0000-000000000000"]
+    );
+  }
+  const { data: lojas } = await lojasQuery;
 
+  // Loja escolhida: a do seletor (?loja) se for da conta; sen\u00e3o a NGK (s\u00f3 p/
+  // admin, mantendo o padr\u00e3o antigo) ou a primeira loja da conta do usu\u00e1rio.
+  const lojaParam =
+    params.loja && escopo.lojaIds.includes(params.loja) ? params.loja : null;
   const lojaSelecionada =
-    lojas?.find(
-      (loja) =>
-        normalizarTexto(loja.apelido)?.includes("ngk") &&
-        normalizarTexto(loja.marketplace)?.includes("shopee")
-    ) || null;
+    lojas?.find((l) => l.id === lojaParam) ||
+    (escopo.admin
+      ? lojas?.find(
+          (loja) =>
+            normalizarTexto(loja.apelido)?.includes("ngk") &&
+            normalizarTexto(loja.marketplace)?.includes("shopee")
+        )
+      : undefined) ||
+    lojas?.[0] ||
+    null;
 
-  const { data: sincronizacoes } = await supabase
+  // Hist\u00f3rico restrito \u00e0s lojas da conta.
+  const filtro = filtroLojas(escopo, params.loja);
+  let sincQuery = supabase
     .from("sincronizacoes")
     .select("*, lojas(apelido)")
     .order("iniciado_em", { ascending: false })
     .limit(20);
+  if (filtro) sincQuery = sincQuery.in("loja_id", filtro);
+  const { data: sincronizacoes } = await sincQuery;
 
   return (
     <div className="p-8 text-white">
@@ -50,6 +83,13 @@ export default async function SincronizacaoPage() {
           {lojaSelecionada?.apelido || "Nenhuma loja encontrada"}
         </span>
       </p>
+
+      {(lojas?.length ?? 0) > 1 && (
+        <p className="mt-1 text-xs text-slate-500">
+          Você tem mais de uma loja — use o seletor de loja no topo para escolher
+          qual sincronizar.
+        </p>
+      )}
 
       <section className="mt-8 rounded-2xl bg-slate-900 p-6">
         <h2 className="text-2xl font-bold">Ações de Sincronização</h2>
@@ -100,7 +140,7 @@ export default async function SincronizacaoPage() {
       </section>
 
       <section className="mt-8">
-        <SincronizarTodosProdutosButton />
+        <SincronizarTodosProdutosButton lojaId={lojaSelecionada?.id || ""} />
       </section>
 
       <section className="mt-8">

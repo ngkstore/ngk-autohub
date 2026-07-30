@@ -208,7 +208,8 @@ export type ResultadoEscrow = {
 // e da Shopee, sem frete). Também grava taxas e o líquido a receber.
 export async function enriquecerEscrowPendentes({
   limite = 150,
-}: { limite?: number } = {}): Promise<ResultadoEscrow> {
+  lojaIds = null,
+}: { limite?: number; lojaIds?: string[] | null } = {}): Promise<ResultadoEscrow> {
   const partnerId = process.env.SHOPEE_PARTNER_ID;
   const partnerKey = process.env.SHOPEE_PARTNER_KEY;
   const baseUrl = process.env.SHOPEE_API_BASE_URL || BASE_URL_PADRAO;
@@ -217,15 +218,22 @@ export async function enriquecerEscrowPendentes({
     throw new Error("Credenciais da Shopee não configuradas.");
   }
 
+  // Sem loja no escopo (conta sem lojas) -> nada a fazer.
+  if (lojaIds && lojaIds.length === 0) {
+    return { processados: 0, atualizados: 0, erros: 0, restantes: 0 };
+  }
+
   // Pedidos pagos/válidos, reais, que ainda não tiveram o escrow puxado.
-  const { data: pedidos } = await supabase
+  // lojaIds null = todas as lojas (cron); [...] = só as lojas da conta.
+  let query = supabase
     .from("pedidos")
     .select("id, loja_id, pedido_externo_id")
     .eq("marketplace", "shopee")
     .eq("pedido_efetivado", true)
     .not("pedido_externo_id", "like", "SH-%")
-    .is("escrow_atualizado_em", null)
-    .limit(limite);
+    .is("escrow_atualizado_em", null);
+  if (lojaIds) query = query.in("loja_id", lojaIds);
+  const { data: pedidos } = await query.limit(limite);
 
   if (!pedidos || pedidos.length === 0) {
     return { processados: 0, atualizados: 0, erros: 0, restantes: 0 };
@@ -290,13 +298,15 @@ export async function enriquecerEscrowPendentes({
     }
   }
 
-  const { count } = await supabase
+  let countQuery = supabase
     .from("pedidos")
     .select("id", { count: "exact", head: true })
     .eq("marketplace", "shopee")
     .eq("pedido_efetivado", true)
     .not("pedido_externo_id", "like", "SH-%")
     .is("escrow_atualizado_em", null);
+  if (lojaIds) countQuery = countQuery.in("loja_id", lojaIds);
+  const { count } = await countQuery;
 
   return {
     processados: pedidos.length,

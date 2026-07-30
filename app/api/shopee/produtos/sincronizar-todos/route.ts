@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { supabase } from "@/lib/supabase";
+import { escopoDoUsuario, podeVerLoja } from "@/lib/conta";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -39,12 +40,29 @@ export async function POST(request: NextRequest) {
 
     let statusIdx = 0;
     let offset = 0;
+    let lojaId: string | undefined;
     try {
       const body = await request.json();
       if (typeof body?.statusIdx === "number") statusIdx = body.statusIdx;
       if (typeof body?.offset === "number") offset = body.offset;
+      if (typeof body?.lojaId === "string") lojaId = body.lojaId;
     } catch {
       // padrão
+    }
+
+    // Escopo por conta: precisa de uma loja e ela tem que ser da conta do usuário.
+    if (!lojaId) {
+      return NextResponse.json(
+        { sucesso: false, erro: "Selecione uma loja antes de sincronizar." },
+        { status: 400 }
+      );
+    }
+    const escopo = await escopoDoUsuario();
+    if (!podeVerLoja(escopo, lojaId)) {
+      return NextResponse.json(
+        { sucesso: false, erro: "Loja fora da sua conta." },
+        { status: 403 }
+      );
     }
 
     if (statusIdx >= STATUSES.length) {
@@ -56,6 +74,7 @@ export async function POST(request: NextRequest) {
       .select("access_token, shop_id, loja_id")
       .eq("marketplace", "shopee")
       .eq("status", "ativo")
+      .eq("loja_id", lojaId)
       .limit(1)
       .single();
 
@@ -65,7 +84,7 @@ export async function POST(request: NextRequest) {
 
     const accessToken = token.access_token;
     const shopId = String(token.shop_id);
-    const lojaId = token.loja_id;
+    // lojaId já veio validado do body (escopo da conta) — não redeclara.
     const itemStatus = STATUSES[statusIdx];
     const pageSize = 50;
 

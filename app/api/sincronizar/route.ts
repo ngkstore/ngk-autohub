@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { importarShopee } from "@/lib/importadores/shopee";
 import { importarTikTok } from "@/lib/importadores/tiktok";
+import { escopoDoUsuario, podeVerLoja } from "@/lib/conta";
 
 type TipoSincronizacao =
   | "produtos"
@@ -37,7 +38,16 @@ export async function POST(request: Request) {
       );
     }
 
+    // Escopo por conta: quem aciona só pode mexer nas lojas da conta dele.
+    const escopo = await escopoDoUsuario();
+
     if (lojaId) {
+      if (!podeVerLoja(escopo, lojaId)) {
+        return NextResponse.json(
+          { sucesso: false, erro: "Loja fora da sua conta." },
+          { status: 403 }
+        );
+      }
       if (marketplace === "shopee") {
         const resultado = await importarShopee({ lojaId, tipo });
         return NextResponse.json(resultado);
@@ -49,10 +59,19 @@ export async function POST(request: Request) {
       }
     }
 
-    const { data: lojas } = await supabase
+    // Sem lojaId (fallback): opera nas lojas do marketplace, mas restrito à
+    // conta do usuário (admin = todas).
+    let lojasQuery = supabase
       .from("lojas")
       .select("*")
       .ilike("marketplace", `%${marketplace}%`);
+    if (!escopo.admin) {
+      lojasQuery = lojasQuery.in(
+        "id",
+        escopo.lojaIds.length ? escopo.lojaIds : ["00000000-0000-0000-0000-000000000000"]
+      );
+    }
+    const { data: lojas } = await lojasQuery;
 
     if (!lojas || lojas.length === 0) {
       return NextResponse.json(

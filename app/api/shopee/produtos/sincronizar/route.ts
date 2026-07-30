@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { supabase } from "@/lib/supabase";
+import { escopoDoUsuario, podeVerLoja } from "@/lib/conta";
 
 function gerarAssinatura(
   partnerId: string,
@@ -116,6 +117,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { sucesso: false, erro: "lojaId não informado." },
         { status: 400 }
+      );
+    }
+
+    // Escopo por conta: a loja tem que ser da conta do usuário logado.
+    const escopo = await escopoDoUsuario();
+    if (!podeVerLoja(escopo, lojaId)) {
+      return NextResponse.json(
+        { sucesso: false, erro: "Loja fora da sua conta." },
+        { status: 403 }
       );
     }
 
