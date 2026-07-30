@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import { supabase } from "@/lib/supabase";
+import { registrarUsoIA } from "@/lib/uso";
 
 const BASE_URL_PADRAO = "https://partner.shopeemobile.com";
 
@@ -67,7 +68,11 @@ async function obterToken(lojaId: string): Promise<TokenLoja> {
   };
 }
 
-async function gerarRespostaIA(client: Anthropic, avaliacao: AvaliacaoRow) {
+async function gerarRespostaIA(
+  client: Anthropic,
+  avaliacao: AvaliacaoRow,
+  lojaId: string
+) {
   const negativa = (avaliacao.avaliacao ?? 5) <= 2;
   const system = negativa ? PROMPT_NEGATIVA : PROMPT_NEUTRA;
 
@@ -81,6 +86,14 @@ async function gerarRespostaIA(client: Anthropic, avaliacao: AvaliacaoRow) {
     max_tokens: 300,
     system,
     messages: [{ role: "user", content: conteudo }],
+  });
+
+  // Mede o consumo (base de cobrança por conta). Best-effort.
+  await registrarUsoIA({
+    lojaId,
+    tipo: "avaliacao",
+    modelo: "claude-haiku-4-5",
+    usage: resposta.usage,
   });
 
   const texto = resposta.content.find((b) => b.type === "text");
@@ -185,7 +198,7 @@ export async function responderAvaliacoesLote({
         texto = modelo5Estrelas(a.comment_id);
         comModelo++;
       } else {
-        texto = await gerarRespostaIA(client, a);
+        texto = await gerarRespostaIA(client, a, lojaId);
         comIA++;
       }
       if (texto) {

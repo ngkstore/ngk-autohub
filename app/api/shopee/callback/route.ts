@@ -22,6 +22,10 @@ export async function GET(request: NextRequest) {
 
     const code = searchParams.get("code");
     const shopId = searchParams.get("shop_id");
+    // Conta destino (usado quando a conexão parte do "Authorize" do console
+    // da Open Platform, que não passa pelo /api/shopee/auth). Ex.: onboarding
+    // de um amigo -> ?conta=<contaId> na Redirect URL.
+    const contaParam = searchParams.get("conta");
 
     if (!code || !shopId) {
       return NextResponse.json(
@@ -88,14 +92,18 @@ export async function GET(request: NextRequest) {
       lojaId = data?.loja_id ?? null;
     }
 
-    // Loja NOVA (amigo conectando a Shopee dele): cria sob a conta pendente.
+    // Loja NOVA (amigo conectando a Shopee dele): cria sob a conta destino.
+    // Prioridade: ?conta= na URL (fluxo do console) -> oauth_conta_pendente.
     if (!lojaId) {
-      const { data: contaPend } = await supabase
-        .from("configuracoes")
-        .select("valor")
-        .eq("chave", "oauth_conta_pendente")
-        .maybeSingle();
-      const contaId = contaPend?.valor || null;
+      let contaId = contaParam || null;
+      if (!contaId) {
+        const { data: contaPend } = await supabase
+          .from("configuracoes")
+          .select("valor")
+          .eq("chave", "oauth_conta_pendente")
+          .maybeSingle();
+        contaId = contaPend?.valor || null;
+      }
       if (contaId) {
         const { data: nova } = await supabase
           .from("lojas")

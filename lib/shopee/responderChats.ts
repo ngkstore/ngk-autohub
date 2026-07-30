@@ -2,6 +2,7 @@ import crypto from "crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import { supabase } from "@/lib/supabase";
 import { enviarTelegram } from "@/lib/telegram";
+import { registrarUsoIA } from "@/lib/uso";
 
 const BASE_URL_PADRAO = "https://partner.shopeemobile.com";
 
@@ -91,13 +92,21 @@ type Decisao = {
 
 async function decidir(
   client: Anthropic,
-  contexto: string
+  contexto: string,
+  lojaId: string
 ): Promise<Decisao | null> {
   const r = await client.messages.create({
     model: "claude-opus-4-8",
     max_tokens: 700,
     system: SYSTEM,
     messages: [{ role: "user", content: contexto }],
+  });
+  // Mede o consumo (base de cobrança por conta). Best-effort.
+  await registrarUsoIA({
+    lojaId,
+    tipo: "chat",
+    modelo: "claude-opus-4-8",
+    usage: r.usage,
   });
   const bloco = r.content.find((b) => b.type === "text");
   const txt = bloco && "text" in bloco ? bloco.text.trim() : "";
@@ -301,7 +310,7 @@ export async function responderChatsLote({
         `=== CONVERSA ATUAL COM ESTE CLIENTE (do início ao fim) ===\n${conversaTxt}\n\n` +
         `Responda à(s) última(s) mensagem(ns) do cliente, considerando TODA a conversa acima.`;
 
-      decisao = await decidir(client, contexto);
+      decisao = await decidir(client, contexto, lojaId);
       escalar =
         !decisao ||
         decisao.precisa_humano === true ||

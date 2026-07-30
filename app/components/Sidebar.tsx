@@ -17,6 +17,7 @@ const menuItems = [
   { name: "Alertas", href: "/alertas" },
 
   { name: "Lojas", href: "/lojas" },
+  { name: "💸 Consumo (cobrança)", href: "/uso" },
   { name: "Configurações", href: "/configuracoes" },
 ];
 
