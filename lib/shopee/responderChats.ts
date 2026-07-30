@@ -3,21 +3,23 @@ import Anthropic from "@anthropic-ai/sdk";
 import { supabase } from "@/lib/supabase";
 import { enviarTelegram } from "@/lib/telegram";
 import { registrarUsoIA } from "@/lib/uso";
+import { nomeLojaPublico } from "@/lib/shopee/lojas";
 
 const BASE_URL_PADRAO = "https://partner.shopeemobile.com";
 
-const SYSTEM = `Você é o atendimento da NGK Store no chat da Shopee, em português do Brasil. Responda como um vendedor humano, experiente, simpático e RESOLUTIVO.
+function montarSystem(nomeLoja: string) {
+  return `Você é o atendimento da ${nomeLoja} no chat da Shopee, em português do Brasil. Responda como um vendedor humano, experiente, simpático e RESOLUTIVO.
 
-Você recebe: dados do produto, EXEMPLOS REAIS de como a NGK Store já respondeu antes, e a CONVERSA ATUAL COMPLETA. Leia tudo e resolva a dúvida do cliente.
+Você recebe: dados do produto, EXEMPLOS REAIS de como a ${nomeLoja} já respondeu antes, e a CONVERSA ATUAL COMPLETA. Leia tudo e resolva a dúvida do cliente.
 
 O cliente costuma dividir a dúvida em várias mensagens — leia a conversa INTEIRA e junte o contexto antes de responder.
 
 REGRA PRINCIPAL: você DEVE RESPONDER a grande maioria das dúvidas, INCLUSIVE sobre envio, prazo de entrega, pagamento, devolução e reembolso. NÃO escale essas dúvidas — resolva usando as orientações abaixo e o jeito que a loja já respondeu nos exemplos. Aprenda o tom e as orientações dos exemplos reais.
 
-Orientações padrão da NGK Store (use e adapte ao caso):
+Orientações padrão da ${nomeLoja} (use e adapte ao caso):
 - Prazo / envio: o pedido é despachado dentro do prazo de manuseio do anúncio (geralmente poucos dias úteis); o prazo de ENTREGA aparece na tela de pagamento e no acompanhamento do pedido no app da Shopee. Tranquilize o cliente e oriente a acompanhar por lá.
 - Pagamento: dúvidas/problemas de pagamento são tratados pelo próprio app da Shopee (Eu > Central de Ajuda / suporte). Oriente com gentileza.
-- Devolução / Reembolso: o cliente solicita direto pelo app — Eu > Minhas Compras > [o pedido] > "Devolução/Reembolso" — e a NGK Store apoia o processo. Demonstre empatia e explique esse passo a passo de forma acolhedora.
+- Devolução / Reembolso: o cliente solicita direto pelo app — Eu > Minhas Compras > [o pedido] > "Devolução/Reembolso" — e a ${nomeLoja} apoia o processo. Demonstre empatia e explique esse passo a passo de forma acolhedora.
 - Produto: responda pela DESCRIÇÃO e pelos exemplos. Se a informação específica não existir, oriente o cliente a conferir as imagens/descrição do anúncio.
 
 Categorias: "produto" | "envio_prazo" | "pagamento" | "devolucao_reembolso" | "defeito" | "outro".
@@ -28,6 +30,7 @@ TOM: caloroso, humano, gentil e completo o suficiente pra resolver, sem enrolaç
 
 Responda APENAS com um JSON válido, sem nenhum texto fora dele, no formato:
 {"categoria":"produto|envio_prazo|pagamento|devolucao_reembolso|defeito|outro","confianca":"alta|baixa","precisa_humano":true|false,"resposta":"..."}`;
+}
 
 type Token = { accessToken: string; shopId: string };
 
@@ -93,12 +96,13 @@ type Decisao = {
 async function decidir(
   client: Anthropic,
   contexto: string,
-  lojaId: string
+  lojaId: string,
+  system: string
 ): Promise<Decisao | null> {
   const r = await client.messages.create({
     model: "claude-opus-4-8",
     max_tokens: 700,
-    system: SYSTEM,
+    system,
     messages: [{ role: "user", content: contexto }],
   });
   // Mede o consumo (base de cobrança por conta). Best-effort.
@@ -176,6 +180,8 @@ export async function responderChatsLote({
 
   const token = await obterToken(lojaId);
   const client = new Anthropic();
+  const nomeLoja = await nomeLojaPublico(lojaId); // nome individual da loja
+  const system = montarSystem(nomeLoja);
 
   // Aprendizado: exemplos REAIS de como a loja já respondeu (qualquer produto),
   // para o robô seguir o mesmo tom e as mesmas orientações (envio, devolução…).
@@ -305,12 +311,12 @@ export async function responderChatsLote({
     } else {
       const contexto =
         `=== PRODUTO ===\n${produtoTxt}\n\n` +
-        `=== COMO A NGK STORE JÁ RESPONDEU (exemplos reais — siga o mesmo tom e orientações) ===\n${exemplosTxt}\n\n` +
+        `=== COMO A ${nomeLoja.toUpperCase()} JÁ RESPONDEU (exemplos reais — siga o mesmo tom e orientações) ===\n${exemplosTxt}\n\n` +
         `=== RESPOSTAS ANTERIORES DA LOJA NESTE PRODUTO ===\n${historicoTxt}\n\n` +
         `=== CONVERSA ATUAL COM ESTE CLIENTE (do início ao fim) ===\n${conversaTxt}\n\n` +
         `Responda à(s) última(s) mensagem(ns) do cliente, considerando TODA a conversa acima.`;
 
-      decisao = await decidir(client, contexto, lojaId);
+      decisao = await decidir(client, contexto, lojaId, system);
       escalar =
         !decisao ||
         decisao.precisa_humano === true ||

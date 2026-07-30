@@ -2,41 +2,50 @@ import crypto from "crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import { supabase } from "@/lib/supabase";
 import { registrarUsoIA } from "@/lib/uso";
+import { nomeLojaPublico } from "@/lib/shopee/lojas";
 
 const BASE_URL_PADRAO = "https://partner.shopeemobile.com";
 
 // Modelos prontos para avaliações 5★ (rodízio, para não parecer robô/spam).
-const MODELOS_5_ESTRELAS = [
-  "Muito obrigado pela avaliação! Ficamos felizes que tenha gostado. Conte sempre com a NGK Store. 💖",
-  "Que alegria receber seu feedback! Agradecemos a confiança e esperamos te atender de novo em breve. 🧡",
-  "Obrigado pela nota máxima! Seu apoio faz toda a diferença pra gente. Volte sempre! ✨",
-  "Ficamos muito felizes com sua avaliação! Obrigado por escolher a NGK Store. 🙌",
-  "Agradecemos demais pelo carinho! É ótimo saber que você gostou da sua compra. 💫",
-  "Obrigado por compartilhar sua experiência! Contamos com você nas próximas compras. 😊",
-  "Que bom que você gostou! Muito obrigado pela avaliação e pela confiança na NGK Store. 💚",
-  "Seu feedback nos deixa muito felizes! Obrigado e até a próxima compra. 🛍️",
-];
-
-function modelo5Estrelas(commentId: number) {
-  const idx = Math.abs(commentId) % MODELOS_5_ESTRELAS.length;
-  return MODELOS_5_ESTRELAS[idx];
+// O nome da loja é individual (cada loja fala o próprio nome).
+function modelos5Estrelas(nomeLoja: string) {
+  return [
+    `Muito obrigado pela avaliação! Ficamos felizes que tenha gostado. Conte sempre com a ${nomeLoja}. 💖`,
+    "Que alegria receber seu feedback! Agradecemos a confiança e esperamos te atender de novo em breve. 🧡",
+    "Obrigado pela nota máxima! Seu apoio faz toda a diferença pra gente. Volte sempre! ✨",
+    `Ficamos muito felizes com sua avaliação! Obrigado por escolher a ${nomeLoja}. 🙌`,
+    "Agradecemos demais pelo carinho! É ótimo saber que você gostou da sua compra. 💫",
+    "Obrigado por compartilhar sua experiência! Contamos com você nas próximas compras. 😊",
+    `Que bom que você gostou! Muito obrigado pela avaliação e pela confiança na ${nomeLoja}. 💚`,
+    "Seu feedback nos deixa muito felizes! Obrigado e até a próxima compra. 🛍️",
+  ];
 }
 
-const PROMPT_NEGATIVA = `Você responde avaliações de clientes da NGK Store (loja na Shopee) em português do Brasil.
+function modelo5Estrelas(commentId: number, nomeLoja: string) {
+  const lista = modelos5Estrelas(nomeLoja);
+  const idx = Math.abs(commentId) % lista.length;
+  return lista[idx];
+}
+
+function promptNegativa(nomeLoja: string) {
+  return `Você responde avaliações de clientes da ${nomeLoja} (loja na Shopee) em português do Brasil.
 Esta é uma avaliação NEGATIVA. Escreva uma resposta curta (2-4 frases), empática e profissional:
 - Lamente sinceramente que a experiência não foi boa, sem ser robótico.
 - Assuma a responsabilidade e mostre vontade de resolver.
 - Oriente o cliente a abrir uma solicitação de devolução/reembolso pelo próprio app da Shopee, ou a entrar em contato pelo chat da loja, para que a equipe resolva.
 - Tom acolhedor e humano. Pode usar no máximo 1 emoji discreto.
 Responda APENAS com o texto da resposta ao cliente, sem aspas e sem rótulos.`;
+}
 
-const PROMPT_NEUTRA = `Você responde avaliações de clientes da NGK Store (loja na Shopee) em português do Brasil.
+function promptNeutra(nomeLoja: string) {
+  return `Você responde avaliações de clientes da ${nomeLoja} (loja na Shopee) em português do Brasil.
 Esta avaliação é mediana/positiva. Escreva uma resposta curta (1-3 frases):
 - Agradeça pelo feedback.
 - Reconheça brevemente o ponto levantado, se houver comentário.
 - Convide o cliente a comprar novamente.
 - Tom acolhedor. Pode usar no máximo 1 emoji discreto.
 Responda APENAS com o texto da resposta ao cliente, sem aspas e sem rótulos.`;
+}
 
 type AvaliacaoRow = {
   id: string;
@@ -71,10 +80,11 @@ async function obterToken(lojaId: string): Promise<TokenLoja> {
 async function gerarRespostaIA(
   client: Anthropic,
   avaliacao: AvaliacaoRow,
-  lojaId: string
+  lojaId: string,
+  nomeLoja: string
 ) {
   const negativa = (avaliacao.avaliacao ?? 5) <= 2;
-  const system = negativa ? PROMPT_NEGATIVA : PROMPT_NEUTRA;
+  const system = negativa ? promptNegativa(nomeLoja) : promptNeutra(nomeLoja);
 
   const conteudo =
     `Produto: ${avaliacao.nome_produto || "produto da loja"}\n` +
@@ -186,6 +196,7 @@ export async function responderAvaliacoesLote({
 
   const token = await obterToken(lojaId);
   const client = new Anthropic(); // lê ANTHROPIC_API_KEY do ambiente
+  const nomeLoja = await nomeLojaPublico(lojaId); // nome individual da loja
 
   const aPublicar: { comment_id: number; comment: string; id: string }[] = [];
   let comModelo = 0;
@@ -195,10 +206,10 @@ export async function responderAvaliacoesLote({
     try {
       let texto: string;
       if ((a.avaliacao ?? 5) >= 5) {
-        texto = modelo5Estrelas(a.comment_id);
+        texto = modelo5Estrelas(a.comment_id, nomeLoja);
         comModelo++;
       } else {
-        texto = await gerarRespostaIA(client, a, lojaId);
+        texto = await gerarRespostaIA(client, a, lojaId, nomeLoja);
         comIA++;
       }
       if (texto) {

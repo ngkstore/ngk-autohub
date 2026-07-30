@@ -46,3 +46,19 @@ export async function lojasShopeeDoEscopo(escopo: Escopo): Promise<LojaShopee[]>
   if (escopo.admin) return todas;
   return todas.filter((l) => escopo.lojaIds.includes(l.lojaId));
 }
+
+// Nome PÚBLICO da loja usado pelo robô ao falar com o cliente (avaliações/chat).
+// Prioridade: nome_publico -> apelido -> nome -> "nossa loja".
+export async function nomeLojaPublico(lojaId: string): Promise<string> {
+  const { data } = await supabase
+    .from("lojas")
+    .select("nome_publico, apelido, nome")
+    .eq("id", lojaId)
+    .maybeSingle();
+  return (
+    data?.nome_publico ||
+    data?.apelido ||
+    data?.nome ||
+    "nossa loja"
+  ).trim();
+}
