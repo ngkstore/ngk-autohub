@@ -60,32 +60,55 @@ export async function GET(request: NextRequest) {
   const accessToken = token.access_token as string;
   const shopId = String(token.shop_id);
 
-  const dias = Number(request.nextUrl.searchParams.get("dias")) || 15;
-  const agora = Math.floor(Date.now() / 1000);
-  const desde = agora - dias * 24 * 60 * 60;
-
   const path = "/api/v2/payment/get_wallet_transaction_list";
-  const timestamp = Math.floor(Date.now() / 1000);
-  const sign = crypto
-    .createHmac("sha256", partnerKey)
-    .update(`${partnerId}${path}${timestamp}${accessToken}${shopId}`)
-    .digest("hex");
 
-  const url =
-    `${baseUrl}${path}` +
-    `?partner_id=${partnerId}` +
-    `&timestamp=${timestamp}` +
-    `&access_token=${encodeURIComponent(accessToken)}` +
-    `&shop_id=${shopId}` +
-    `&sign=${sign}` +
-    `&page_no=1&page_size=20` +
-    `&create_time_from=${desde}&create_time_to=${agora}`;
+  async function chamar(dias: number) {
+    const agora = Math.floor(Date.now() / 1000);
+    const desde = agora - dias * 24 * 60 * 60;
+    const timestamp = Math.floor(Date.now() / 1000);
+    const sign = crypto
+      .createHmac("sha256", partnerKey as string)
+      .update(`${partnerId}${path}${timestamp}${accessToken}${shopId}`)
+      .digest("hex");
 
-  try {
+    const url =
+      `${baseUrl}${path}` +
+      `?partner_id=${partnerId}` +
+      `&timestamp=${timestamp}` +
+      `&access_token=${encodeURIComponent(accessToken)}` +
+      `&shop_id=${shopId}` +
+      `&sign=${sign}` +
+      `&page_no=1&page_size=20` +
+      `&create_time_from=${desde}&create_time_to=${agora}`;
+
     const resp = await fetch(url, { method: "GET", cache: "no-store" });
     const data = await resp.json();
+    return { dias, http: resp.status, data };
+  }
 
-    // Amostra: primeiras transações, pra ver os campos (e se tem order_sn).
+  try {
+    // Se o usuário forçar ?dias, usa só ele; senão tenta janelas decrescentes
+    // até a Shopee parar de reclamar de "time period too large".
+    const forcado = Number(request.nextUrl.searchParams.get("dias"));
+    const candidatos = forcado ? [forcado] : [14, 10, 7, 3, 1];
+
+    let ok: Awaited<ReturnType<typeof chamar>> | null = null;
+    const tentativas: { dias: number; erro: string | null }[] = [];
+    for (const d of candidatos) {
+      const r = await chamar(d);
+      tentativas.push({ dias: d, erro: r.data?.error || null });
+      if (!r.data?.error) {
+        ok = r;
+        break;
+      }
+      // Só continua encolhendo se for erro de janela; outro erro para aqui.
+      if (r.data?.error !== "wallet.time_invalid") {
+        ok = r;
+        break;
+      }
+    }
+
+    const data = ok?.data;
     const lista =
       data?.response?.transaction_list ||
       data?.response?.wallet_transaction_list ||
@@ -93,14 +116,14 @@ export async function GET(request: NextRequest) {
       null;
 
     return NextResponse.json({
-      sucesso: !data?.error,
+      sucesso: !!data && !data?.error,
       loja_id: token.loja_id,
       shop_id: shopId,
-      janela_dias: dias,
-      http_status: resp.status,
+      janela_dias_ok: ok?.dias ?? null,
+      tentativas,
+      http_status: ok?.http ?? null,
       erro_shopee: data?.error || null,
       mensagem_shopee: data?.message || null,
-      // Dica de leitura:
       dica:
         "erro vazio + transaction_list preenchida = TEMOS ACESSO. " +
         "Se aparecer 'no permission'/'invalid scope' = falta o escopo de Finanças no app parceiro. " +
