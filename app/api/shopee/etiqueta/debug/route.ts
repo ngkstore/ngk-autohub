@@ -87,34 +87,59 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Tenta alguns tipos de documento (o erro dirá qual é válido p/ a loja).
-    const tipos = ["THERMAL_AIR_WAYBILL", "NORMAL_AIR_WAYBILL"];
-    const resultados: Record<string, unknown> = {};
-    let acheiEndereco: unknown = null;
+    // TODAS as chamadas abaixo são SOMENTE LEITURA (não cria/altera envio).
+    // Tenta vários formatos + endpoints numa rodada só pra achar o que funciona.
+    const tentativas: { nome: string; path: string; body: unknown }[] = [
+      { nome: "data_info__order_list", path: "/api/v2/logistics/get_shipping_document_data_info", body: { order_list: [{ order_sn: orderSn }] } },
+      { nome: "data_info__order_sn", path: "/api/v2/logistics/get_shipping_document_data_info", body: { order_sn: orderSn } },
+      { nome: "data_info__order_list_tipo", path: "/api/v2/logistics/get_shipping_document_data_info", body: { order_list: [{ order_sn: orderSn }], shipping_document_type: "NORMAL_AIR_WAYBILL" } },
+      { nome: "shipping_parameter", path: "/api/v2/logistics/get_shipping_parameter", body: { order_sn: orderSn } },
+      { nome: "tracking_number", path: "/api/v2/logistics/get_tracking_number", body: { order_sn: orderSn } },
+    ];
 
-    for (const tipo of tipos) {
-      const data = await postar("/api/v2/logistics/get_shipping_document_data_info", {
-        shipping_document_type: tipo,
-        order_list: [{ order_sn: orderSn }],
-      });
-      resultados[tipo] = data;
-      // procura recipient_address em qualquer lugar da resposta
-      const info = data?.response?.data_info_list?.[0] || data?.response || null;
-      const addr = info?.recipient_address || info?.buyer_address || null;
-      if (addr && !acheiEndereco) acheiEndereco = addr;
-      if (!data?.error) break; // deu certo, para
+    // Procura recursivamente por qualquer coisa que pareça endereço/cidade/estado.
+    function acharEndereco(obj: unknown): unknown {
+      if (!obj || typeof obj !== "object") return null;
+      const o = obj as Record<string, unknown>;
+      for (const chave of ["recipient_address", "buyer_address", "to_address", "address"]) {
+        if (o[chave] && typeof o[chave] === "object") return o[chave];
+      }
+      if ("state" in o || "city" in o || "district" in o || "zipcode" in o) return o;
+      for (const v of Object.values(o)) {
+        const achou = acharEndereco(v);
+        if (achou) return achou;
+      }
+      return null;
+    }
+
+    const respostas: Record<string, unknown> = {};
+    let endereco: unknown = null;
+    let ondeAchou: string | null = null;
+
+    for (const t of tentativas) {
+      const data = await postar(t.path, t.body);
+      respostas[t.nome] = data;
+      if (!endereco && !data?.error) {
+        const addr = acharEndereco(data?.response);
+        if (addr) {
+          endereco = addr;
+          ondeAchou = t.nome;
+        }
+      }
     }
 
     return NextResponse.json({
       sucesso: true,
       loja_id: token.loja_id,
       pedido: orderSn,
-      endereco_na_etiqueta: acheiEndereco,
+      endereco_encontrado: endereco,
+      onde_achou: ondeAchou,
       dica:
-        "Se 'endereco_na_etiqueta' vier com cidade/estado = REGIÃO POR API (sem coletor). " +
-        "Se der 'please create shipping document first' = a etiqueta precisa ser gerada antes (fluxo async). " +
-        "Se der 'no permission' = falta escopo de Logística. Se vier mascarado = só via coletor.",
-      respostas: resultados,
+        "endereco_encontrado com cidade/estado = REGIÃO (e nome) POR API. " +
+        "'no permission' = falta escopo de Logística. " +
+        "'create document first' = precisa gerar a etiqueta antes (mas o Upseller já gerou; se aparecer, revemos). " +
+        "Tudo mascarado (****) = só via coletor.",
+      respostas,
     });
   } catch (error) {
     return NextResponse.json(
