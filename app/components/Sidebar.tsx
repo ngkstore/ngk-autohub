@@ -6,6 +6,7 @@ const menuItems = [
   { name: "Atendimento", href: "/atendimento" },
   { name: "Produtos", href: "/produtos" },
   { name: "Pedidos", href: "/pedidos" },
+  { name: "💰 Finanças", href: "/financas" },
   { name: "Financeiro", href: "/financeiro" },
   { name: "Auditoria", href: "/auditoria" },
   { name: "Analytics", href: "/analytics" },
