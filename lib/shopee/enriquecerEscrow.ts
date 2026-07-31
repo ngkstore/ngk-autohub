@@ -231,7 +231,8 @@ export async function enriquecerEscrowPendentes({
     .eq("marketplace", "shopee")
     .eq("pedido_efetivado", true)
     .not("pedido_externo_id", "like", "SH-%")
-    .is("escrow_atualizado_em", null);
+    // escrow ainda não puxado OU falta a comissão de afiliado (backfill gradual)
+    .or("escrow_atualizado_em.is.null,comissao_afiliado.is.null");
   if (lojaIds) query = query.in("loja_id", lojaIds);
   const { data: pedidos } = await query.limit(limite);
 
@@ -282,6 +283,7 @@ export async function enriquecerEscrowPendentes({
           cupom_loja: n(buyer.seller_voucher ?? income.voucher_from_seller),
           frete: n(buyer.shipping_fee ?? income.buyer_paid_shipping_fee),
           desconto_vendedor: n(income.order_seller_discount),
+          comissao_afiliado: n(income.order_ams_commission_fee), // Programa de Afiliados
           escrow_atualizado_em: new Date().toISOString(),
         })
         .eq("id", pedido.id);

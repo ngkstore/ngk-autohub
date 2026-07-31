@@ -33,6 +33,10 @@ alter table pedidos add column if not exists enviado_em timestamptz;    -- rastr
 alter table pedidos add column if not exists entregue_em timestamptz;   -- rastreio: entregue
 alter table pedidos add column if not exists regiao_atualizada_em timestamptz;
 
+-- 2b) Comissão do Programa de Afiliados (custo VARIÁVEL, igual Ads — não é
+--     taxa obrigatória). Vem do escrow em order_ams_commission_fee.
+alter table pedidos add column if not exists comissao_afiliado numeric(14,2);
+
 -- 3) Custo do produto (editável na tela). Custo TOTAL por unidade.
 alter table produtos add column if not exists custo numeric(14,2);
 
@@ -76,6 +80,8 @@ as $$
     'taxas',           (select coalesce(sum(coalesce(taxa_comissao,0)+coalesce(taxa_servico,0)),0) from efet),
     'cupom_proprio',   (select coalesce(sum(cupom_loja),0) from efet),
     'qtd_cupom',       (select count(*) from efet where coalesce(cupom_loja,0) > 0),
+    'afiliado',        (select coalesce(sum(comissao_afiliado),0) from efet),
+    'qtd_afiliado',    (select count(*) from efet where coalesce(comissao_afiliado,0) > 0),
     'receita_liquida', (select coalesce(sum(valor_liquido),0) from efet where escrow_atualizado_em is not null),
     'recebido',        (select coalesce(sum(valor_recebido),0) from efet where recebido_em is not null),
     'qtd_recebido',    (select count(*) from efet where recebido_em is not null),

@@ -139,6 +139,7 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
   const receita = n(r.receita_bruta);
   const taxas = Math.abs(n(r.taxas));
   const cupom = Math.abs(n(r.cupom_proprio)); // cupom_loja vem negativo no banco
+  const afiliado = Math.abs(n(r.afiliado)); // custo opcional, já dentro do escrow
   const liquida = n(r.receita_liquida);
   const ads = n(r.ads);
   const reemb = n(r.reembolsos);
@@ -148,7 +149,8 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
 
   const linhas = [
     { l: "Receita (pedidos pagos)", v: receita, tot: false },
-    { l: "(−) Taxas Shopee", v: -taxas, tot: false },
+    { l: "(−) Taxas Shopee (comissão + serviço)", v: -taxas, tot: false },
+    { l: "(−) Comissão de afiliado (opcional)", v: -afiliado, tot: false },
     { l: "(−) Cupom próprio (Shopee não entra)", v: -cupom, tot: false },
     { l: "= Receita líquida (escrow)", v: liquida, tot: true },
     { l: "(−) Ads (saída da carteira)", v: -ads, tot: false },
@@ -159,11 +161,12 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
 
   return (
     <div>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         <Kpi label="Recebido" val={brl(n(r.recebido))} hint={`${n(r.qtd_recebido)} pedido(s)`} cor="text-emerald-300" />
         <Kpi label="Falta receber" val={brl(n(r.a_receber))} hint={`${n(r.qtd_a_receber)} pedido(s)`} cor="text-blue-300" />
         <Kpi label="Resultado" val={brl(resultado)} hint="antes do custo" />
-        <Kpi label="Margem" val={`${margem.toFixed(1)}%`} hint="sobre a receita" />
+        <Kpi label="Margem" val={`${margem.toFixed(1)}%`} hint="antes do custo" />
+        <Kpi label="Afiliado pago" val={brl(afiliado)} hint={`${n(r.qtd_afiliado)} pedido(s) · custo opcional`} cor="text-violet-300" />
         <Kpi label="Cupom próprio" val={brl(cupom)} hint={`${n(r.qtd_cupom)} pedido(s)`} cor="text-orange-300" />
       </div>
 
