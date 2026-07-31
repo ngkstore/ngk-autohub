@@ -137,6 +137,8 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
   });
   const r = (data as Record<string, unknown>) || {};
   const receita = n(r.receita_bruta);
+  const taxas = Math.abs(n(r.taxas));
+  const cupom = Math.abs(n(r.cupom_proprio)); // cupom_loja vem negativo no banco
   const liquida = n(r.receita_liquida);
   const ads = n(r.ads);
   const reemb = n(r.reembolsos);
@@ -146,8 +148,8 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
 
   const linhas = [
     { l: "Receita (pedidos pagos)", v: receita, tot: false },
-    { l: "(−) Taxas Shopee", v: -n(r.taxas), tot: false },
-    { l: "(−) Cupom próprio (Shopee não entra)", v: -n(r.cupom_proprio), tot: false },
+    { l: "(−) Taxas Shopee", v: -taxas, tot: false },
+    { l: "(−) Cupom próprio (Shopee não entra)", v: -cupom, tot: false },
     { l: "= Receita líquida (escrow)", v: liquida, tot: true },
     { l: "(−) Ads (saída da carteira)", v: -ads, tot: false },
     { l: "(−) Reembolsos / devoluções", v: -reemb, tot: false },
@@ -162,7 +164,7 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
         <Kpi label="Falta receber" val={brl(n(r.a_receber))} hint={`${n(r.qtd_a_receber)} pedido(s)`} cor="text-blue-300" />
         <Kpi label="Resultado" val={brl(resultado)} hint="antes do custo" />
         <Kpi label="Margem" val={`${margem.toFixed(1)}%`} hint="sobre a receita" />
-        <Kpi label="Cupom próprio" val={brl(n(r.cupom_proprio))} hint={`${n(r.qtd_cupom)} pedido(s)`} cor="text-orange-300" />
+        <Kpi label="Cupom próprio" val={brl(cupom)} hint={`${n(r.qtd_cupom)} pedido(s)`} cor="text-orange-300" />
       </div>
 
       <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6">
