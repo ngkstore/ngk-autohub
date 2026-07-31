@@ -72,8 +72,11 @@ export async function GET(request: NextRequest) {
 
   let orderSn = request.nextUrl.searchParams.get("pedido") || null;
   if (!orderSn) {
+    // Prefere "A enviar" (READY_TO_SHIP) — janela em que o endereço deveria
+    // estar visível pra gerar a etiqueta. Depois cai pra outros status.
     orderSn =
-      (await acharPedido(["COMPLETED", "TO_CONFIRM_RECEIVE", "SHIPPED"])) ||
+      (await acharPedido(["READY_TO_SHIP"])) ||
+      (await acharPedido(["PROCESSED", "SHIPPED", "TO_CONFIRM_RECEIVE", "COMPLETED"])) ||
       (await acharPedido());
   }
   if (!orderSn) {
