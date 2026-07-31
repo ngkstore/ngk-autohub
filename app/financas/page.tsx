@@ -45,11 +45,25 @@ const PERIODOS = [
 const ABAS = [
   { k: "balanco", r: "📊 Balanço" },
   { k: "conciliacao", r: "🧮 Conciliação" },
+  { k: "previsao", r: "📅 Previsão" },
   { k: "divergencias", r: "⚠️ Divergências" },
   { k: "carteira", r: "👛 Carteira" },
   { k: "produtos", r: "🏷️ Produtos & Margem" },
   { k: "impostos", r: "🧾 Impostos" },
 ];
+
+function diaLabel(s: string) {
+  return new Date(`${s}T12:00:00-03:00`).toLocaleDateString("pt-BR", {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+  });
+}
+function addDiasBRT(nd: number) {
+  const s = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + nd)).toISOString().slice(0, 10);
+}
 
 function brl(v: number) {
   return (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -116,6 +130,7 @@ export default async function FinancasPage({ searchParams }: Props) {
       <div className="mt-8">
         {aba === "balanco" && <Balanco lojas={lojas} periodo={periodo} conta={escopo.contaId} />}
         {aba === "conciliacao" && <Conciliacao lojas={lojas} periodo={periodo} />}
+        {aba === "previsao" && <Previsao lojas={lojas} />}
         {aba === "divergencias" && <Divergencias lojas={lojas} periodo={periodo} />}
         {aba === "carteira" && <Carteira lojas={lojas} />}
         {aba === "produtos" && <Produtos lojas={lojas} />}
@@ -458,6 +473,71 @@ async function Impostos({ conta }: { conta: string | null }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ---------------- PREVISÃO DE FLUXO DE CAIXA ----------------
+async function Previsao({ lojas }: { lojas: string[] | null }) {
+  const { data } = await supabase.rpc("previsao_fluxo_caixa", { p_loja_ids: lojas, p_dias: 30 });
+  const r = (data as Record<string, unknown>) || {};
+  const dias = (r.proximos_dias as { dia: string; valor: number; pedidos: number }[]) || [];
+  const porUf = (r.por_uf as { uf: string; dias: number; amostra: number }[]) || [];
+  const maxV = Math.max(1, ...dias.map((d) => n(d.valor)));
+  const lim7 = addDiasBRT(7);
+  const prox7 = dias.filter((d) => d.dia < lim7).reduce((t, d) => t + n(d.valor), 0);
+
+  return (
+    <div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Kpi label="A receber (total)" val={brl(n(r.total_a_receber))} hint={`${n(r.qtd_a_receber)} pedido(s) em aberto`} cor="text-blue-300" />
+        <Kpi label="Próximos 7 dias" val={brl(prox7)} hint="previsto cair na carteira" cor="text-emerald-300" />
+        <Kpi label="Tempo médio" val={`${n(r.media_geral_dias)} dias`} hint={`base: ${n(r.base_amostra)} pedidos já recebidos`} />
+        <Kpi label="Atrasado" val={brl(n(r.atrasado_valor))} hint={`${n(r.atrasado_pedidos)} pedido(s) passaram da média`} cor="text-orange-300" />
+      </div>
+
+      <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6">
+        <h2 className="mb-1 text-xl font-bold">Quanto entra por dia (próximos 30 dias)</h2>
+        <p className="mb-5 text-xs text-slate-500">
+          Estimativa: data do pedido + tempo médio até cair (por UF quando há amostra, senão a média geral).
+        </p>
+        {dias.length === 0 ? (
+          <p className="text-slate-400">
+            Ainda sem base pra prever. Assim que a carteira e a região terminarem de sincronizar, a previsão aparece.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {dias.map((d) => (
+              <div key={d.dia} className="flex items-center gap-3">
+                <span className="w-24 shrink-0 text-sm text-slate-400">{diaLabel(d.dia)}</span>
+                <div className="h-6 flex-1 overflow-hidden rounded-md bg-slate-800">
+                  <div
+                    className="flex h-full items-center justify-end rounded-md bg-emerald-600 pr-2 text-xs font-semibold text-white"
+                    style={{ width: `${Math.max(6, (n(d.valor) / maxV) * 100)}%` }}
+                  >
+                    {brl(n(d.valor))}
+                  </div>
+                </div>
+                <span className="w-16 shrink-0 text-right text-xs text-slate-500">{n(d.pedidos)} ped.</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {porUf.length > 0 && (
+        <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-6">
+          <h2 className="mb-4 text-xl font-bold">Tempo médio de recebimento por região</h2>
+          <div className="flex flex-wrap gap-2">
+            {porUf.map((u) => (
+              <span key={u.uf} className="rounded-lg bg-slate-800 px-3 py-2 text-sm">
+                <b>{u.uf}</b> · {u.dias} dias <span className="text-slate-500">({u.amostra} amostra)</span>
+              </span>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-slate-500">Vai ficando mais preciso conforme a base de região enche.</p>
+        </div>
+      )}
     </div>
   );
 }
