@@ -53,19 +53,28 @@ export async function GET(request: NextRequest) {
   const shopId = String(token.shop_id);
 
   // Qual pedido sondar? ?pedido, ou um recente/real da loja.
-  let orderSn = request.nextUrl.searchParams.get("pedido") || null;
-  if (!orderSn) {
-    let pq = supabase
+  // Prefere um pedido JÁ ENVIADO/ENTREGUE (rastreio com eventos que podem
+  // conter cidade/UF); se não houver, cai pra qualquer pedido real recente.
+  async function acharPedido(status?: string[]) {
+    let q = supabase
       .from("pedidos")
-      .select("pedido_externo_id, loja_id")
+      .select("pedido_externo_id")
       .eq("marketplace", "shopee")
       .not("pedido_externo_id", "like", "SH-%")
       .not("data_pedido", "is", null)
       .order("data_pedido", { ascending: false })
       .limit(1);
-    if (token.loja_id) pq = pq.eq("loja_id", token.loja_id);
-    const { data: ped } = await pq.maybeSingle();
-    orderSn = ped?.pedido_externo_id ?? null;
+    if (token?.loja_id) q = q.eq("loja_id", token.loja_id);
+    if (status) q = q.in("status", status);
+    const { data } = await q.maybeSingle();
+    return data?.pedido_externo_id ?? null;
+  }
+
+  let orderSn = request.nextUrl.searchParams.get("pedido") || null;
+  if (!orderSn) {
+    orderSn =
+      (await acharPedido(["COMPLETED", "TO_CONFIRM_RECEIVE", "SHIPPED"])) ||
+      (await acharPedido());
   }
   if (!orderSn) {
     return NextResponse.json({ sucesso: false, erro: "Nenhum pedido real encontrado p/ sondar. Passe ?pedido=<order_sn>." }, { status: 404 });
