@@ -83,7 +83,13 @@ export async function GET(request: NextRequest) {
       body: JSON.stringify(body),
       cache: "no-store",
     });
-    return r.json();
+    const txt = await r.text();
+    try {
+      return JSON.parse(txt);
+    } catch {
+      // Resposta não-JSON (erro de gateway/binário): guarda o texto cru.
+      return { _nao_json: true, http_status: r.status, corpo: txt.slice(0, 400) };
+    }
   }
 
   try {
