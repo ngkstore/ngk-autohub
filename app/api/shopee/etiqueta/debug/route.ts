@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
     for (const tipo of tipos) {
       const data = await postar("/api/v2/logistics/get_shipping_document_data_info", {
         shipping_document_type: tipo,
-        order_list: [{ order_sn: orderSn, shipping_document_type: tipo }],
+        order_list: [{ order_sn: orderSn }],
       });
       resultados[tipo] = data;
       // procura recipient_address em qualquer lugar da resposta
