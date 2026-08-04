@@ -16,9 +16,11 @@ async function rodar(lojas: { lojaId: string }[], dias: number) {
   return NextResponse.json({ sucesso: true, importadas, lojas: resultados });
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // cron usa 14 dias; backfill manual: ?dias=90 (idempotente, pode repetir).
+  const dias = Number(request.nextUrl.searchParams.get("dias")) || 14;
   const lojas = await listarLojasShopeeAtivas();
-  return rodar(lojas, 14);
+  return rodar(lojas, dias);
 }
 
 export async function POST(request: NextRequest) {

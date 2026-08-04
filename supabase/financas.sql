@@ -83,10 +83,27 @@ as $$
     'afiliado',        (select coalesce(sum(comissao_afiliado),0) from efet),
     'qtd_afiliado',    (select count(*) from efet where coalesce(comissao_afiliado,0) > 0),
     'receita_liquida', (select coalesce(sum(valor_liquido),0) from efet where escrow_atualizado_em is not null),
-    'recebido',        (select coalesce(sum(valor_recebido),0) from efet where recebido_em is not null),
-    'qtd_recebido',    (select count(*) from efet where recebido_em is not null),
-    'a_receber',       (select coalesce(sum(coalesce(valor_liquido, valor_total)),0) from efet where recebido_em is null),
-    'qtd_a_receber',   (select count(*) from efet where recebido_em is null),
+    -- Recebido = dinheiro que CAIU no período (filtra por recebido_em, não pela data do pedido).
+    'recebido',        (select coalesce(sum(valor_recebido),0) from pedidos
+                          where marketplace='shopee' and recebido_em is not null
+                            and (p_loja_ids is null or loja_id = any(p_loja_ids))
+                            and (p_inicio is null or recebido_em >= p_inicio)
+                            and (p_fim is null or recebido_em < p_fim)),
+    'qtd_recebido',    (select count(*) from pedidos
+                          where marketplace='shopee' and recebido_em is not null
+                            and (p_loja_ids is null or loja_id = any(p_loja_ids))
+                            and (p_inicio is null or recebido_em >= p_inicio)
+                            and (p_fim is null or recebido_em < p_fim)),
+    -- A receber = pendências RECENTES (últimos 90 dias), independente do filtro de período
+    -- (evita inflar com pedidos antigos cuja renda ainda não foi sincronizada).
+    'a_receber',       (select coalesce(sum(coalesce(valor_liquido, valor_total)),0) from pedidos
+                          where marketplace='shopee' and pedido_efetivado and recebido_em is null
+                            and (p_loja_ids is null or loja_id = any(p_loja_ids))
+                            and data_pedido >= now() - interval '90 days'),
+    'qtd_a_receber',   (select count(*) from pedidos
+                          where marketplace='shopee' and pedido_efetivado and recebido_em is null
+                            and (p_loja_ids is null or loja_id = any(p_loja_ids))
+                            and data_pedido >= now() - interval '90 days'),
     'ads',             (select coalesce(-sum(valor),0) from carteira_transacoes c
                           where c.categoria = 'ads'
                             and (p_loja_ids is null or c.loja_id = any(p_loja_ids))
