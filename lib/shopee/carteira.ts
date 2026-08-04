@@ -86,14 +86,16 @@ export type ResultadoCarteira = {
 export async function sincronizarCarteiraLoja({
   lojaId,
   dias = 30,
+  pular = 0,
 }: {
   lojaId: string;
   dias?: number;
+  pular?: number; // dias a "pular" a partir de hoje (backfill em janelas)
 }): Promise<ResultadoCarteira> {
   const token = await obterToken(lojaId);
   if (!token) return { lojaId, importadas: 0, erro: "sem token ativo" };
 
-  const agora = Math.floor(Date.now() / 1000);
+  const agora = Math.floor(Date.now() / 1000) - pular * 24 * 60 * 60;
   const limite = agora - dias * 24 * 60 * 60;
   let importadas = 0;
   let erro: string | undefined;
