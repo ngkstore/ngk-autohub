@@ -31,7 +31,7 @@ function periodoFiltro(periodo: string): { inicio: string; fim: string } | null 
     case "7dias": return { inicio: desloca(-7), fim: amanha };
     case "30dias": return { inicio: desloca(-30), fim: amanha };
     case "mes": return { inicio: isoBRT(a, m, 1), fim: amanha };
-    case "tudo": return null;
+    case "180dias": return { inicio: desloca(-180), fim: amanha };
     default: return { inicio: isoBRT(a, m, 1), fim: amanha };
   }
 }
@@ -39,7 +39,7 @@ const PERIODOS = [
   { k: "mes", r: "Este mês" },
   { k: "30dias", r: "30 dias" },
   { k: "7dias", r: "7 dias" },
-  { k: "tudo", r: "Tudo" },
+  { k: "180dias", r: "6 meses" },
 ];
 
 const ABAS = [

@@ -101,7 +101,7 @@ export async function sincronizarCarteiraLoja({
   // Percorre em janelas de 14 dias (do mais recente para trás).
   for (let ate = agora; ate > limite; ate -= JANELA_DIAS * 24 * 60 * 60) {
     const de = Math.max(limite, ate - JANELA_DIAS * 24 * 60 * 60);
-    for (let page = 1; page <= 100; page++) {
+    for (let page = 1; page <= 200; page++) {
       const { lista, more, erro: e } = await buscarPagina(token, de, ate, page);
       if (e) {
         erro = e;
