@@ -17,9 +17,12 @@ async function rodar(lojas: { lojaId: string }[], dias: number) {
 }
 
 export async function GET(request: NextRequest) {
-  // cron usa 14 dias; backfill manual: ?dias=90 (idempotente, pode repetir).
+  // cron usa 14 dias (todas as lojas). Backfill manual: ?dias=45&loja=<id>
+  // (uma loja por vez, senão o backfill de todas estoura o tempo da Vercel).
   const dias = Number(request.nextUrl.searchParams.get("dias")) || 14;
-  const lojas = await listarLojasShopeeAtivas();
+  const loja = request.nextUrl.searchParams.get("loja");
+  let lojas = await listarLojasShopeeAtivas();
+  if (loja) lojas = lojas.filter((l) => l.lojaId === loja);
   return rodar(lojas, dias);
 }
 
