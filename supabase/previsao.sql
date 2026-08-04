@@ -39,7 +39,7 @@ as $$
     from pedidos p
     where p.marketplace = 'shopee' and p.pedido_efetivado
       and p.recebido_em is null and p.data_pedido is not null
-      and p.data_pedido >= now() - interval '90 days'  -- só pendências recentes
+      and p.data_pedido >= now() - interval '45 days'  -- só pendências recentes
       and (p_loja_ids is null or p.loja_id = any(p_loja_ids))
   ),
   previsto as (

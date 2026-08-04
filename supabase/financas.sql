@@ -104,7 +104,7 @@ as $$
     from pedidos
     where marketplace = 'shopee' and pedido_efetivado and recebido_em is null
       and (p_loja_ids is null or loja_id = any(p_loja_ids))
-      and data_pedido >= now() - interval '90 days'
+      and data_pedido >= now() - interval '45 days'
   ),
   cart as (
     select
