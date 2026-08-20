@@ -100,16 +100,17 @@ async function decidir(
   system: string
 ): Promise<Decisao | null> {
   const r = await client.messages.create({
-    model: "claude-opus-4-8",
+    model: "claude-haiku-4-5",
     max_tokens: 700,
-    system,
+    // system (fixo por loja: instruções + exemplos) marcado para CACHE de prompt.
+    system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: contexto }],
   });
   // Mede o consumo (base de cobrança por conta). Best-effort.
   await registrarUsoIA({
     lojaId,
     tipo: "chat",
-    modelo: "claude-opus-4-8",
+    modelo: "claude-haiku-4-5",
     usage: r.usage,
   });
   const bloco = r.content.find((b) => b.type === "text");
@@ -181,7 +182,6 @@ export async function responderChatsLote({
   const token = await obterToken(lojaId);
   const client = new Anthropic();
   const nomeLoja = await nomeLojaPublico(lojaId); // nome individual da loja
-  const system = montarSystem(nomeLoja);
 
   // Aprendizado: exemplos REAIS de como a loja já respondeu (qualquer produto),
   // para o robô seguir o mesmo tom e as mesmas orientações (envio, devolução…).
@@ -208,6 +208,12 @@ export async function responderChatsLote({
     exemplosLoja.length > 0
       ? exemplosLoja.map((t) => `- ${t}`).join("\n")
       : "(sem exemplos)";
+
+  // Prompt FIXO por loja (instruções + exemplos): idêntico em todas as conversas
+  // desta rodada -> marcado para CACHE (paga ~10% nas repetições em vez de 100%).
+  const system =
+    montarSystem(nomeLoja) +
+    `\n\n=== COMO A ${nomeLoja.toUpperCase()} JÁ RESPONDEU (exemplos reais — siga o mesmo tom e orientações) ===\n${exemplosTxt}`;
 
   let enviados = 0;
   let escalados = 0;
@@ -311,7 +317,6 @@ export async function responderChatsLote({
     } else {
       const contexto =
         `=== PRODUTO ===\n${produtoTxt}\n\n` +
-        `=== COMO A ${nomeLoja.toUpperCase()} JÁ RESPONDEU (exemplos reais — siga o mesmo tom e orientações) ===\n${exemplosTxt}\n\n` +
         `=== RESPOSTAS ANTERIORES DA LOJA NESTE PRODUTO ===\n${historicoTxt}\n\n` +
         `=== CONVERSA ATUAL COM ESTE CLIENTE (do início ao fim) ===\n${conversaTxt}\n\n` +
         `Responda à(s) última(s) mensagem(ns) do cliente, considerando TODA a conversa acima.`;
