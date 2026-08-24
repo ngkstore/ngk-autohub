@@ -144,13 +144,21 @@ type Periodo = { inicio: string; fim: string } | null;
 
 // ---------------- BALANÇO (DRE) ----------------
 async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; periodo: Periodo; conta: string | null }) {
-  const { data } = await supabase.rpc("resumo_financas", {
-    p_loja_ids: lojas,
-    p_inicio: periodo?.inicio ?? null,
-    p_fim: periodo?.fim ?? null,
-    p_conta: conta,
-  });
+  const [{ data }, { data: dataCmv }] = await Promise.all([
+    supabase.rpc("resumo_financas", {
+      p_loja_ids: lojas,
+      p_inicio: periodo?.inicio ?? null,
+      p_fim: periodo?.fim ?? null,
+      p_conta: conta,
+    }),
+    supabase.rpc("resumo_cmv", {
+      p_loja_ids: lojas,
+      p_inicio: periodo?.inicio ?? null,
+      p_fim: periodo?.fim ?? null,
+    }),
+  ]);
   const r = (data as Record<string, unknown>) || {};
+  const c = (dataCmv as Record<string, unknown>) || {};
   const receita = n(r.receita_bruta);
   const taxas = Math.abs(n(r.taxas));
   const cupom = Math.abs(n(r.cupom_proprio)); // cupom_loja vem negativo no banco
@@ -162,6 +170,14 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
   const resultado = liquida - ads - reemb - imposto;
   const margem = receita > 0 ? (resultado / receita) * 100 : 0;
 
+  // CMV: custo da mercadoria vendida no período. Cobertura = % de itens com custo.
+  const cmv = n(c.cmv);
+  const itensTotal = n(c.itens_total);
+  const itensComCusto = n(c.itens_com_custo);
+  const cobertura = itensTotal > 0 ? (itensComCusto / itensTotal) * 100 : 0;
+  const lucro = resultado - cmv;
+  const margemLucro = receita > 0 ? (lucro / receita) * 100 : 0;
+
   const linhas = [
     { l: "Receita (pedidos pagos)", v: receita, tot: false },
     { l: "(−) Taxas Shopee (comissão + serviço)", v: -taxas, tot: false },
@@ -172,15 +188,17 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
     { l: "(−) Reembolsos / devoluções", v: -reemb, tot: false },
     { l: "(−) Imposto lançado", v: -imposto, tot: false },
     { l: "= Resultado (antes do custo)", v: resultado, tot: true },
+    { l: `(−) Custo da mercadoria (CMV${cobertura < 100 ? ` · ${cobertura.toFixed(0)}% dos itens` : ""})`, v: -cmv, tot: false },
+    { l: "= Lucro líquido", v: lucro, tot: true },
   ];
 
   return (
     <div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <Kpi label="Lucro líquido" val={cobertura > 0 ? brl(lucro) : "—"} hint={cobertura > 0 ? `margem ${margemLucro.toFixed(1)}% · ${cobertura.toFixed(0)}% dos itens c/ custo` : "cadastre os custos p/ ver"} cor={lucro >= 0 ? "text-emerald-300" : "text-red-300"} />
         <Kpi label="Recebido" val={brl(n(r.recebido))} hint={`${n(r.qtd_recebido)} pedido(s)`} cor="text-emerald-300" />
         <Kpi label="Falta receber" val={brl(n(r.a_receber))} hint={`${n(r.qtd_a_receber)} pedido(s)`} cor="text-blue-300" />
-        <Kpi label="Resultado" val={brl(resultado)} hint="antes do custo" />
-        <Kpi label="Margem" val={`${margem.toFixed(1)}%`} hint="antes do custo" />
+        <Kpi label="Resultado" val={brl(resultado)} hint="antes do custo da mercadoria" />
         <Kpi label="Afiliado pago" val={brl(afiliado)} hint={`${n(r.qtd_afiliado)} pedido(s) · custo opcional`} cor="text-violet-300" />
         <Kpi label="Cupom próprio" val={brl(cupom)} hint={`${n(r.qtd_cupom)} pedido(s)`} cor="text-orange-300" />
       </div>
@@ -201,7 +219,12 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
           ))}
         </div>
         <p className="mt-4 text-xs text-slate-500">
-          O <b>custo da mercadoria</b> entra no resultado quando você cadastra os custos na aba Produtos &amp; Margem.
+          {cobertura < 100 ? (
+            <>O <b>lucro líquido</b> considera o custo de <b>{cobertura.toFixed(0)}%</b> dos itens vendidos —
+            cadastre o custo dos produtos restantes na aba <b>Produtos &amp; Margem</b> pra fechar 100%. </>
+          ) : (
+            <>O <b>lucro líquido</b> já desconta o custo de <b>todos</b> os itens vendidos. </>
+          )}
           A conciliação (recebido) é preenchida pela sincronização da carteira.
         </p>
       </div>
@@ -389,17 +412,34 @@ async function Produtos({ lojas }: { lojas: string[] | null }) {
   let q = supabase
     .from("produtos")
     .select("id, nome, sku, preco, custo")
-    .order("nome", { ascending: true })
-    .limit(300);
+    // sem custo primeiro (maior preço antes) — preenche o que falta e o que mais pesa
+    .order("custo", { ascending: true, nullsFirst: true })
+    .order("preco", { ascending: false })
+    .limit(400);
   if (lojas) q = q.in("loja_id", lojas);
   const { data } = await q;
   const prods = (data as Record<string, unknown>[]) || [];
+  const total = prods.length;
+  const comCusto = prods.filter((p) => p.custo != null && n(p.custo) > 0).length;
+  const faltando = total - comCusto;
+  const pct = total > 0 ? Math.round((comCusto / total) * 100) : 0;
 
   return (
     <div>
-      <p className="mb-3 text-sm text-slate-400">
-        💡 O <b>custo é editável aqui</b> — digite o custo total por unidade e a margem recalcula.
-      </p>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-slate-400">
+          💡 Digite o custo por unidade e aperte <b>Enter</b> pra pular pra próxima. A margem e o lucro recalculam.
+        </p>
+        <div className="flex items-center gap-3 text-sm">
+          <span className="text-slate-300">
+            <b className="text-emerald-300">{comCusto}</b> / {total} com custo
+            {faltando > 0 && <span className="text-orange-300"> · faltam {faltando}</span>}
+          </span>
+          <div className="h-2 w-32 overflow-hidden rounded-full bg-slate-800">
+            <div className="h-full bg-emerald-500" style={{ width: `${pct}%` }} />
+          </div>
+        </div>
+      </div>
       <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900">
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-800 text-xs uppercase text-slate-400">
@@ -408,7 +448,7 @@ async function Produtos({ lojas }: { lojas: string[] | null }) {
           <tbody>
             {prods.length === 0 ? (
               <tr><td className="p-4 text-slate-400" colSpan={6}>Nenhum produto. Sincronize os produtos primeiro.</td></tr>
-            ) : prods.map((p) => {
+            ) : prods.map((p, i) => {
               const preco = n(p.preco);
               const custo = p.custo != null ? n(p.custo) : null;
               const margem = preco > 0 && custo != null ? ((preco - custo) / preco) * 100 : null;
@@ -417,7 +457,7 @@ async function Produtos({ lojas }: { lojas: string[] | null }) {
                   <td className="p-3 font-mono text-xs">{String(p.sku || "—")}</td>
                   <td className="p-3">{String(p.nome || "—")}</td>
                   <td className="p-3 text-right">{brl(preco)}</td>
-                  <td className="p-3 text-right"><CustoInput produtoId={String(p.id)} inicial={custo} /></td>
+                  <td className="p-3 text-right"><CustoInput produtoId={String(p.id)} inicial={custo} idx={i} /></td>
                   <td className={`p-3 text-right ${margem == null ? "text-slate-500" : margem < 0 ? "text-red-300" : margem < 15 ? "text-orange-300" : "text-emerald-300"}`}>
                     {margem == null ? "—" : `${margem.toFixed(0)}%`}
                   </td>

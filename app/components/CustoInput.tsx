@@ -7,9 +7,11 @@ import { useState } from "react";
 export default function CustoInput({
   produtoId,
   inicial,
+  idx,
 }: {
   produtoId: string;
   inicial: number | null;
+  idx?: number; // posição na grade — permite pular pra próxima linha no Enter
 }) {
   const [valor, setValor] = useState(
     inicial != null ? String(inicial).replace(".", ",") : ""
@@ -36,11 +38,22 @@ export default function CustoInput({
     <span className="inline-flex items-center gap-2">
       <span className="text-slate-500">R$</span>
       <input
+        data-custo-idx={idx}
         value={valor}
         onChange={(e) => setValor(e.target.value)}
         onBlur={salvar}
         onKeyDown={(e) => {
-          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          if (e.key === "Enter") {
+            e.preventDefault();
+            (e.target as HTMLInputElement).blur(); // dispara o salvar (onBlur)
+            if (idx != null) {
+              const prox = document.querySelector<HTMLInputElement>(
+                `input[data-custo-idx="${idx + 1}"]`
+              );
+              prox?.focus();
+              prox?.select();
+            }
+          }
         }}
         inputMode="decimal"
         placeholder="0,00"
