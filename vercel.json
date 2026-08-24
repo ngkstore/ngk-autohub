@@ -47,6 +47,10 @@
     {
       "path": "/api/shopee/regiao/enriquecer",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/shopee/ads/sincronizar",
+      "schedule": "0 */6 * * *"
     }
   ]
 }
