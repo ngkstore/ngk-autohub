@@ -2,6 +2,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { escopoDoUsuario, filtroLojas } from "@/lib/conta";
 import CustoInput from "../components/CustoInput";
+import CustoVariacaoInput from "../components/CustoVariacaoInput";
 import ImpostoForm from "../components/ImpostoForm";
 
 export const dynamic = "force-dynamic";
@@ -50,6 +51,7 @@ const ABAS = [
   { k: "carteira", r: "👛 Carteira" },
   { k: "ads", r: "📢 Ads" },
   { k: "produtos", r: "🏷️ Produtos & Margem" },
+  { k: "variacoes", r: "🧩 Custo por variação" },
   { k: "impostos", r: "🧾 Impostos" },
 ];
 
@@ -71,6 +73,9 @@ function brl(v: number) {
 }
 function n(v: unknown) {
   return Number(v || 0);
+}
+function int(v: unknown) {
+  return (Number(v) || 0).toLocaleString("pt-BR");
 }
 function dt(s?: string | null) {
   return s ? new Date(s).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
@@ -136,6 +141,7 @@ export default async function FinancasPage({ searchParams }: Props) {
         {aba === "carteira" && <Carteira lojas={lojas} />}
         {aba === "ads" && <Ads lojas={lojas} />}
         {aba === "produtos" && <Produtos lojas={lojas} />}
+        {aba === "variacoes" && <Variacoes lojas={lojas} />}
         {aba === "impostos" && <Impostos conta={escopo.contaId} />}
       </div>
     </div>
@@ -475,6 +481,102 @@ async function Ads({ lojas }: { lojas: string[] | null }) {
         (quanto da venda o anúncio come). <b>ROAS</b> = retorno sobre o anúncio. A <b>Fase 2</b> (Raio-X por
         anúncio, com ROAS de equilíbrio na margem) vem com o coletor.
       </p>
+    </div>
+  );
+}
+
+// ---------------- CUSTO POR VARIAÇÃO ----------------
+type VarRow = {
+  loja_id: string; loja: string; item_sku: string; item_nome: string;
+  model_sku: string; variacao: string | null; un: number;
+  preco_med: number; custo: number | null; custo_item: number | null;
+};
+async function Variacoes({ lojas }: { lojas: string[] | null }) {
+  const { data } = await supabase.rpc("variacoes_custo", { p_loja_ids: lojas });
+  const rows = (Array.isArray(data) ? (data as VarRow[]) : []);
+  const total = rows.length;
+  const comProprio = rows.filter((r) => r.custo != null).length;
+
+  // agrupa por produto (loja + item_sku)
+  const grupos = new Map<string, { loja: string; item_sku: string; item_nome: string; un: number; vars: VarRow[] }>();
+  for (const r of rows) {
+    const k = r.loja_id + "|" + r.item_sku;
+    let g = grupos.get(k);
+    if (!g) { g = { loja: r.loja, item_sku: r.item_sku, item_nome: r.item_nome, un: 0, vars: [] }; grupos.set(k, g); }
+    g.un += n(r.un);
+    g.vars.push(r);
+  }
+  const lista = [...grupos.values()].sort((a, b) => b.un - a.un);
+  let idx = 0;
+
+  return (
+    <div>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-slate-400">
+          💡 Cada <b>variação</b> com seu custo. Digite e aperte <b>Enter</b> pra pular pra próxima. Vazio = <b>herda o custo do item</b>.
+        </p>
+        <span className="text-sm text-slate-300">
+          <b className="text-emerald-300">{comProprio}</b> / {total} variações com custo próprio
+        </span>
+      </div>
+
+      {lista.length === 0 ? (
+        <p className="rounded-2xl border border-slate-800 bg-slate-900 p-6 text-slate-400">
+          Nenhuma variação com venda nos últimos 90 dias.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          {lista.map((g) => (
+            <div key={g.loja + g.item_sku} className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
+              <div className="flex items-center justify-between gap-3 border-b border-slate-800 bg-slate-800/50 px-4 py-3">
+                <div>
+                  <span className="font-semibold text-white">{g.item_nome}</span>
+                  <span className="ml-2 font-mono text-xs text-slate-400">{g.item_sku}</span>
+                </div>
+                <span className="whitespace-nowrap text-xs text-slate-400">{g.loja.replace(" Shopee", "")} · {int(g.un)} un</span>
+              </div>
+              <table className="w-full text-left text-sm">
+                <thead className="text-xs uppercase text-slate-500">
+                  <tr>
+                    <th className="px-4 py-2">Variação</th>
+                    <th className="px-4 py-2 text-right">Vend.</th>
+                    <th className="px-4 py-2 text-right">Preço méd.</th>
+                    <th className="px-4 py-2 text-right">Custo</th>
+                    <th className="px-4 py-2 text-right">Margem</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {g.vars.map((v) => {
+                    const custoEfetivo = v.custo != null ? n(v.custo) : v.custo_item != null ? n(v.custo_item) : null;
+                    const preco = n(v.preco_med);
+                    const margem = preco > 0 && custoEfetivo != null ? ((preco - custoEfetivo) / preco) * 100 : null;
+                    const meu = idx++;
+                    return (
+                      <tr key={v.model_sku} className="border-t border-slate-800/70">
+                        <td className="px-4 py-2">
+                          <span className="text-slate-200">{v.variacao || "—"}</span>
+                          <span className="ml-2 font-mono text-[11px] text-violet-300">{v.model_sku}</span>
+                        </td>
+                        <td className="px-4 py-2 text-right text-slate-400">{int(v.un)}</td>
+                        <td className="px-4 py-2 text-right">{brl(preco)}</td>
+                        <td className="px-4 py-2 text-right">
+                          <CustoVariacaoInput lojaId={v.loja_id} modelSku={v.model_sku} inicial={v.custo != null ? n(v.custo) : null} idx={meu} />
+                          {v.custo == null && v.custo_item != null && (
+                            <span className="ml-2 text-[11px] text-orange-300">herda {brl(n(v.custo_item))}</span>
+                          )}
+                        </td>
+                        <td className={`px-4 py-2 text-right ${margem == null ? "text-slate-500" : margem < 0 ? "text-red-300" : margem < 30 ? "text-orange-300" : "text-emerald-300"}`}>
+                          {margem == null ? "—" : `${margem.toFixed(0)}%`}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
