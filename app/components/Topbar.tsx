@@ -46,6 +46,9 @@ export default function Topbar() {
 
     const query = params.toString();
     router.push(query ? `${pathname}?${query}` : pathname);
+    // Força o servidor a re-renderizar com o filtro novo (senão o App Router
+    // pode servir os dados em cache e o filtro "não funciona").
+    router.refresh();
   }
 
   return (
