@@ -388,14 +388,17 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
 
   const { count: totalRespostas } = await respostasQuery;
 
+  const lojaScope = escopo.lojaIds.length > 0 ? escopo.lojaIds : ["00000000-0000-0000-0000-000000000000"];
   const { count: totalLojas } = await supabase
     .from("lojas")
-    .select("*", { count: "exact", head: true });
+    .select("*", { count: "exact", head: true })
+    .in("id", lojaScope);
 
   const { count: lojasAtivas } = await supabase
     .from("lojas")
     .select("*", { count: "exact", head: true })
-    .eq("status", "ativo");
+    .in("id", lojaScope)
+    .in("status", ["ativo", "ativa"]);
 
   const ticketMedio =
     resumo.efetivadosCount > 0

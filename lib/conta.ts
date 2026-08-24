@@ -44,8 +44,12 @@ export async function escopoDoUsuario(): Promise<Escopo> {
     // membro null (logado sem vínculo) -> admin=false, contaId=null -> sem lojas.
   }
 
+  // Cada usuário (inclusive o admin/dono) vê só as lojas da SUA conta.
+  // O flag `admin` continua servindo às páginas administrativas (ex.: /uso),
+  // mas NÃO dá mais visão de todas as lojas no dia a dia.
+  // Exceção: pré-setup (tabelas de conta ainda não existem) -> dono vê tudo.
   let lojaIds: string[] = [];
-  if (admin) {
+  if (preSetup) {
     const { data } = await supabase.from("lojas").select("id");
     lojaIds = (data || []).map((l) => l.id);
   } else if (contaId) {
@@ -67,8 +71,7 @@ export function filtroLojas(
   lojaParam?: string
 ): string[] | null {
   if (lojaParam && escopo.lojaIds.includes(lojaParam)) return [lojaParam];
-  if (escopo.admin) return null; // admin sem seleção válida -> todas
-  return escopo.lojaIds; // conta do usuário (vazio = nenhuma)
+  return escopo.lojaIds; // sempre escopa pela conta do usuário (vazio = nenhuma)
 }
 
 // O usuário pode operar/ver esta loja? Admin vê tudo; senão só as da conta.

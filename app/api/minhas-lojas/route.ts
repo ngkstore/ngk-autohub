@@ -5,19 +5,16 @@ import { escopoDoUsuario } from "@/lib/conta";
 export const dynamic = "force-dynamic";
 
 // Lojas visíveis para o usuário logado (alimenta o seletor do topo).
+// Sempre escopado pela conta do usuário (via escopo.lojaIds).
 export async function GET() {
   const escopo = await escopoDoUsuario();
+  if (escopo.lojaIds.length === 0) return NextResponse.json({ lojas: [] });
 
-  let query = supabase
+  const { data } = await supabase
     .from("lojas")
     .select("id, apelido, marketplace")
+    .in("id", escopo.lojaIds)
     .order("apelido");
 
-  if (!escopo.admin) {
-    if (!escopo.contaId) return NextResponse.json({ lojas: [] });
-    query = query.eq("conta_id", escopo.contaId);
-  }
-
-  const { data } = await query;
   return NextResponse.json({ lojas: data || [] });
 }
