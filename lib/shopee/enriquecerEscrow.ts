@@ -231,8 +231,9 @@ export async function enriquecerEscrowPendentes({
     .eq("marketplace", "shopee")
     .eq("pedido_efetivado", true)
     .not("pedido_externo_id", "like", "SH-%")
-    // escrow ainda não puxado OU falta a comissão de afiliado (backfill gradual)
-    .or("escrow_atualizado_em.is.null,comissao_afiliado.is.null")
+    // escrow ainda não puxado (quando o escrow é gravado, a comissão de afiliado
+    // vai junto no mesmo update — então "afiliado null" é redundante com este).
+    .is("escrow_atualizado_em", null)
     // recentes primeiro: garante o mês atual sempre certo; backfill do histórico depois
     .order("data_pedido", { ascending: false, nullsFirst: false });
   if (lojaIds) query = query.in("loja_id", lojaIds);

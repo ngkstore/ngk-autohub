@@ -39,6 +39,9 @@ create index if not exists pedidos_recebido_em_idx on pedidos (recebido_em);
 create index if not exists pedidos_data_pedido_idx on pedidos (data_pedido);
 create index if not exists pedidos_mkt_efet_idx on pedidos (marketplace, pedido_efetivado);
 create index if not exists pedidos_regiao_pend_idx on pedidos (regiao_atualizada_em);
+-- seleção "escrow pendente, mais recentes primeiro" instantânea (evita timeout no cron)
+create index if not exists pedidos_escrow_pend_idx on pedidos (data_pedido desc)
+  where escrow_atualizado_em is null and marketplace = 'shopee' and pedido_efetivado;
 
 -- 3) Custo do produto (editável na tela).
 alter table produtos add column if not exists custo numeric(14,2);
