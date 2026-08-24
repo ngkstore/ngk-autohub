@@ -36,7 +36,7 @@ function ddmmyyyy(d: Date) {
 // pela sincronização). Janela [hoje-dias, hoje].
 export async function buscarAdsBruto(
   lojaId: string,
-  dias = 30
+  dias = 29
 ): Promise<{ ok: boolean; erro?: string; response?: unknown }> {
   const token = await obterToken(lojaId);
   if (!token) return { ok: false, erro: "sem token ativo" };
@@ -94,7 +94,7 @@ export type ResultadoAds = { lojaId: string; importados: number; erro?: string }
 // Sincroniza a performance diária de Ads (nível loja) para ads_diario.
 export async function sincronizarAdsLoja({
   lojaId,
-  dias = 30,
+  dias = 29,
 }: {
   lojaId: string;
   dias?: number;

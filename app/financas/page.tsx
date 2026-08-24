@@ -48,6 +48,7 @@ const ABAS = [
   { k: "previsao", r: "📅 Previsão" },
   { k: "divergencias", r: "⚠️ Divergências" },
   { k: "carteira", r: "👛 Carteira" },
+  { k: "ads", r: "📢 Ads" },
   { k: "produtos", r: "🏷️ Produtos & Margem" },
   { k: "impostos", r: "🧾 Impostos" },
 ];
@@ -133,6 +134,7 @@ export default async function FinancasPage({ searchParams }: Props) {
         {aba === "previsao" && <Previsao lojas={lojas} />}
         {aba === "divergencias" && <Divergencias lojas={lojas} periodo={periodo} />}
         {aba === "carteira" && <Carteira lojas={lojas} />}
+        {aba === "ads" && <Ads lojas={lojas} />}
         {aba === "produtos" && <Produtos lojas={lojas} />}
         {aba === "impostos" && <Impostos conta={escopo.contaId} />}
       </div>
@@ -403,6 +405,76 @@ async function Carteira({ lojas }: { lojas: string[] | null }) {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+// ---------------- ADS (nível loja) ----------------
+async function Ads({ lojas }: { lojas: string[] | null }) {
+  const { data } = await supabase.rpc("resumo_ads", { p_loja_ids: lojas, p_dias: 30 });
+  const linhas = (Array.isArray(data) ? data : []) as {
+    loja: string; gasto: number; gmv_direto: number; roas_direto: number;
+    receita: number; tacos: number; ped_direto: number; cliques: number;
+    impressoes: number; ctr: number;
+  }[];
+
+  const tot = linhas.reduce(
+    (a, l) => ({
+      gasto: a.gasto + n(l.gasto), gmv: a.gmv + n(l.gmv_direto),
+      receita: a.receita + n(l.receita), ped: a.ped + n(l.ped_direto),
+    }),
+    { gasto: 0, gmv: 0, receita: 0, ped: 0 }
+  );
+  const roasTot = tot.gasto > 0 ? tot.gmv / tot.gasto : 0;
+  const tacosTot = tot.receita > 0 ? (tot.gasto / tot.receita) * 100 : 0;
+
+  return (
+    <div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Kpi label="Gasto em Ads (30d)" val={brl(tot.gasto)} hint={`${linhas.length} loja(s)`} cor="text-orange-300" />
+        <Kpi label="ROAS (direto)" val={`${roasTot.toFixed(1)}×`} hint="GMV de ads ÷ gasto" cor="text-emerald-300" />
+        <Kpi label="TACOS" val={`${tacosTot.toFixed(1)}%`} hint="gasto ÷ receita total" cor="text-blue-300" />
+        <Kpi label="Pedidos via Ads" val={String(tot.ped)} hint="atribuição direta" />
+      </div>
+
+      <div className="mt-6 overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-slate-800 text-xs uppercase text-slate-400">
+            <tr>
+              <th className="p-3">Loja</th>
+              <th className="p-3 text-right">Gasto</th>
+              <th className="p-3 text-right">GMV (ads)</th>
+              <th className="p-3 text-right">ROAS</th>
+              <th className="p-3 text-right">TACOS</th>
+              <th className="p-3 text-right">CTR</th>
+              <th className="p-3 text-right">Pedidos</th>
+            </tr>
+          </thead>
+          <tbody>
+            {linhas.length === 0 ? (
+              <tr><td className="p-4 text-slate-400" colSpan={7}>Sem dados de Ads ainda — sincroniza em alguns minutos.</td></tr>
+            ) : linhas.map((l) => (
+              <tr key={l.loja} className="border-t border-slate-800">
+                <td className="p-3">{l.loja}</td>
+                <td className="p-3 text-right">{brl(n(l.gasto))}</td>
+                <td className="p-3 text-right">{brl(n(l.gmv_direto))}</td>
+                <td className="p-3 text-right text-emerald-300">{n(l.roas_direto).toFixed(1)}×</td>
+                <td className={`p-3 text-right ${n(l.tacos) > 15 ? "text-red-300" : n(l.tacos) > 8 ? "text-orange-300" : "text-emerald-300"}`}>
+                  {n(l.tacos).toFixed(1)}%
+                </td>
+                <td className="p-3 text-right">{n(l.ctr).toFixed(2)}%</td>
+                <td className="p-3 text-right">{n(l.ped_direto)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="mt-4 text-xs text-slate-500">
+        Últimos 30 dias · nível <b>loja</b>, direto da API de Ads da Shopee. <b>TACOS</b> = gasto ÷ receita total
+        (quanto da venda o anúncio come). <b>ROAS</b> = retorno sobre o anúncio. A <b>Fase 2</b> (Raio-X por
+        anúncio, com ROAS de equilíbrio na margem) vem com o coletor.
+      </p>
     </div>
   );
 }

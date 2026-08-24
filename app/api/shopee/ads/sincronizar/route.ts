@@ -17,7 +17,7 @@ async function rodar(lojas: { lojaId: string }[], dias: number) {
 
 // GET = cron (todas as lojas). ?debug=1&loja=<id> mostra a resposta crua (sonda).
 export async function GET(request: NextRequest) {
-  const dias = Number(request.nextUrl.searchParams.get("dias")) || 30;
+  const dias = Number(request.nextUrl.searchParams.get("dias")) || 29;
   const loja = request.nextUrl.searchParams.get("loja");
 
   if (request.nextUrl.searchParams.get("debug") === "1") {
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  let dias = 30;
+  let dias = 29;
   try {
     const body = await request.json();
     if (body?.dias) dias = Number(body.dias);
