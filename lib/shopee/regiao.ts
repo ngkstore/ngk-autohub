@@ -130,8 +130,11 @@ export async function enriquecerRegiaoLoja({
   let comUf = 0;
   for (const p of pedidos) {
     try {
-      const { uf, hub } = await buscarRegiao(token, p.pedido_externo_id);
-      const datas = await buscarDatas(token, p.pedido_externo_id);
+      // As duas chamadas são independentes (endpoints diferentes) — em paralelo.
+      const [{ uf, hub }, datas] = await Promise.all([
+        buscarRegiao(token, p.pedido_externo_id),
+        buscarDatas(token, p.pedido_externo_id),
+      ]);
       await supabase
         .from("pedidos")
         .update({

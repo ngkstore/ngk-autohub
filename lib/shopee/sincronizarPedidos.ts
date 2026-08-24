@@ -431,6 +431,16 @@ export async function processarLotesPendentes({
   const resultados: ResultadoLote[] = [];
   let totalPedidos = 0;
 
+  // Auto-cura: lotes presos em 'processando' há mais de 10 min (a função morreu
+  // no meio, ex.: timeout da Vercel) voltam para a fila em vez de ficarem órfãos.
+  await supabase
+    .from("sync_jobs")
+    .update({ status: "pendente", atualizado_em: new Date().toISOString() })
+    .eq("marketplace", "shopee")
+    .eq("tipo", "pedidos")
+    .eq("status", "processando")
+    .lt("atualizado_em", new Date(Date.now() - 10 * 60 * 1000).toISOString());
+
   while (resultados.length < maxLotes) {
     const { data: job } = await supabase
       .from("sync_jobs")

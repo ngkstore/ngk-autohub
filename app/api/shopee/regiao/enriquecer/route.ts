@@ -4,7 +4,7 @@ import { listarLojasShopeeAtivas, lojasShopeeDoEscopo } from "@/lib/shopee/lojas
 import { escopoDoUsuario } from "@/lib/conta";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 300;
+export const maxDuration = 800;
 
 // GET = cron (todas as lojas). POST = usuário (só as lojas da conta).
 async function rodar(lojas: { lojaId: string }[], limite: number) {
@@ -17,9 +17,14 @@ async function rodar(lojas: { lojaId: string }[], limite: number) {
   return NextResponse.json({ sucesso: true, processados, comUf, lojas: resultados });
 }
 
-export async function GET() {
-  const lojas = await listarLojasShopeeAtivas();
-  return rodar(lojas, 30);
+// cron usa 30 (todas as lojas, cabe no tempo). Backfill manual de UF:
+//   ?loja=<id>&limite=250   (uma loja por vez, lotes grandes)
+export async function GET(request: NextRequest) {
+  const loja = request.nextUrl.searchParams.get("loja");
+  const limite = Number(request.nextUrl.searchParams.get("limite")) || 30;
+  let lojas = await listarLojasShopeeAtivas();
+  if (loja) lojas = lojas.filter((l) => l.lojaId === loja);
+  return rodar(lojas, limite);
 }
 
 export async function POST(request: NextRequest) {
