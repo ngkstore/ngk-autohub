@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { escopoDoUsuario, filtroLojas } from "@/lib/conta";
 import CustoInput from "../components/CustoInput";
 import CustoVariacaoInput from "../components/CustoVariacaoInput";
+import UploadCustos from "../components/UploadCustos";
 import ImpostoForm from "../components/ImpostoForm";
 
 export const dynamic = "force-dynamic";
@@ -511,6 +512,7 @@ async function Variacoes({ lojas }: { lojas: string[] | null }) {
 
   return (
     <div>
+      <UploadCustos />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-slate-400">
           💡 Cada <b>variação</b> com seu custo. Digite e aperte <b>Enter</b> pra pular pra próxima. Vazio = <b>herda o custo do item</b>.
