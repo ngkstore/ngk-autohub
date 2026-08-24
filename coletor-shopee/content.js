@@ -104,7 +104,7 @@
     { base: "/api/pas/v1/report/list_report/", paginas: 3 },
     { base: "/api/pas/v1/product/list_product_report/", paginas: 3 },
   ];
-  var JANELAS = [7, 15, 30]; // dias
+  var JANELAS = [7, 15, 30, 60, 90]; // dias (a Shopee pode limitar as maiores)
   var jaReplicou = {};
 
   function replicar() {
