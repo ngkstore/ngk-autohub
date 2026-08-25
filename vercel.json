@@ -51,6 +51,10 @@
     {
       "path": "/api/shopee/ads/sincronizar",
       "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/shopee/pedidos/resumo-diario",
+      "schedule": "*/10 * * * *"
     }
   ]
 }
