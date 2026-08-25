@@ -6,9 +6,9 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 // lojaIds null = todas as lojas (cron). [...] = só as lojas da conta (usuário).
-async function enriquecer(limite: number, lojaIds: string[] | null) {
+async function enriquecer(limite: number, lojaIds: string[] | null, reconferir = false) {
   try {
-    const resultado = await enriquecerEscrowPendentes({ limite, lojaIds });
+    const resultado = await enriquecerEscrowPendentes({ limite, lojaIds, reconferir });
 
     return NextResponse.json({
       sucesso: true,
@@ -34,8 +34,10 @@ async function enriquecer(limite: number, lojaIds: string[] | null) {
 
 export async function GET(request: NextRequest) {
   // Cron da Vercel: processa TODAS as lojas (lojaIds = null).
+  // ?reconferir=1 -> re-puxa o escrow de pedidos 32+ dias (afiliado tardio).
   const limite = Number(request.nextUrl.searchParams.get("limite")) || 200;
-  return enriquecer(limite, null);
+  const reconferir = request.nextUrl.searchParams.get("reconferir") === "1";
+  return enriquecer(limite, null, reconferir);
 }
 
 export async function POST(request: NextRequest) {

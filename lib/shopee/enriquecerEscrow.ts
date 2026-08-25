@@ -209,7 +209,8 @@ export type ResultadoEscrow = {
 export async function enriquecerEscrowPendentes({
   limite = 150,
   lojaIds = null,
-}: { limite?: number; lojaIds?: string[] | null } = {}): Promise<ResultadoEscrow> {
+  reconferir = false,
+}: { limite?: number; lojaIds?: string[] | null; reconferir?: boolean } = {}): Promise<ResultadoEscrow> {
   const partnerId = process.env.SHOPEE_PARTNER_ID;
   const partnerKey = process.env.SHOPEE_PARTNER_KEY;
   const baseUrl = process.env.SHOPEE_API_BASE_URL || BASE_URL_PADRAO;
@@ -223,21 +224,28 @@ export async function enriquecerEscrowPendentes({
     return { processados: 0, atualizados: 0, erros: 0, restantes: 0 };
   }
 
-  // Pedidos pagos/válidos, reais, que ainda não tiveram o escrow puxado.
-  // lojaIds null = todas as lojas (cron); [...] = só as lojas da conta.
-  let query = supabase
-    .from("pedidos")
-    .select("id, loja_id, pedido_externo_id")
-    .eq("marketplace", "shopee")
-    .eq("pedido_efetivado", true)
-    .not("pedido_externo_id", "like", "SH-%")
-    // escrow ainda não puxado (quando o escrow é gravado, a comissão de afiliado
-    // vai junto no mesmo update — então "afiliado null" é redundante com este).
-    .is("escrow_atualizado_em", null)
-    // recentes primeiro: garante o mês atual sempre certo; backfill do histórico depois
-    .order("data_pedido", { ascending: false, nullsFirst: false });
-  if (lojaIds) query = query.in("loja_id", lojaIds);
-  const { data: pedidos } = await query.limit(limite);
+  let pedidos: { id: string; loja_id: string; pedido_externo_id: string }[] | null = null;
+  if (reconferir) {
+    // Re-conferência: re-puxa o escrow de pedidos que já passaram de ~32 dias
+    // (janela em que a comissão de afiliado costuma ser aplicada) mas foram
+    // enriquecidos ANTES disso — capturando o afiliado tardio que faltava.
+    const { data } = await supabase.rpc("reconferencia_escrow_ids", { p_limite: limite });
+    pedidos = (data as typeof pedidos) ?? null;
+  } else {
+    // Pedidos pagos/válidos, reais, que ainda não tiveram o escrow puxado.
+    // lojaIds null = todas as lojas (cron); [...] = só as lojas da conta.
+    let query = supabase
+      .from("pedidos")
+      .select("id, loja_id, pedido_externo_id")
+      .eq("marketplace", "shopee")
+      .eq("pedido_efetivado", true)
+      .not("pedido_externo_id", "like", "SH-%")
+      .is("escrow_atualizado_em", null)
+      .order("data_pedido", { ascending: false, nullsFirst: false });
+    if (lojaIds) query = query.in("loja_id", lojaIds);
+    const res = await query.limit(limite);
+    pedidos = res.data;
+  }
 
   if (!pedidos || pedidos.length === 0) {
     return { processados: 0, atualizados: 0, erros: 0, restantes: 0 };
