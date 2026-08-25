@@ -100,20 +100,27 @@ export default async function RaioXPage({ searchParams }: Props) {
   const sugestoes = vereditosShopee.filter((v) => v.roasSugerido != null);
 
   /* --------- Planilha de Ads (gasto/ROAS por item) — complementa --------- */
+  // Só o METADADO (sem a coluna 'linhas', que é gorda) pra achar a planilha de Ads.
   let qi = supabase
     .from("insights_importacoes")
-    .select("arquivo, colunas, linhas, periodo_inicio, periodo_fim")
+    .select("id, arquivo, colunas, periodo_inicio, periodo_fim")
     .order("importado_em", { ascending: false })
     .limit(20);
   if (!escopo.admin) qi = qi.in("conta_id", escopo.contaId ? [escopo.contaId] : []);
   const { data: imports } = await qi;
   let anunciosAds: AnuncioAds[] = [];
   let importAds: { arquivo: string | null; periodo_inicio: string | null } | null = null;
-  for (const c of (imports || []).filter((i) => tipoDaPlanilha(i.colunas) === "ads")) {
-    const lidos = lerAds((c.linhas || []) as Record<string, unknown>[]);
-    if (lidos.length > anunciosAds.length) {
-      anunciosAds = lidos;
-      importAds = c;
+  const metaAds = (imports || []).find((i) => tipoDaPlanilha(i.colunas) === "ads");
+  if (metaAds) {
+    // Carrega as linhas SÓ da importação de Ads escolhida (1 registro).
+    const { data: full } = await supabase
+      .from("insights_importacoes")
+      .select("arquivo, periodo_inicio, linhas")
+      .eq("id", metaAds.id)
+      .maybeSingle();
+    if (full) {
+      anunciosAds = lerAds((full.linhas || []) as Record<string, unknown>[]);
+      importAds = { arquivo: full.arquivo, periodo_inicio: full.periodo_inicio };
     }
   }
   const adsPorItem = new Map(anunciosAds.map((a) => [a.itemId, a]));

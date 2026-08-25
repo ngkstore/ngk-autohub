@@ -58,34 +58,47 @@ export default async function PedidosPage({
 
   const intervalo = obterIntervaloPeriodo(periodo);
 
+  // Tabela: só as colunas exibidas (sem a jsonb gorda dados_pedido).
   let pedidosQuery = supabase
     .from("pedidos")
-    .select("*, lojas(apelido)")
+    .select("id, pedido_externo_id, cliente_nome, marketplace, valor_total, status, lojas(apelido)")
     .order("criado_em", { ascending: false })
     .limit(50);
 
   if (lojas) {
     pedidosQuery = pedidosQuery.in("loja_id", lojas);
   }
-
   if (intervalo) {
     pedidosQuery = pedidosQuery
       .gte("data_pedido", intervalo.inicio.toISOString())
       .lte("data_pedido", intervalo.fim.toISOString());
   }
 
-  const { data: pedidos } = await pedidosQuery;
+  // KPIs: agregados no banco (antes eram calculados só sobre as 50 linhas -> errados).
+  const [{ data: pedidosRaw }, { data: resumoData }] = await Promise.all([
+    pedidosQuery,
+    supabase.rpc("resumo_pedidos", {
+      p_loja_ids: lojas,
+      p_inicio: intervalo ? intervalo.inicio.toISOString() : null,
+      p_fim: intervalo ? intervalo.fim.toISOString() : null,
+    }),
+  ]);
+  const resumo = (resumoData as {
+    total_pedidos: number; pedidos_efetivados: number; faturamento_efetivado: number;
+  } | null) || { total_pedidos: 0, pedidos_efetivados: 0, faturamento_efetivado: 0 };
+  const totalPedidos = Number(resumo.total_pedidos || 0);
+  const pedidosEfetivados = Number(resumo.pedidos_efetivados || 0);
+  const faturamento = Number(resumo.faturamento_efetivado || 0);
 
-  const totalPedidos = pedidos?.length || 0;
-
-  const pedidosPendentes =
-    pedidos?.filter((pedido) => pedido.status !== "entregue").length || 0;
-
-  const faturamento =
-    pedidos?.reduce(
-      (total, pedido) => total + Number(pedido.valor_total || 0),
-      0
-    ) || 0;
+  const pedidos = (pedidosRaw || []) as unknown as Array<{
+    id: string;
+    pedido_externo_id: string | null;
+    cliente_nome: string | null;
+    marketplace: string | null;
+    valor_total: number | null;
+    status: string | null;
+    lojas: { apelido: string } | null;
+  }>;
 
   return (
     <div className="p-8 text-white">
@@ -102,12 +115,12 @@ export default async function PedidosPage({
         </div>
 
         <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Pedidos em Aberto</p>
-          <p className="mt-2 text-4xl font-bold">{pedidosPendentes}</p>
+          <p className="text-sm text-slate-400">Pedidos Efetivados</p>
+          <p className="mt-2 text-4xl font-bold text-emerald-300">{pedidosEfetivados}</p>
         </div>
 
         <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Valor no Período</p>
+          <p className="text-sm text-slate-400">Valor Efetivado (período)</p>
           <p className="mt-2 text-4xl font-bold">
             R$ {Number(faturamento || 0).toFixed(2)}
           </p>

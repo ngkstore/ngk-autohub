@@ -84,11 +84,17 @@ export default async function AvaliacoesPage({
       .lte("criado_em", intervalo.fim.toISOString());
   }
 
-  const { data: avaliacoes } = await avaliacoesQuery;
+  const { data: avaliacoes } = await avaliacoesQuery.limit(50);
 
-  const { data: respostas } = await supabase
-    .from("respostas_ia")
-    .select("*");
+  // Busca só as respostas DAS avaliações desta página (antes puxava respostas_ia
+  // inteira, sem escopo — pesado e vazava entre contas) e indexa num Map.
+  const ids = (avaliacoes || []).map((a) => a.id);
+  const { data: respostas } = ids.length
+    ? await supabase.from("respostas_ia").select("*").in("avaliacao_id", ids)
+    : { data: [] as { avaliacao_id: string }[] };
+  const respostasPorAval = new Map(
+    (respostas || []).map((r) => [r.avaliacao_id, r])
+  );
 
   return (
     <div className="p-8 text-white">
@@ -107,9 +113,7 @@ export default async function AvaliacoesPage({
       <div className="space-y-4">
         {avaliacoes && avaliacoes.length > 0 ? (
           avaliacoes.map((avaliacao) => {
-            const resposta = respostas?.find(
-              (item) => item.avaliacao_id === avaliacao.id
-            );
+            const resposta = respostasPorAval.get(avaliacao.id);
 
             return (
               <div

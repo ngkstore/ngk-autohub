@@ -1,46 +1,11 @@
 import { supabase } from "@/lib/supabase";
 
+// Gera o ranking de produtos AGREGANDO no banco (RPC gerar_ranking_produtos):
+// soma unidades/receita por item_id a partir do item_list dos pedidos (90 dias)
+// e calcula o lucro com o custo (variação -> item). Antes isso era um N+1 que
+// contava os pedidos da loja inteira para CADA produto (errado e pesadíssimo).
 export async function gerarRankingProdutos() {
-  const { data: produtos, error: produtosError } = await supabase
-    .from("produtos")
-    .select("*");
-
-  if (produtosError) {
-    throw produtosError;
-  }
-
-  await supabase.from("ranking_produtos").delete().neq("id", "");
-
-  for (const produto of produtos || []) {
-    const { data: pedidos } = await supabase
-      .from("pedidos")
-      .select("*")
-      .eq("loja_id", produto.loja_id)
-      .ilike("cliente_nome", "%Cliente%");
-
-    const pedidosQtd = pedidos?.length || 0;
-
-    const faturamento =
-      pedidos?.reduce(
-        (total, pedido) => total + Number(pedido.valor_total || 0),
-        0
-      ) || 0;
-
-    const custoTotal = Number(produto.custo || 0) * pedidosQtd;
-    const lucro = faturamento - custoTotal;
-
-    await supabase.from("ranking_produtos").insert({
-      loja_id: produto.loja_id,
-      produto_id: produto.id,
-      pedidos: pedidosQtd,
-      faturamento,
-      lucro,
-      atualizado_em: new Date().toISOString(),
-    });
-  }
-
-  return {
-    sucesso: true,
-    mensagem: "Ranking de produtos gerado com sucesso.",
-  };
+  const { error } = await supabase.rpc("gerar_ranking_produtos");
+  if (error) throw error;
+  return { sucesso: true, mensagem: "Ranking de produtos gerado com sucesso." };
 }

@@ -1,7 +1,10 @@
 import { supabase } from "@/lib/supabase";
+import { escopoDoUsuario, filtroLojas } from "@/lib/conta";
 import GerarAlertasButton from "../components/GerarAlertasButton";
 
-function getCorTipo(tipo?: string) {
+export const dynamic = "force-dynamic";
+
+function getCorTipo(tipo?: string | null) {
   switch (tipo) {
     case "estoque":
       return "bg-red-900 text-red-300";
@@ -17,11 +20,25 @@ function getCorTipo(tipo?: string) {
 }
 
 export default async function AlertasPage() {
-  const { data: alertas } = await supabase
+  const escopo = await escopoDoUsuario();
+  const lojas = filtroLojas(escopo);
+
+  let query = supabase
     .from("alertas")
-    .select("*, lojas(apelido)")
+    .select("id, titulo, descricao, tipo, status, criado_em, lojas(apelido)")
     .order("criado_em", { ascending: false })
     .limit(50);
+  if (lojas) query = query.in("loja_id", lojas);
+  const { data: alertasRaw } = await query;
+  const alertas = (alertasRaw || []) as unknown as Array<{
+    id: string;
+    titulo: string | null;
+    descricao: string | null;
+    tipo: string | null;
+    status: string | null;
+    criado_em: string | null;
+    lojas: { apelido: string } | null;
+  }>;
 
   const totalAlertas = alertas?.length || 0;
   const totalEstoque =
