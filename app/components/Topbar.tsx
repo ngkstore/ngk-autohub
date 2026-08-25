@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import AuthStatus from "./AuthStatus";
 
@@ -34,6 +34,19 @@ export default function Topbar() {
   // Padrão = últimos 30 dias (o dashboard usa isso; "Todos" é all-time explícito).
   const periodoSelecionado = searchParams.get("periodo") || "30dias";
 
+  // Depois que a URL do filtro muda (loja/período), re-busca os dados do servidor.
+  // Feito num efeito (após a navegação COMMITAR) pra não ter corrida com o push —
+  // era o que fazia o filtro "não pegar" às vezes. Pula a montagem inicial.
+  const sp = searchParams.toString();
+  const primeira = useRef(true);
+  useEffect(() => {
+    if (primeira.current) {
+      primeira.current = false;
+      return;
+    }
+    router.refresh();
+  }, [sp, router]);
+
   function atualizarFiltro(chave: string, valor: string) {
     const params = new URLSearchParams(searchParams.toString());
 
@@ -47,9 +60,6 @@ export default function Topbar() {
 
     const query = params.toString();
     router.push(query ? `${pathname}?${query}` : pathname);
-    // Força o servidor a re-renderizar com o filtro novo (senão o App Router
-    // pode servir os dados em cache e o filtro "não funciona").
-    router.refresh();
   }
 
   return (

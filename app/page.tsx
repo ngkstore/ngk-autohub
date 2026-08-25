@@ -321,55 +321,63 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
       .lt("data_pedido", periodo.fim);
   }
 
-  const resumo = await calcularResumoPedidos(lojas, periodo);
-
-  const { count: totalAvaliacoes } = await avaliacoesQuery;
-  const { data: resumoAvalData } = await supabase.rpc("resumo_avaliacoes", {
-    p_loja_ids: lojas,
-    p_inicio: periodo?.inicio ?? null,
-    p_fim: periodo?.fim ?? null,
-  });
-  const resumoAval = (resumoAvalData as {
-    total: number; media: number; n1: number; n2: number; n3: number; n4: number; n5: number;
-  } | null) || { total: 0, media: 0, n1: 0, n2: 0, n3: 0, n4: 0, n5: 0 };
-  const { data: ultimasAvaliacoes } = await ultimasQuery;
-  const { count: produtosSemEstoque } = await produtosSemEstoqueQuery;
-  const { data: financeiro } = await financeiroQuery;
-  const { data: rankingProdutos } = await rankingQuery;
-  const { data: efetivadosRecentesData } = await recentesQuery;
-
-  const efetivadosRecentes = (efetivadosRecentesData as PedidoRow[]) || [];
-
   let respostasQuery = supabase
     .from("respostas_ia")
     .select("*, avaliacoes!inner(loja_id, criado_em)", {
       count: "exact",
       head: true,
     });
-
   if (lojas) {
     respostasQuery = respostasQuery.in("avaliacoes.loja_id", lojas);
   }
-
   if (periodo) {
     respostasQuery = respostasQuery
       .gte("avaliacoes.criado_em", periodo.inicio)
       .lt("avaliacoes.criado_em", periodo.fim);
   }
 
-  const { count: totalRespostas } = await respostasQuery;
+  const lojaScope =
+    escopo.lojaIds.length > 0 ? escopo.lojaIds : ["00000000-0000-0000-0000-000000000000"];
 
-  const lojaScope = escopo.lojaIds.length > 0 ? escopo.lojaIds : ["00000000-0000-0000-0000-000000000000"];
-  const { count: totalLojas } = await supabase
-    .from("lojas")
-    .select("*", { count: "exact", head: true })
-    .in("id", lojaScope);
+  // Tudo em PARALELO (antes era uma query após a outra -> load lento).
+  const [
+    resumo,
+    { count: totalAvaliacoes },
+    { data: resumoAvalData },
+    { data: ultimasAvaliacoes },
+    { count: produtosSemEstoque },
+    { data: financeiro },
+    { data: rankingProdutos },
+    { data: efetivadosRecentesData },
+    { count: totalRespostas },
+    { count: totalLojas },
+    { count: lojasAtivas },
+  ] = await Promise.all([
+    calcularResumoPedidos(lojas, periodo),
+    avaliacoesQuery,
+    supabase.rpc("resumo_avaliacoes", {
+      p_loja_ids: lojas,
+      p_inicio: periodo?.inicio ?? null,
+      p_fim: periodo?.fim ?? null,
+    }),
+    ultimasQuery,
+    produtosSemEstoqueQuery,
+    financeiroQuery,
+    rankingQuery,
+    recentesQuery,
+    respostasQuery,
+    supabase.from("lojas").select("*", { count: "exact", head: true }).in("id", lojaScope),
+    supabase
+      .from("lojas")
+      .select("*", { count: "exact", head: true })
+      .in("id", lojaScope)
+      .in("status", ["ativo", "ativa"]),
+  ]);
 
-  const { count: lojasAtivas } = await supabase
-    .from("lojas")
-    .select("*", { count: "exact", head: true })
-    .in("id", lojaScope)
-    .in("status", ["ativo", "ativa"]);
+  const resumoAval = (resumoAvalData as {
+    total: number; media: number; n1: number; n2: number; n3: number; n4: number; n5: number;
+  } | null) || { total: 0, media: 0, n1: 0, n2: 0, n3: 0, n4: 0, n5: 0 };
+  const efetivadosRecentes = (efetivadosRecentesData as PedidoRow[]) || [];
 
   const ticketMedio =
     resumo.efetivadosCount > 0
