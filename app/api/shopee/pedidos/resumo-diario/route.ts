@@ -4,14 +4,13 @@ import { supabase } from "@/lib/supabase";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-// Recria as tabelas-resumo (dashboard + finanças) que as telas leem.
-// Roda por cron; a varredura da tabela gorda tem timeout próprio nas funções.
+// Recria a tabela-resumo do DASHBOARD (rápida, <8s). O resumo de FINANÇAS é
+// pesado (desaninha item_list) e passa dos 8s do anon, então roda via pg_cron
+// dentro do banco (jobs rebuild-pedidos / rebuild-financas, a cada 10 min).
 async function rodar() {
-  const ped = await supabase.rpc("rebuild_pedidos_resumo_diario");
-  const fin = await supabase.rpc("rebuild_financas_resumo_diario");
-  const erro = ped.error?.message || fin.error?.message;
-  if (erro) {
-    return NextResponse.json({ sucesso: false, erro }, { status: 500 });
+  const { error } = await supabase.rpc("rebuild_pedidos_resumo_diario");
+  if (error) {
+    return NextResponse.json({ sucesso: false, erro: error.message }, { status: 500 });
   }
   return NextResponse.json({ sucesso: true });
 }
