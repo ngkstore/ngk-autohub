@@ -14,8 +14,10 @@ export const dynamic = "force-dynamic";
 const BASE = process.env.SHOPEE_API_BASE_URL || "https://partner.shopeemobile.com";
 
 export async function GET(request: NextRequest) {
+  const auth = request.headers.get("authorization");
+  const viaCron = !!process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`;
   const escopo = await escopoDoUsuario();
-  if (!escopo.admin) {
+  if (!viaCron && !escopo.admin) {
     return NextResponse.json({ sucesso: false, erro: "Só o administrador pode sondar." }, { status: 403 });
   }
   const partnerId = process.env.SHOPEE_PARTNER_ID;
@@ -39,7 +41,7 @@ export async function GET(request: NextRequest) {
       .maybeSingle();
     lojaAlvo = ped?.loja_id ?? null;
   }
-  if (lojaAlvo && !podeVerLoja(escopo, lojaAlvo)) {
+  if (!viaCron && lojaAlvo && !podeVerLoja(escopo, lojaAlvo)) {
     return NextResponse.json({ sucesso: false, erro: "Loja fora da sua conta." }, { status: 403 });
   }
 
