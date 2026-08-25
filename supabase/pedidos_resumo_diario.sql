@@ -21,11 +21,12 @@ create index if not exists prd_loja_dia_idx on pedidos_resumo_diario (loja_id, d
 
 -- Reconstrói o resumo a partir dos pedidos (janela por dia BRT). SET LOCAL sobe
 -- o timeout só desta execução (a varredura da tabela gorda passa dos 8s).
+-- security definer: roda como owner (o role anon barra DELETE sem WHERE).
 create or replace function rebuild_pedidos_resumo_diario()
-returns void language plpgsql as $$
+returns void language plpgsql security definer as $$
 begin
   set local statement_timeout = '120s';
-  delete from pedidos_resumo_diario;
+  delete from pedidos_resumo_diario where true;
   insert into pedidos_resumo_diario (loja_id, dia, status, efetivado, faturado, qtd, valor)
   select loja_id,
     (coalesce(data_pagamento, data_pedido) at time zone 'America/Sao_Paulo')::date as dia,
