@@ -31,14 +31,15 @@ export default function Topbar() {
   }, []);
 
   const lojaSelecionada = searchParams.get("loja") || "todas";
-  // Sem parâmetro na URL, as páginas mostram TODO o período — então o seletor
-  // precisa refletir "Todos" (antes exibia "Este mês" sem filtrar de fato).
-  const periodoSelecionado = searchParams.get("periodo") || "todos";
+  // Padrão = últimos 30 dias (o dashboard usa isso; "Todos" é all-time explícito).
+  const periodoSelecionado = searchParams.get("periodo") || "30dias";
 
   function atualizarFiltro(chave: string, valor: string) {
     const params = new URLSearchParams(searchParams.toString());
 
-    if (valor === "todas" || valor === "todos") {
+    // Só o seletor de LOJA tem "todas" que limpa o filtro. O período sempre é
+    // explícito na URL (inclusive "todos"), pra bater com o padrão de 30 dias.
+    if (chave === "loja" && valor === "todas") {
       params.delete(chave);
     } else {
       params.set(chave, valor);

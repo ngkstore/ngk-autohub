@@ -106,8 +106,12 @@ function getPeriodoFiltro(
     case "ano":
       return { inicio: isoInicioBRT(ano, 1, 1), fim: inicioAmanha };
 
+    case "todos":
+      return null; // all-time (explícito — pode ser mais lento)
+
     default:
-      return null;
+      // Padrão do dashboard: últimos 30 dias (evita a varredura all-time no load).
+      return { inicio: deslocar(-30), fim: inicioAmanha };
   }
 }
 
@@ -230,54 +234,20 @@ async function calcularResumoPedidos(
     };
   }
 
-  // ---- Fallback paginado ----
-  const pedidos = await buscarTodosPedidos(lojaIds, periodo);
-
-  const efetivados = pedidos.filter((p) => p.pedido_efetivado);
-  const faturados = pedidos.filter((p) => p.entra_faturamento);
-  const cancelados = pedidos.filter(
-    (p) => !p.pedido_efetivado && p.status !== "UNPAID"
-  );
-
-  const vendasMap = new Map<string, number>();
-  efetivados.forEach((p) => {
-    if (!p.data_pedido) return;
-    const chave = diaBRT(new Date(p.data_pedido)); // agrupa por dia em Brasília
-    vendasMap.set(chave, (vendasMap.get(chave) || 0) + num(p.valor_total));
-  });
-
-  const marketplaceMap = new Map<string, number>();
-  efetivados.forEach((p) => {
-    const mk = p.marketplace || "sem marketplace";
-    marketplaceMap.set(mk, (marketplaceMap.get(mk) || 0) + num(p.valor_total));
-  });
-
-  const statusMap = new Map<string, number>();
-  pedidos.forEach((p) => {
-    const label = rotuloStatus(p.status);
-    statusMap.set(label, (statusMap.get(label) || 0) + 1);
-  });
-
+  // RPC indisponível/timeout (ex.: período "Todos" muito grande): retorna zeros.
+  // NÃO paginamos os pedidos no app (isso puxava 65k linhas e saturava o banco).
+  // O usuário deve escolher um período menor.
   return {
-    totalPedidos: pedidos.length,
-    efetivadosCount: efetivados.length,
-    faturadosCount: faturados.length,
-    canceladosCount: cancelados.length,
-    faturamentoGeral: pedidos.reduce((t, p) => t + num(p.valor_total), 0),
-    faturamentoEfetivado: efetivados.reduce((t, p) => t + num(p.valor_total), 0),
-    faturamentoConcluido: faturados.reduce((t, p) => t + num(p.valor_total), 0),
-    vendasPorPeriodo: Array.from(vendasMap.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([chave, faturamento]) => ({
-        data: formatarDiaCurto(chave),
-        faturamento,
-      })),
-    faturamentoPorMarketplace: Array.from(marketplaceMap.entries()).map(
-      ([marketplace, faturamento]) => ({ marketplace, faturamento })
-    ),
-    pedidosPorStatus: Array.from(statusMap.entries())
-      .map(([status, quantidade]) => ({ status, quantidade }))
-      .sort((a, b) => b.quantidade - a.quantidade),
+    totalPedidos: 0,
+    efetivadosCount: 0,
+    faturadosCount: 0,
+    canceladosCount: 0,
+    faturamentoGeral: 0,
+    faturamentoEfetivado: 0,
+    faturamentoConcluido: 0,
+    vendasPorPeriodo: [],
+    faturamentoPorMarketplace: [],
+    pedidosPorStatus: [],
   };
 }
 
