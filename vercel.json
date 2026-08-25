@@ -57,7 +57,7 @@
       "schedule": "*/10 * * * *"
     },
     {
-      "path": "/api/shopee/pedidos/enriquecer-financeiro?reconferir=1&limite=300",
+      "path": "/api/shopee/pedidos/enriquecer-financeiro?reconferir=1&limite=150",
       "schedule": "0 * * * *"
     }
   ]
