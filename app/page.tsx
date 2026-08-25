@@ -292,8 +292,6 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
     .from("avaliacoes")
     .select("*", { count: "exact", head: true });
 
-  let avaliacoesMediaQuery = supabase.from("avaliacoes").select("avaliacao");
-
   let ultimasQuery = supabase
     .from("avaliacoes")
     .select("*")
@@ -328,7 +326,6 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
 
   if (lojas) {
     avaliacoesQuery = avaliacoesQuery.in("loja_id", lojas);
-    avaliacoesMediaQuery = avaliacoesMediaQuery.in("loja_id", lojas);
     ultimasQuery = ultimasQuery.in("loja_id", lojas);
     produtosSemEstoqueQuery = produtosSemEstoqueQuery.in("loja_id", lojas);
     financeiroQuery = financeiroQuery.in("loja_id", lojas);
@@ -338,9 +335,6 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
 
   if (periodo) {
     avaliacoesQuery = avaliacoesQuery
-      .gte("criado_em", periodo.inicio)
-      .lt("criado_em", periodo.fim);
-    avaliacoesMediaQuery = avaliacoesMediaQuery
       .gte("criado_em", periodo.inicio)
       .lt("criado_em", periodo.fim);
     ultimasQuery = ultimasQuery
@@ -360,7 +354,14 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
   const resumo = await calcularResumoPedidos(lojas, periodo);
 
   const { count: totalAvaliacoes } = await avaliacoesQuery;
-  const { data: avaliacoesMedia } = await avaliacoesMediaQuery;
+  const { data: resumoAvalData } = await supabase.rpc("resumo_avaliacoes", {
+    p_loja_ids: lojas,
+    p_inicio: periodo?.inicio ?? null,
+    p_fim: periodo?.fim ?? null,
+  });
+  const resumoAval = (resumoAvalData as {
+    total: number; media: number; n1: number; n2: number; n3: number; n4: number; n5: number;
+  } | null) || { total: 0, media: 0, n1: 0, n2: 0, n3: 0, n4: 0, n5: 0 };
   const { data: ultimasAvaliacoes } = await ultimasQuery;
   const { count: produtosSemEstoque } = await produtosSemEstoqueQuery;
   const { data: financeiro } = await financeiroQuery;
@@ -422,15 +423,7 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
 
   const lucroEstimado = totalReceitas - totalDespesas;
 
-  const notaMedia =
-    avaliacoesMedia && avaliacoesMedia.length > 0
-      ? (
-          avaliacoesMedia.reduce(
-            (total, item) => total + Number(item.avaliacao || 0),
-            0
-          ) / avaliacoesMedia.length
-        ).toFixed(1)
-      : "0.0";
+  const notaMedia = Number(resumoAval.media || 0).toFixed(1);
 
   const taxaAutomacao = totalAvaliacoes
     ? Math.round(((totalRespostas ?? 0) / totalAvaliacoes) * 100)
@@ -444,9 +437,9 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
 
   const avaliacoesPorNota = [1, 2, 3, 4, 5].map((nota) => ({
     nota: `${nota} estrela${nota > 1 ? "s" : ""}`,
-    quantidade:
-      avaliacoesMedia?.filter((item) => Number(item.avaliacao) === nota)
-        .length || 0,
+    quantidade: Number(
+      resumoAval[`n${nota}` as "n1" | "n2" | "n3" | "n4" | "n5"] || 0
+    ),
   }));
 
   return (
