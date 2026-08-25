@@ -20,6 +20,7 @@ function isoBRT(a: number, m: number, d: number) {
   const p = (n: number) => String(n).padStart(2, "0");
   return `${a}-${p(m)}-${p(d)}T00:00:00-03:00`;
 }
+// Mesmas chaves do seletor de período da Topbar (filtro unificado).
 function periodoFiltro(periodo: string): { inicio: string; fim: string } | null {
   const [a, m, d] = diaBRT(new Date()).split("-").map(Number);
   const base = new Date(Date.UTC(a, m - 1, d));
@@ -29,20 +30,18 @@ function periodoFiltro(periodo: string): { inicio: string; fim: string } | null 
     return isoBRT(x.getUTCFullYear(), x.getUTCMonth() + 1, x.getUTCDate());
   };
   const amanha = desloca(1);
+  const inicioHoje = isoBRT(a, m, d);
   switch (periodo) {
+    case "hoje": return { inicio: inicioHoje, fim: amanha };
+    case "ontem": return { inicio: desloca(-1), fim: inicioHoje };
     case "7dias": return { inicio: desloca(-7), fim: amanha };
     case "30dias": return { inicio: desloca(-30), fim: amanha };
     case "mes": return { inicio: isoBRT(a, m, 1), fim: amanha };
-    case "180dias": return { inicio: desloca(-180), fim: amanha };
-    default: return { inicio: isoBRT(a, m, 1), fim: amanha };
+    case "ano": return { inicio: isoBRT(a, 1, 1), fim: amanha };
+    case "todos": return null;
+    default: return { inicio: desloca(-30), fim: amanha }; // padrão: 30 dias
   }
 }
-const PERIODOS = [
-  { k: "mes", r: "Este mês" },
-  { k: "30dias", r: "30 dias" },
-  { k: "7dias", r: "7 dias" },
-  { k: "180dias", r: "6 meses" },
-];
 
 const ABAS = [
   { k: "balanco", r: "📊 Balanço" },
@@ -85,37 +84,25 @@ function dt(s?: string | null) {
 export default async function FinancasPage({ searchParams }: Props) {
   const params = await searchParams;
   const aba = params.aba || "balanco";
-  const periodoK = params.periodo || "mes";
+  const periodoK = params.periodo || "30dias"; // padrão alinhado com a Topbar
   const escopo = await escopoDoUsuario();
   const lojas = filtroLojas(escopo, params.loja); // string[] | null
   const periodo = periodoFiltro(periodoK);
 
-  const linkAba = (k: string) =>
-    `/financas?aba=${k}&periodo=${periodoK}${params.loja ? `&loja=${params.loja}` : ""}`;
-  const linkPer = (k: string) =>
-    `/financas?aba=${aba}&periodo=${k}${params.loja ? `&loja=${params.loja}` : ""}`;
+  // Troca de aba preserva loja/período (que vêm da Topbar).
+  const qs = new URLSearchParams();
+  if (params.periodo) qs.set("periodo", params.periodo);
+  if (params.loja) qs.set("loja", params.loja);
+  const sufixo = qs.toString() ? `&${qs.toString()}` : "";
+  const linkAba = (k: string) => `/financas?aba=${k}${sufixo}`;
 
   return (
     <div className="p-8 text-white">
       <h1 className="text-4xl font-bold">💰 Finanças</h1>
       <p className="mt-2 text-slate-400">
-        Tudo do dinheiro num lugar só — do pedido ao resultado, por loja.
+        Tudo do dinheiro num lugar só — do pedido ao resultado. Use os seletores de
+        <b> loja</b> e <b>período</b> no topo.
       </p>
-
-      {/* período */}
-      <div className="mt-5 flex flex-wrap gap-2">
-        {PERIODOS.map((p) => (
-          <Link
-            key={p.k}
-            href={linkPer(p.k)}
-            className={`rounded-full px-4 py-2 text-sm font-semibold ${
-              p.k === periodoK ? "bg-emerald-600 text-white" : "bg-slate-800 text-slate-300 hover:bg-slate-700"
-            }`}
-          >
-            {p.r}
-          </Link>
-        ))}
-      </div>
 
       {/* sub-abas */}
       <div className="mt-6 flex flex-wrap gap-1 border-b border-slate-800">
