@@ -428,6 +428,24 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
         Visão geral das operações. Use o seletor de loja no topo para filtrar.
       </p>
 
+      {/* DEBUG TEMPORÁRIO — me mande o conteúdo desta caixa */}
+      <pre className="mt-4 overflow-auto rounded-lg border border-lime-700 bg-black p-3 text-xs text-lime-300">
+{JSON.stringify(
+  {
+    loja_param: params.loja ?? null,
+    periodo_param: params.periodo ?? null,
+    lojas_usados_no_filtro: lojas,
+    total_pedidos_calculado: resumo.totalPedidos,
+    faturamento_efetivado: resumo.faturamentoEfetivado,
+    escopo_lojaIds: escopo.lojaIds,
+    escopo_admin: escopo.admin,
+    escopo_preSetup: escopo.preSetup,
+  },
+  null,
+  2
+)}
+      </pre>
+
       {/* Destaque: faturamento */}
       <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
         <div className="rounded-2xl border border-emerald-700 bg-slate-900 p-6">
