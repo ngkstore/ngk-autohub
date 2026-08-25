@@ -156,9 +156,10 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
   const r = (data as Record<string, unknown>) || {};
   const c = (dataCmv as Record<string, unknown>) || {};
   const receita = n(r.receita_bruta);
-  const taxas = Math.abs(n(r.taxas));
+  const taxaServAfiliado = Math.abs(n(r.taxa_servico_afiliado)); // taxa de serviço de afiliado
+  const taxas = Math.abs(n(r.taxas)) - taxaServAfiliado; // taxas Shopee SEM a de afiliado (separada)
   const cupom = Math.abs(n(r.cupom_proprio)); // cupom_loja vem negativo no banco
-  const afiliado = Math.abs(n(r.afiliado)); // custo opcional, já dentro do escrow
+  const afiliado = Math.abs(n(r.afiliado)); // comissão de afiliado (liquida ~30 dias depois)
   const liquida = n(r.receita_liquida);
   const ads = n(r.ads);
   const reemb = n(r.reembolsos);
@@ -177,7 +178,8 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
   const linhas = [
     { l: "Receita (pedidos pagos)", v: receita, tot: false },
     { l: "(−) Taxas Shopee (comissão + serviço)", v: -taxas, tot: false },
-    { l: "(−) Comissão de afiliado (opcional)", v: -afiliado, tot: false },
+    { l: "(−) Comissão de afiliado (liquida ~30 dias depois)", v: -afiliado, tot: false },
+    { l: "(−) Taxa de serviço de afiliado", v: -taxaServAfiliado, tot: false },
     { l: "(−) Cupom próprio (Shopee não entra)", v: -cupom, tot: false },
     { l: "= Receita líquida (escrow)", v: liquida, tot: true },
     { l: "(−) Ads (saída da carteira)", v: -ads, tot: false },
