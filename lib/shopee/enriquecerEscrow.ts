@@ -274,6 +274,16 @@ export async function enriquecerEscrowPendentes({
           ? n(buyer.merchant_subtotal)
           : n(income.order_selling_price);
 
+      // Taxa de serviço de AFILIADO: vem dentro de net_service_fee_info_list
+      // (ex.: "Taxa de Serviço Afiliados do Vendedor"), separada da comissão.
+      const listaServ = Array.isArray(income.net_service_fee_info_list)
+        ? (income.net_service_fee_info_list as { rule_display_name?: string; fee_amount?: unknown }[])
+        : [];
+      const taxaServAfiliado = listaServ.reduce((s, f) => {
+        const nome = String(f?.rule_display_name || "").toLowerCase();
+        return nome.includes("afili") ? s + n(f?.fee_amount) : s;
+      }, 0);
+
       const { error: updateError } = await supabase
         .from("pedidos")
         .update({
@@ -282,11 +292,14 @@ export async function enriquecerEscrowPendentes({
           valor_liquido: n(income.escrow_amount),
           taxa_comissao: n(income.commission_fee ?? income.net_commission_fee),
           taxa_servico: n(income.service_fee ?? income.net_service_fee),
+          taxa_servico_afiliado: taxaServAfiliado,
           cupom_shopee: n(buyer.shopee_voucher ?? income.voucher_from_shopee),
           cupom_loja: n(buyer.seller_voucher ?? income.voucher_from_seller),
           frete: n(buyer.shipping_fee ?? income.buyer_paid_shipping_fee),
+          frete_real: n(income.actual_shipping_fee),
+          shopee_rebate_frete: n(income.shopee_shipping_rebate),
           desconto_vendedor: n(income.order_seller_discount),
-          comissao_afiliado: n(income.order_ams_commission_fee), // Programa de Afiliados
+          comissao_afiliado: n(income.order_ams_commission_fee), // Programa de Afiliados (comissão)
           escrow_atualizado_em: new Date().toISOString(),
         })
         .eq("id", pedido.id);
