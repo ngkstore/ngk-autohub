@@ -1,23 +1,22 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useSearchParams, usePathname } from "next/navigation";
 import AuthStatus from "./AuthStatus";
 
 type Loja = { id: string; apelido: string };
 
 const periodos = [
-  { id: "todos", nome: "Todos" },
+  { id: "30dias", nome: "Últimos 30 dias" },
   { id: "hoje", nome: "Hoje" },
   { id: "ontem", nome: "Ontem" },
   { id: "7dias", nome: "Últimos 7 dias" },
-  { id: "30dias", nome: "Últimos 30 dias" },
   { id: "mes", nome: "Este mês" },
   { id: "ano", nome: "Este ano" },
+  { id: "todos", nome: "Todos (mais lento)" },
 ];
 
 export default function Topbar() {
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -31,27 +30,12 @@ export default function Topbar() {
   }, []);
 
   const lojaSelecionada = searchParams.get("loja") || "todas";
-  // Padrão = últimos 30 dias (o dashboard usa isso; "Todos" é all-time explícito).
   const periodoSelecionado = searchParams.get("periodo") || "30dias";
-
-  // Depois que a URL do filtro muda (loja/período), re-busca os dados do servidor.
-  // Feito num efeito (após a navegação COMMITAR) pra não ter corrida com o push —
-  // era o que fazia o filtro "não pegar" às vezes. Pula a montagem inicial.
-  const sp = searchParams.toString();
-  const primeira = useRef(true);
-  useEffect(() => {
-    if (primeira.current) {
-      primeira.current = false;
-      return;
-    }
-    router.refresh();
-  }, [sp, router]);
 
   function atualizarFiltro(chave: string, valor: string) {
     const params = new URLSearchParams(searchParams.toString());
 
-    // Só o seletor de LOJA tem "todas" que limpa o filtro. O período sempre é
-    // explícito na URL (inclusive "todos"), pra bater com o padrão de 30 dias.
+    // Só o seletor de LOJA tem "todas" que limpa o filtro.
     if (chave === "loja" && valor === "todas") {
       params.delete(chave);
     } else {
@@ -59,7 +43,10 @@ export default function Topbar() {
     }
 
     const query = params.toString();
-    router.push(query ? `${pathname}?${query}` : pathname);
+    // Navegação de PÁGINA INTEIRA: garante que o servidor re-renderiza com o
+    // filtro novo, sem cache do App Router nem corrida. Confiabilidade acima
+    // de tudo (o push do router estava servindo dado velho às vezes).
+    window.location.assign(query ? `${pathname}?${query}` : pathname);
   }
 
   return (
