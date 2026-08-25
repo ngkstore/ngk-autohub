@@ -33,7 +33,7 @@ export default async function SincronizacaoPage({
     .from("lojas")
     .select("*")
     .order("criado_em", { ascending: false });
-  if (!escopo.admin) {
+  if (!escopo.preSetup) {
     lojasQuery = lojasQuery.in(
       "id",
       escopo.lojaIds.length

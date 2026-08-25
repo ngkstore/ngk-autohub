@@ -28,7 +28,7 @@ export default async function IntegracoesPage() {
     .from("lojas")
     .select("*")
     .order("criado_em", { ascending: false });
-  if (!escopo.admin) {
+  if (!escopo.preSetup) {
     lojasQuery = lojasQuery.in(
       "conta_id",
       escopo.contaId ? [escopo.contaId] : []
@@ -43,12 +43,15 @@ export default async function IntegracoesPage() {
     .select("*, lojas(apelido)")
     .order("iniciado_em", { ascending: false })
     .limit(20);
-  if (!escopo.admin) sincQuery = sincQuery.in("loja_id", lojaIds);
-  const { data: sincronizacoes } = await sincQuery;
+  if (!escopo.preSetup) sincQuery = sincQuery.in("loja_id", lojaIds);
 
   let tokensQuery = supabase.from("marketplace_tokens").select("*");
-  if (!escopo.admin) tokensQuery = tokensQuery.in("loja_id", lojaIds);
-  const { data: tokens } = await tokensQuery;
+  if (!escopo.preSetup) tokensQuery = tokensQuery.in("loja_id", lojaIds);
+
+  const [{ data: sincronizacoes }, { data: tokens }] = await Promise.all([
+    sincQuery,
+    tokensQuery,
+  ]);
 
   return (
     <div className="p-8 text-white">

@@ -10,7 +10,7 @@ export default async function LojasPage() {
     .from("lojas")
     .select("*")
     .order("criado_em", { ascending: false });
-  if (!escopo.admin) {
+  if (!escopo.preSetup) {
     lojasQuery = lojasQuery.in(
       "conta_id",
       escopo.contaId ? [escopo.contaId] : []

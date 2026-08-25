@@ -12,7 +12,7 @@ export default async function InsightsPage() {
     .select("id, arquivo, colunas, total_linhas, loja_id, periodo_inicio, periodo_fim, importado_em, lojas(apelido)")
     .order("importado_em", { ascending: false })
     .limit(30);
-  if (!escopo.admin) {
+  if (!escopo.preSetup) {
     query = query.in("conta_id", escopo.contaId ? [escopo.contaId] : []);
   }
   const { data: importacoes } = await query;

@@ -51,7 +51,7 @@ export default async function RaioXPage({ searchParams }: Props) {
   /* ---------------- Coletor: funil por produto, por janela ---------------- */
   const capsRanking = await capturas(
     "dashboard/product-rankings",
-    escopo.admin,
+    escopo.preSetup,
     escopo.contaId
   );
 
@@ -84,8 +84,8 @@ export default async function RaioXPage({ searchParams }: Props) {
 
   /* ------------- Coletor: posição, CPC e sugestão de ROAS ---------------- */
   const [capsVerdict, capsTempo] = await Promise.all([
-    capturas("diagnosis/homepage_batch_list_verdict", escopo.admin, escopo.contaId),
-    capturas("report/get_time_graph", escopo.admin, escopo.contaId),
+    capturas("diagnosis/homepage_batch_list_verdict", escopo.preSetup, escopo.contaId),
+    capturas("report/get_time_graph", escopo.preSetup, escopo.contaId),
   ]);
   const vereditosShopee = capsVerdict[0] ? lerVerdict(capsVerdict[0].payload) : [];
   const serie = capsTempo[0] ? lerTimeGraph(capsTempo[0].payload) : [];
@@ -106,7 +106,7 @@ export default async function RaioXPage({ searchParams }: Props) {
     .select("id, arquivo, colunas, periodo_inicio, periodo_fim")
     .order("importado_em", { ascending: false })
     .limit(20);
-  if (!escopo.admin) qi = qi.in("conta_id", escopo.contaId ? [escopo.contaId] : []);
+  if (!escopo.preSetup) qi = qi.in("conta_id", escopo.contaId ? [escopo.contaId] : []);
   const { data: imports } = await qi;
   let anunciosAds: AnuncioAds[] = [];
   let importAds: { arquivo: string | null; periodo_inicio: string | null } | null = null;
