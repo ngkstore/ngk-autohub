@@ -363,23 +363,30 @@ export async function enriquecerPedidosPendentes({
         const valorVenda =
           vendaItens > 0 ? vendaItens : Number(detalhe.total_amount ?? 0);
 
+        // Campos leves (sempre). No RESYNC paramos aqui: o pedido já tem
+        // dados_pedido/cliente/data — reescrever a coluna gorda dados_pedido
+        // a cada re-checagem gera bloat/WAL e satura o Nano (autovacuum).
+        const payload: Record<string, unknown> = {
+          valor_total: valorVenda,
+          status: statusShopee,
+          data_pagamento: detalhe.pay_time
+            ? new Date(detalhe.pay_time * 1000).toISOString()
+            : null,
+          pedido_efetivado: classificacao.pedido_efetivado,
+          entra_faturamento: classificacao.entra_faturamento,
+          atualizado_em: new Date().toISOString(),
+        };
+        if (!resync) {
+          // Enriquecimento inicial (pedido sem detalhe): grava tudo, 1ª vez.
+          payload.dados_pedido = detalhe;
+          payload.cliente_nome = detalhe.buyer_username ?? null;
+          payload.data_pedido = detalhe.create_time
+            ? new Date(detalhe.create_time * 1000).toISOString()
+            : null;
+        }
         const { error: updateError } = await supabase
           .from("pedidos")
-          .update({
-            valor_total: valorVenda,
-            cliente_nome: detalhe.buyer_username ?? null,
-            status: statusShopee,
-            data_pedido: detalhe.create_time
-              ? new Date(detalhe.create_time * 1000).toISOString()
-              : null,
-            data_pagamento: detalhe.pay_time
-              ? new Date(detalhe.pay_time * 1000).toISOString()
-              : null,
-            pedido_efetivado: classificacao.pedido_efetivado,
-            entra_faturamento: classificacao.entra_faturamento,
-            dados_pedido: detalhe,
-            atualizado_em: new Date().toISOString(),
-          })
+          .update(payload)
           .eq("id", id);
 
         if (updateError) {

@@ -329,7 +329,14 @@ export async function responderChatsLote({
         `=== CONVERSA ATUAL COM ESTE CLIENTE (do início ao fim) ===\n${conversaTxt}\n\n` +
         `Responda à(s) última(s) mensagem(ns) do cliente, considerando TODA a conversa acima.`;
 
-      decisao = await decidir(client, contexto, lojaId, system);
+      try {
+        decisao = await decidir(client, contexto, lojaId, system);
+      } catch {
+        // Falha transitória da IA (sobrecarga/rate limit/rede): NÃO derruba o
+        // lote inteiro nem marca a conversa. Pula esta e tenta de novo na
+        // próxima rodada — assim nenhuma mensagem fica órfã por causa de 1 erro.
+        continue;
+      }
       escalar =
         !decisao ||
         decisao.precisa_humano === true ||
