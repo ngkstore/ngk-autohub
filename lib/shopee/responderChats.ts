@@ -225,6 +225,7 @@ export async function responderChatsLote({
 
   let enviados = 0;
   let escalados = 0;
+  let erroEnvio: string | undefined;
   const propostas: PropostaChat[] = [];
 
   for (const c of pendentes) {
@@ -428,8 +429,10 @@ export async function responderChatsLote({
           .eq("conversation_id", c.conversation_id);
         enviados++;
       }
-    } catch {
-      // falha no envio: deixa pendente para a próxima rodada
+    } catch (e) {
+      // falha no envio: registra o motivo (antes era engolido) e deixa
+      // pendente para a próxima rodada.
+      erroEnvio = e instanceof Error ? e.message : String(e);
     }
   }
 
@@ -438,5 +441,6 @@ export async function responderChatsLote({
     enviados,
     escalados,
     propostas,
+    erro: erroEnvio,
   };
 }

@@ -23,8 +23,9 @@ function agregar(resultados: ResultadoChat[]) {
       enviados: acc.enviados + r.enviados,
       escalados: acc.escalados + r.escalados,
       propostas: [...acc.propostas, ...r.propostas],
+      erro: r.erro || acc.erro,
     }),
-    { processados: 0, enviados: 0, escalados: 0, propostas: [] as ResultadoChat["propostas"] }
+    { processados: 0, enviados: 0, escalados: 0, propostas: [] as ResultadoChat["propostas"], erro: undefined as string | undefined }
   );
 }
 
