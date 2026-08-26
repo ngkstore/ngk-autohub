@@ -146,6 +146,7 @@ export type ResultadoChat = {
   processados: number;
   enviados: number;
   escalados: number;
+  foraJanela?: number;
   propostas: PropostaChat[];
   erro?: string;
 };
@@ -225,6 +226,7 @@ export async function responderChatsLote({
 
   let enviados = 0;
   let escalados = 0;
+  let foraJanela = 0;
   let erroEnvio: string | undefined;
   const propostas: PropostaChat[] = [];
 
@@ -430,9 +432,29 @@ export async function responderChatsLote({
         enviados++;
       }
     } catch (e) {
-      // falha no envio: registra o motivo (antes era engolido) e deixa
-      // pendente para a próxima rodada.
-      erroEnvio = e instanceof Error ? e.message : String(e);
+      // falha no envio: registra o motivo (antes era engolido).
+      const msg = e instanceof Error ? e.message : String(e);
+      erroEnvio = msg;
+      // Fora da janela de mensagem da Shopee (só dá pra responder se o cliente
+      // falou nos últimos 7 dias / comprou em 30 dias / tem devolução aberta):
+      // não adianta re-tentar — nem manualmente dá. Marca como tratada pra não
+      // travar a fila reprocessando a mesma conversa a cada rodada.
+      if (/forbidden|only message the buyer/i.test(msg)) {
+        await supabase
+          .from("chat_conversas")
+          .update({
+            ultimo_tratado_msg_id: c.latest_message_id,
+            precisa_resposta: false,
+            escalada: true,
+            motivo_escala: "fora_janela_shopee",
+            categoria,
+            confianca,
+            resposta_ia: resposta,
+          })
+          .eq("conversation_id", c.conversation_id);
+        foraJanela++;
+      }
+      // outros erros (token/rede/transitório): deixa pendente pra próxima rodada.
     }
   }
 
@@ -440,6 +462,7 @@ export async function responderChatsLote({
     processados: pendentes.length,
     enviados,
     escalados,
+    foraJanela,
     propostas,
     erro: erroEnvio,
   };
