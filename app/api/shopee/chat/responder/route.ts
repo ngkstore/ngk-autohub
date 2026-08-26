@@ -22,7 +22,7 @@ function agregar(resultados: ResultadoChat[]) {
       processados: acc.processados + r.processados,
       enviados: acc.enviados + r.enviados,
       escalados: acc.escalados + r.escalados,
-      foraJanela: acc.foraJanela + (r.foraJanela || 0),
+      foraJanela: (acc.foraJanela || 0) + (r.foraJanela || 0),
       propostas: [...acc.propostas, ...r.propostas],
       erro: r.erro || acc.erro,
     }),
