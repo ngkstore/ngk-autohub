@@ -55,6 +55,10 @@
     {
       "path": "/api/shopee/pedidos/enriquecer-financeiro?reconferir=1&limite=150",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/shopee/pedidos/resync-status?limite=300",
+      "schedule": "15,45 * * * *"
     }
   ]
 }

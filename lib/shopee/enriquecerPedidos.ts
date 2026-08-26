@@ -247,6 +247,7 @@ export type ResultadoEnriquecimento = {
   atualizados: number;
   erros: number;
   restantes: number;
+  viraramEfetivados?: number;
   mensagemErro?: string;
 };
 
@@ -254,11 +255,18 @@ export type ResultadoEnriquecimento = {
  * Enriquece um lote de pedidos ainda sem detalhe (data_pedido = null),
  * preenchendo valor, cliente, status e a data do pedido a partir do
  * get_order_detail. Processa em blocos de 50 e grava cada pedido.
+ *
+ * modo `resync`: em vez dos pedidos sem detalhe, re-checa os que ficaram
+ * presos em UNPAID (recentes primeiro). O sync normal cobre só janelas de
+ * 15 min por create_time, então quando o comprador paga horas/dias depois
+ * ninguém atualiza o status — o pedido pago congela como UNPAID e fica fora
+ * do faturamento. Este modo re-busca o detalhe atual e vira os que pagaram.
  */
 export async function enriquecerPedidosPendentes({
   limite = 300,
   lojaIds = null,
-}: { limite?: number; lojaIds?: string[] | null } = {}): Promise<ResultadoEnriquecimento> {
+  resync = false,
+}: { limite?: number; lojaIds?: string[] | null; resync?: boolean } = {}): Promise<ResultadoEnriquecimento> {
   const partnerId = process.env.SHOPEE_PARTNER_ID;
   const partnerKey = process.env.SHOPEE_PARTNER_KEY;
   const baseUrl = process.env.SHOPEE_API_BASE_URL || BASE_URL_PADRAO;
@@ -272,14 +280,25 @@ export async function enriquecerPedidosPendentes({
     return { processados: 0, atualizados: 0, erros: 0, restantes: 0 };
   }
 
-  // Pedidos pendentes de enriquecimento: reais (não fake SH-) e sem data.
+  // Pedidos-alvo: reais (não fake SH-). No modo normal, os sem detalhe
+  // (data_pedido null). No modo resync, os presos em UNPAID (recentes 1o).
   // lojaIds null = todas as lojas (cron); [...] = só as lojas da conta.
   let query = supabase
     .from("pedidos")
     .select("id, loja_id, pedido_externo_id")
     .eq("marketplace", "shopee")
-    .not("pedido_externo_id", "like", "SH-%")
-    .is("data_pedido", null);
+    .not("pedido_externo_id", "like", "SH-%");
+  if (resync) {
+    // Menos-recentemente-checado primeiro: cada rodada avança na fila e cobre
+    // todo o backlog num ciclo, sem re-martelar os pedidos mortos (que ficam
+    // UNPAID pra sempre). Ao re-checar, atualizado_em sobe -> vão pro fim.
+    query = query.eq("status", "UNPAID").order("atualizado_em", {
+      ascending: true,
+      nullsFirst: true,
+    });
+  } else {
+    query = query.is("data_pedido", null);
+  }
   if (lojaIds) query = query.in("loja_id", lojaIds);
   const { data: pedidos } = await query.limit(limite);
 
@@ -297,6 +316,7 @@ export async function enriquecerPedidosPendentes({
 
   let atualizados = 0;
   let erros = 0;
+  let viraramEfetivados = 0;
   let mensagemErro: string | undefined;
 
   for (const [lojaId, lista] of porLoja) {
@@ -367,6 +387,9 @@ export async function enriquecerPedidosPendentes({
           mensagemErro = updateError.message;
         } else {
           atualizados++;
+          // resync: todos entraram como UNPAID; se agora classifica como
+          // efetivado, é um pedido pago que estava congelado fora do faturamento.
+          if (resync && classificacao.pedido_efetivado) viraramEfetivados++;
         }
       }
     }
@@ -377,8 +400,10 @@ export async function enriquecerPedidosPendentes({
     .from("pedidos")
     .select("id", { count: "exact", head: true })
     .eq("marketplace", "shopee")
-    .not("pedido_externo_id", "like", "SH-%")
-    .is("data_pedido", null);
+    .not("pedido_externo_id", "like", "SH-%");
+  countQuery = resync
+    ? countQuery.eq("status", "UNPAID")
+    : countQuery.is("data_pedido", null);
   if (lojaIds) countQuery = countQuery.in("loja_id", lojaIds);
   const { count } = await countQuery;
 
@@ -387,6 +412,7 @@ export async function enriquecerPedidosPendentes({
     atualizados,
     erros,
     restantes: count ?? 0,
+    viraramEfetivados,
     mensagemErro,
   };
 }
