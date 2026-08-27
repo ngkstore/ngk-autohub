@@ -210,7 +210,8 @@ export async function enriquecerEscrowPendentes({
   limite = 150,
   lojaIds = null,
   reconferir = false,
-}: { limite?: number; lojaIds?: string[] | null; reconferir?: boolean } = {}): Promise<ResultadoEscrow> {
+  backfill = false,
+}: { limite?: number; lojaIds?: string[] | null; reconferir?: boolean; backfill?: boolean } = {}): Promise<ResultadoEscrow> {
   const partnerId = process.env.SHOPEE_PARTNER_ID;
   const partnerKey = process.env.SHOPEE_PARTNER_KEY;
   const baseUrl = process.env.SHOPEE_API_BASE_URL || BASE_URL_PADRAO;
@@ -242,6 +243,9 @@ export async function enriquecerEscrowPendentes({
       .not("pedido_externo_id", "like", "SH-%")
       .is("escrow_atualizado_em", null)
       .order("data_pedido", { ascending: false, nullsFirst: false });
+    // Drenador do backfill histórico: só os pedidos importados; o cron ao vivo
+    // fica só com os do dia (origem null), pra não competirem pela mesma cota.
+    query = backfill ? query.eq("origem", "backfill") : query.is("origem", null);
     if (lojaIds) query = query.in("loja_id", lojaIds);
     const res = await query.limit(limite);
     pedidos = res.data;
@@ -331,6 +335,9 @@ export async function enriquecerEscrowPendentes({
     .eq("pedido_efetivado", true)
     .not("pedido_externo_id", "like", "SH-%")
     .is("escrow_atualizado_em", null);
+  if (!reconferir) {
+    countQuery = backfill ? countQuery.eq("origem", "backfill") : countQuery.is("origem", null);
+  }
   if (lojaIds) countQuery = countQuery.in("loja_id", lojaIds);
   const { count } = await countQuery;
 

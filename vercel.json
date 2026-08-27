@@ -67,6 +67,10 @@
     {
       "path": "/api/shopee/pedidos/enriquecer-backfill?limite=800",
       "schedule": "8,18,28,38,48,58 * * * *"
+    },
+    {
+      "path": "/api/shopee/pedidos/enriquecer-financeiro-backfill?limite=200",
+      "schedule": "6,16,26,36,46,56 * * * *"
     }
   ]
 }
