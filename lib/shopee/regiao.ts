@@ -114,15 +114,22 @@ export async function enriquecerRegiaoLoja({
   const token = await obterToken(lojaId);
   if (!token) return { lojaId, processados: 0, comUf: 0, erro: "sem token ativo" };
 
+  // Re-tenta TODOS os sem-UF recentes (não só os nunca-tentados): o sort_code
+  // muitas vezes não existe quando o pedido é novo (documento de envio ainda
+  // não gerado); tentando de novo depois, ele aparece. Janela de 30 dias
+  // (docs antigos expiram), menos-recentemente-tentado primeiro (nulls = nunca
+  // tentado vêm antes). Só pedidos pagos.
+  const desde = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const { data: pedidos } = await supabase
     .from("pedidos")
     .select("id, pedido_externo_id")
     .eq("marketplace", "shopee")
     .eq("loja_id", lojaId)
-    .is("regiao_atualizada_em", null)
+    .eq("pedido_efetivado", true)
+    .is("uf", null)
+    .gte("data_pedido", desde)
     .not("pedido_externo_id", "like", "SH-%")
-    .not("data_pedido", "is", null)
-    .order("data_pedido", { ascending: false })
+    .order("regiao_atualizada_em", { ascending: true, nullsFirst: true })
     .limit(limite);
 
   if (!pedidos || pedidos.length === 0) return { lojaId, processados: 0, comUf: 0 };
@@ -135,16 +142,16 @@ export async function enriquecerRegiaoLoja({
         buscarRegiao(token, p.pedido_externo_id),
         buscarDatas(token, p.pedido_externo_id),
       ]);
-      await supabase
-        .from("pedidos")
-        .update({
-          uf,
-          hub_regiao: hub,
-          enviado_em: datas.enviado_em,
-          entregue_em: datas.entregue_em,
-          regiao_atualizada_em: new Date().toISOString(),
-        })
-        .eq("id", p.id);
+      // Só grava o que achou — re-try que falhar não apaga uf/hub/datas já
+      // preenchidos (só marca regiao_atualizada_em pra ir pro fim da fila).
+      const payload: Record<string, unknown> = { regiao_atualizada_em: new Date().toISOString() };
+      if (uf) {
+        payload.uf = uf;
+        payload.hub_regiao = hub;
+      }
+      if (datas.enviado_em) payload.enviado_em = datas.enviado_em;
+      if (datas.entregue_em) payload.entregue_em = datas.entregue_em;
+      await supabase.from("pedidos").update(payload).eq("id", p.id);
       if (uf) comUf++;
     } catch {
       // pula este pedido; tenta na próxima rodada
