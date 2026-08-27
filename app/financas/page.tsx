@@ -5,11 +5,12 @@ import CustoInput from "../components/CustoInput";
 import CustoVariacaoInput from "../components/CustoVariacaoInput";
 import UploadCustos from "../components/UploadCustos";
 import ImpostoForm from "../components/ImpostoForm";
+import SeletorEstado from "../components/SeletorEstado";
 
 export const dynamic = "force-dynamic";
 
 type Props = {
-  searchParams: Promise<{ aba?: string; periodo?: string; loja?: string }>;
+  searchParams: Promise<{ aba?: string; periodo?: string; loja?: string; ufTend?: string }>;
 };
 
 // ---------- período (Brasília, fim exclusivo) ----------
@@ -134,7 +135,7 @@ export default async function FinancasPage({ searchParams }: Props) {
       <div className="mt-8">
         {aba === "balanco" && <Balanco lojas={lojas} periodo={periodo} conta={escopo.contaId} />}
         {(aba === "conciliacao" || aba === "divergencias") && <Conciliacao lojas={lojas} periodo={periodo} />}
-        {aba === "previsao" && <Previsao lojas={lojas} />}
+        {aba === "previsao" && <Previsao lojas={lojas} ufTend={params.ufTend} sufixo={sufixo} />}
         {aba === "carteira" && <Carteira lojas={lojas} />}
         {aba === "ads" && <Ads lojas={lojas} />}
         {aba === "produtos" && <Produtos lojas={lojas} />}
@@ -929,15 +930,30 @@ async function Impostos({ conta }: { conta: string | null }) {
 }
 
 // ---------------- PREVISÃO DE FLUXO DE CAIXA ----------------
-async function Previsao({ lojas }: { lojas: string[] | null }) {
-  const { data } = await supabase.rpc("previsao_fluxo_caixa", { p_loja_ids: lojas, p_dias: 30 });
+async function Previsao({ lojas, ufTend, sufixo }: { lojas: string[] | null; ufTend?: string; sufixo: string }) {
+  const [{ data }, { data: tempoRaw }] = await Promise.all([
+    supabase.rpc("previsao_fluxo_caixa", { p_loja_ids: lojas, p_dias: 30 }),
+    supabase.rpc("tempo_por_estado", { p_loja_ids: lojas, p_dias: 60 }),
+  ]);
   const r = (data as Record<string, unknown>) || {};
   const dias = (r.proximos_dias as { dia: string; valor: number; pedidos: number }[]) || [];
-  const porUf = (r.por_uf as { uf: string; dias: number; amostra: number }[]) || [];
+
+  // Tempo de ENTREGA por estado (entregue − pedido), janela uniforme de 60 dias.
   const BR_UFS = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
-  const ufMap = new Map(porUf.map((u) => [u.uf, u]));
-  const ufComDados = [...porUf].filter((u) => u.uf !== "—").sort((a, b) => n(a.dias) - n(b.dias));
-  const ufSemDados = BR_UFS.filter((uf) => !ufMap.has(uf));
+  const tempoEstado = (tempoRaw as { uf: string; media_dias: number; amostra: number }[]) || [];
+  const teMap = new Map(tempoEstado.map((u) => [u.uf, u]));
+  const teComDados = [...tempoEstado].sort((a, b) => n(a.media_dias) - n(b.media_dias));
+  const teSemDados = BR_UFS.filter((uf) => !teMap.has(uf));
+
+  // Estado do gráfico de evolução: o escolhido (?ufTend) ou o de maior amostra.
+  const porAmostra = [...tempoEstado].sort((a, b) => n(b.amostra) - n(a.amostra)).map((u) => u.uf);
+  const ufSel = ufTend && teMap.has(ufTend) ? ufTend : porAmostra[0] || "";
+  const { data: evoRaw } = ufSel
+    ? await supabase.rpc("evolucao_entrega", { p_loja_ids: lojas, p_uf: ufSel, p_semanas: 12 })
+    : { data: [] };
+  const evo = (evoRaw as { semana: string; media_dias: number; amostra: number }[]) || [];
+  const maxEvo = Math.max(1, ...evo.map((e) => n(e.media_dias)));
+
   const maxV = Math.max(1, ...dias.map((d) => n(d.valor)));
   const lim7 = addDiasBRT(7);
   const prox7 = dias.filter((d) => d.dia < lim7).reduce((t, d) => t + n(d.valor), 0);
@@ -980,35 +996,70 @@ async function Previsao({ lojas }: { lojas: string[] | null }) {
         )}
       </div>
 
+      {/* Tempo de entrega por estado (janela uniforme) */}
       <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-6">
-        <h2 className="mb-1 text-xl font-bold">Tempo de recebimento por estado</h2>
+        <h2 className="mb-1 text-xl font-bold">Tempo de entrega por estado</h2>
         <p className="mb-4 text-xs text-slate-500">
-          Dias médios do pedido até o dinheiro cair, por UF (do mais rápido ao mais lento). Todos os 27 estados —
-          os que ainda não têm amostra aparecem apagados.
+          Dias médios do pedido até a entrega, por UF (do mais rápido ao mais lento), nos <b>últimos 60 dias</b> —
+          janela uniforme pra comparação justa. Todos os 27 estados; os sem amostra aparecem apagados.
         </p>
-        {ufComDados.length > 0 && (
+        {teComDados.length === 0 ? (
+          <p className="text-slate-400">Ainda enchendo a base de região (o rastreio está sincronizando) — volte em breve.</p>
+        ) : (
           <div className="mb-4 flex flex-wrap gap-2">
-            {ufComDados.map((u) => (
+            {teComDados.map((u) => (
               <span key={u.uf} className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm">
-                <b>{u.uf}</b> · <span className="text-emerald-300">{u.dias}d</span>{" "}
+                <b>{u.uf}</b> · <span className="text-emerald-300">{u.media_dias}d</span>{" "}
                 <span className="text-slate-500">({int(u.amostra)})</span>
               </span>
             ))}
           </div>
         )}
-        {ufSemDados.length > 0 && (
+        {teSemDados.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
-            {ufSemDados.map((uf) => (
-              <span key={uf} className="rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-600">
-                {uf}
-              </span>
+            {teSemDados.map((uf) => (
+              <span key={uf} className="rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-600">{uf}</span>
             ))}
           </div>
         )}
-        <p className="mt-3 text-xs text-slate-500">
-          Vai ficando mais preciso conforme a base de cada estado enche. Estados sem amostra usam a média geral na previsão.
-        </p>
       </div>
+
+      {/* Evolução do tempo de entrega por estado */}
+      {ufSel && (
+        <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-6">
+          <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-xl font-bold">Evolução da entrega no tempo</h2>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-400">Estado:</span>
+              <SeletorEstado estados={porAmostra} atual={ufSel} baseUrl={`/financas?aba=previsao${sufixo}`} />
+            </div>
+          </div>
+          <p className="mb-5 text-xs text-slate-500">
+            Média de dias até a entrega em <b>{ufSel}</b>, por semana. Barra <b>menor = mais rápido</b> — dá pra ver se
+            a logística vem melhorando ou piorando.
+          </p>
+          {evo.length === 0 ? (
+            <p className="text-slate-400">Sem dados suficientes pra {ufSel} ainda.</p>
+          ) : (
+            <div className="space-y-2">
+              {evo.map((e) => (
+                <div key={e.semana} className="flex items-center gap-3">
+                  <span className="w-24 shrink-0 text-sm text-slate-400">{diaLabel(e.semana)}</span>
+                  <div className="h-6 flex-1 overflow-hidden rounded-md bg-slate-800">
+                    <div
+                      className="flex h-full items-center justify-end rounded-md bg-blue-600 pr-2 text-xs font-semibold text-white"
+                      style={{ width: `${Math.max(10, (n(e.media_dias) / maxEvo) * 100)}%` }}
+                    >
+                      {e.media_dias}d
+                    </div>
+                  </div>
+                  <span className="w-16 shrink-0 text-right text-xs text-slate-500">{int(e.amostra)} ped.</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
