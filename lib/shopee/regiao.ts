@@ -84,19 +84,29 @@ async function buscarDatas(token: TokenLoja, orderSn: string) {
     data?.response?.tracking_info || [];
   let enviado: number | null = null;
   let entregue: number | null = null;
+  // UF de destino: as descrições trazem "cidade - UF" (ex.: "último centro
+  // logístico: Curitiba - PR"). Os eventos vêm do mais recente ao mais antigo,
+  // então o 1º "- UF" é o hub mais próximo da entrega = estado do comprador.
+  let uf: string | null = null;
   for (const e of eventos) {
     const st = (e.logistics_status || "").toUpperCase();
-    const d = (e.description || "").toLowerCase();
+    const desc = e.description || "";
+    const d = desc.toLowerCase();
     if (!enviado && (st.includes("PICKED_UP") || d.includes("coletado") || d.includes("postado"))) {
       enviado = e.update_time ?? null;
     }
     if (st.includes("DELIVERED") || d.includes("entregue")) {
       entregue = e.update_time ?? null;
     }
+    if (!uf) {
+      const m = desc.match(/[-–]\s*([A-Z]{2})\s*$/);
+      if (m && UFS.has(m[1])) uf = m[1];
+    }
   }
   return {
     enviado_em: enviado ? new Date(enviado * 1000).toISOString() : null,
     entregue_em: entregue ? new Date(entregue * 1000).toISOString() : null,
+    uf,
   };
 }
 
@@ -137,22 +147,17 @@ export async function enriquecerRegiaoLoja({
   let comUf = 0;
   for (const p of pedidos) {
     try {
-      // As duas chamadas são independentes (endpoints diferentes) — em paralelo.
-      const [{ uf, hub }, datas] = await Promise.all([
-        buscarRegiao(token, p.pedido_externo_id),
-        buscarDatas(token, p.pedido_externo_id),
-      ]);
-      // Só grava o que achou — re-try que falhar não apaga uf/hub/datas já
-      // preenchidos (só marca regiao_atualizada_em pra ir pro fim da fila).
+      // UF + datas do rastreio (get_tracking_info) numa chamada só — cobre bem
+      // mais que o sort_code do documento de envio (que falhava ~84%).
+      const datas = await buscarDatas(token, p.pedido_externo_id);
+      // Só grava o que achou — re-try que falhar não apaga o que já existe
+      // (só marca regiao_atualizada_em pra ir pro fim da fila).
       const payload: Record<string, unknown> = { regiao_atualizada_em: new Date().toISOString() };
-      if (uf) {
-        payload.uf = uf;
-        payload.hub_regiao = hub;
-      }
+      if (datas.uf) payload.uf = datas.uf;
       if (datas.enviado_em) payload.enviado_em = datas.enviado_em;
       if (datas.entregue_em) payload.entregue_em = datas.entregue_em;
       await supabase.from("pedidos").update(payload).eq("id", p.id);
-      if (uf) comUf++;
+      if (datas.uf) comUf++;
     } catch {
       // pula este pedido; tenta na próxima rodada
     }
