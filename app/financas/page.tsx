@@ -50,7 +50,6 @@ const ABAS = [
   { k: "conciliacao", r: "🧮 Conciliação & Taxas" },
   { k: "previsao", r: "📅 Previsão" },
   { k: "carteira", r: "👛 Carteira" },
-  { k: "ads", r: "📢 Ads" },
   { k: "produtos", r: "🏷️ Produtos & Margem" },
   { k: "impostos", r: "🧾 Impostos" },
 ];
@@ -140,7 +139,6 @@ export default async function FinancasPage({ searchParams }: Props) {
         {(aba === "conciliacao" || aba === "divergencias") && <Conciliacao lojas={lojas} periodo={periodo} />}
         {aba === "previsao" && <Previsao lojas={lojas} ufTend={params.ufTend} sufixo={sufixo} />}
         {aba === "carteira" && <Carteira lojas={lojas} />}
-        {aba === "ads" && <Ads lojas={lojas} />}
         {(aba === "produtos" || aba === "variacoes") && (
           <Produtos lojas={lojas} pagina={Math.max(0, Number(params.pMargem) || 0)} sufixo={sufixo} />
         )}

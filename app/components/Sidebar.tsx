@@ -27,6 +27,7 @@ const grupos: Grupo[] = [
   {
     titulo: "Marketing",
     itens: [
+      { name: "📊 Ads", href: "/ads" },
       { name: "🔬 Raio-X do Anúncio", href: "/raio-x" },
       { name: "Insights (planilhas)", href: "/insights" },
     ],
