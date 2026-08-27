@@ -57,8 +57,8 @@
       "schedule": "0 * * * *"
     },
     {
-      "path": "/api/shopee/pedidos/resync-status?limite=150",
-      "schedule": "35 * * * *"
+      "path": "/api/shopee/pedidos/resync-status?limite=200",
+      "schedule": "0 * * * *"
     }
   ]
 }

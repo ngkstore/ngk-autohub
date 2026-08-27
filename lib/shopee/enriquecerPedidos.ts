@@ -289,12 +289,13 @@ export async function enriquecerPedidosPendentes({
     .eq("marketplace", "shopee")
     .not("pedido_externo_id", "like", "SH-%");
   if (resync) {
-    // Menos-recentemente-checado primeiro: cada rodada avança na fila e cobre
-    // todo o backlog num ciclo, sem re-martelar os pedidos mortos (que ficam
-    // UNPAID pra sempre). Ao re-checar, atualizado_em sobe -> vão pro fim.
-    query = query.eq("status", "UNPAID").order("atualizado_em", {
-      ascending: true,
-      nullsFirst: true,
+    // Recentes primeiro: os pagamentos caem nos pedidos dos últimos ~2 dias
+    // (boleto/pix), então re-checar os mais novos pega os que viraram pago
+    // rápido. Os UNPAID antigos (>2 dias) são abandonados — não precisam de
+    // re-checagem. (O backlog histórico já foi limpo.)
+    query = query.eq("status", "UNPAID").order("data_pedido", {
+      ascending: false,
+      nullsFirst: false,
     });
   } else {
     query = query.is("data_pedido", null);
