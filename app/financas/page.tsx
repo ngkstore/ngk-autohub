@@ -360,14 +360,16 @@ async function Divergencias({ lojas, periodo }: { lojas: string[] | null; period
 
 // ---------------- CARTEIRA ----------------
 async function Carteira({ lojas }: { lojas: string[] | null }) {
-  const [{ data: saldosRaw }, { data: movRaw }, { data: heatRaw }] = await Promise.all([
+  const [{ data: saldosRaw }, { data: movRaw }, { data: saqueRaw }, { data: heatRaw }] = await Promise.all([
     supabase.rpc("carteira_saldos", { p_loja_ids: lojas }),
     supabase.rpc("carteira_movimento_dia", { p_loja_ids: lojas, p_dias: 60 }),
+    supabase.rpc("carteira_saque_dia", { p_loja_ids: lojas, p_dias: 30 }),
     supabase.rpc("carteira_entrada_heatmap", { p_loja_ids: lojas, p_dias: 60 }),
   ]);
   const carteiras =
     (saldosRaw as { loja_id: string; nome: string; saldo: number; atualizado_em: string }[]) || [];
   const mov = (movRaw as { dow: number; entrou: number; saiu: number }[]) || [];
+  const saques = (saqueRaw as { dow: number; saque_medio: number; pct: number; n_dias: number }[]) || [];
   const cells = (heatRaw as { dow: number; hora: number; total: number; qtd: number }[]) || [];
   const totalGeral = carteiras.reduce((s, c) => s + n(c.saldo), 0);
 
@@ -383,6 +385,21 @@ async function Carteira({ lojas }: { lojas: string[] | null }) {
   }
   const maxAbs = Math.max(1, ...entrouDia, ...saiuDia);
   const temMov = mov.length > 0;
+
+  // Saque por dia da semana: média por dia típico + % do total.
+  const saquePorDia = new Array(7).fill(0);
+  const saquePct = new Array(7).fill(0);
+  let saqueTotal = 0;
+  let diasTotal = 0;
+  for (const s of saques) {
+    saquePorDia[s.dow] = n(s.saque_medio);
+    saquePct[s.dow] = n(s.pct);
+    saqueTotal += n(s.saque_medio) * n(s.n_dias);
+    diasTotal += n(s.n_dias);
+  }
+  const saqueMedioDia = diasTotal > 0 ? saqueTotal / diasTotal : 0;
+  const maxSaque = Math.max(1, ...saquePorDia);
+  const temSaque = saqueTotal > 0;
 
   // Horário em que as vendas caem (renda) por hora do dia.
   const perHour = new Array(24).fill(0);
@@ -474,6 +491,42 @@ async function Carteira({ lojas }: { lojas: string[] | null }) {
           <span>· o valor à direita é o líquido médio do dia</span>
         </div>
       </div>
+
+      {/* Quanto você saca por dia da semana */}
+      {temSaque && (
+        <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-6">
+          <div className="mb-1 flex items-baseline justify-between gap-3">
+            <h2 className="text-xl font-bold">Quanto você saca por dia</h2>
+            <span className="text-sm text-slate-400">
+              média <b className="text-red-300">{brl(saqueMedioDia)}</b>/dia
+            </span>
+          </div>
+          <p className="mb-5 text-xs text-slate-500">
+            Média do que sai pra sua conta (saque + PIX) em cada dia da semana, e o % do total de saques
+            (base: últimos 30 dias).
+          </p>
+          <div className="space-y-2">
+            {diasOrd.map((d) => (
+              <div key={d} className="flex items-center gap-3">
+                <span className="w-10 shrink-0 text-sm text-slate-400">{diasLbl[d]}</span>
+                <div className="h-6 flex-1 overflow-hidden rounded-md bg-slate-800">
+                  <div
+                    className="flex h-full items-center justify-end rounded-md bg-red-500/75 pr-2"
+                    style={{ width: `${saquePorDia[d] > 0 ? Math.max(8, (saquePorDia[d] / maxSaque) * 100) : 0}%` }}
+                  >
+                    {saquePct[d] > 0 && (
+                      <span className="text-[11px] font-semibold text-white">{saquePct[d].toFixed(0)}%</span>
+                    )}
+                  </div>
+                </div>
+                <span className="w-28 shrink-0 text-right text-sm tabular-nums text-slate-200">
+                  {brl(saquePorDia[d])}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Horário em que as vendas caem (por hora) */}
       {temHora && (

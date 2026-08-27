@@ -50,6 +50,38 @@ language sql stable as $$
 $$;
 grant execute on function carteira_movimento_dia(uuid[], int) to anon, authenticated;
 
+-- Saque por dia da semana: quanto (R$ médio num dia típico) e que % do total
+-- de saques cai em cada dia. Saque = dinheiro que sai pra conta do vendedor
+-- (categoria 'saque' + os "PIX Transfer Send", que hoje estão como 'outro').
+create or replace function carteira_saque_dia(p_loja_ids uuid[] default null, p_dias int default 30)
+returns table(dow int, saque_medio numeric, pct numeric, n_dias int)
+language sql stable as $$
+  with cal as (
+    select extract(dow from d)::int as dow, count(*)::numeric as n
+    from generate_series(
+      ((now() - (p_dias || ' days')::interval) at time zone 'America/Sao_Paulo')::date,
+      (now() at time zone 'America/Sao_Paulo')::date, interval '1 day') d
+    group by 1
+  ),
+  saques as (
+    select extract(dow from criado_em at time zone 'America/Sao_Paulo')::int as dow,
+           sum(abs(valor)) as total
+    from carteira_transacoes
+    where valor < 0
+      and (categoria = 'saque' or descricao ilike 'PIX Transfer%')
+      and criado_em >= now() - (p_dias || ' days')::interval
+      and (p_loja_ids is null or loja_id = any(p_loja_ids))
+    group by 1
+  ),
+  tot as (select coalesce(sum(total), 0) as t from saques)
+  select c.dow,
+    round(coalesce(s.total, 0) / greatest(c.n, 1), 2) as saque_medio,
+    round(case when tot.t > 0 then 100 * coalesce(s.total, 0) / tot.t else 0 end, 1) as pct,
+    c.n::int as n_dias
+  from cal c cross join tot left join saques s on s.dow = c.dow;
+$$;
+grant execute on function carteira_saque_dia(uuid[], int) to anon, authenticated;
+
 -- Heatmap das ENTRADAS (renda) por dia-da-semana (0=Dom..6=Sáb) × hora (BRT),
 -- nos últimos p_dias. Cada célula: total em R$ e quantidade.
 create or replace function carteira_entrada_heatmap(p_loja_ids uuid[] default null, p_dias int default 60)
