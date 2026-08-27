@@ -23,7 +23,9 @@ function assinar(pid: string, path: string, ts: number, token: string, shopId: s
 
 export async function GET(request: NextRequest) {
   const escopo = await escopoDoUsuario();
-  if (!escopo.admin) {
+  const auth = request.headers.get("authorization");
+  const viaCron = !!process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`;
+  if (!viaCron && !escopo.admin) {
     return NextResponse.json({ sucesso: false, erro: "Só o administrador pode sondar." }, { status: 403 });
   }
 
@@ -34,7 +36,7 @@ export async function GET(request: NextRequest) {
   }
 
   const lojaParam = request.nextUrl.searchParams.get("loja");
-  if (lojaParam && !podeVerLoja(escopo, lojaParam)) {
+  if (!viaCron && lojaParam && !podeVerLoja(escopo, lojaParam)) {
     return NextResponse.json({ sucesso: false, erro: "Loja fora da sua conta." }, { status: 403 });
   }
 
