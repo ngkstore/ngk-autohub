@@ -934,6 +934,10 @@ async function Previsao({ lojas }: { lojas: string[] | null }) {
   const r = (data as Record<string, unknown>) || {};
   const dias = (r.proximos_dias as { dia: string; valor: number; pedidos: number }[]) || [];
   const porUf = (r.por_uf as { uf: string; dias: number; amostra: number }[]) || [];
+  const BR_UFS = ["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"];
+  const ufMap = new Map(porUf.map((u) => [u.uf, u]));
+  const ufComDados = [...porUf].filter((u) => u.uf !== "—").sort((a, b) => n(a.dias) - n(b.dias));
+  const ufSemDados = BR_UFS.filter((uf) => !ufMap.has(uf));
   const maxV = Math.max(1, ...dias.map((d) => n(d.valor)));
   const lim7 = addDiasBRT(7);
   const prox7 = dias.filter((d) => d.dia < lim7).reduce((t, d) => t + n(d.valor), 0);
@@ -943,8 +947,8 @@ async function Previsao({ lojas }: { lojas: string[] | null }) {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Kpi label="A receber (total)" val={brl(n(r.total_a_receber))} hint={`${n(r.qtd_a_receber)} pedido(s) em aberto`} cor="text-blue-300" />
         <Kpi label="Próximos 7 dias" val={brl(prox7)} hint="previsto cair na carteira" cor="text-emerald-300" />
-        <Kpi label="Tempo médio" val={`${n(r.media_geral_dias)} dias`} hint={`base: ${n(r.base_amostra)} pedidos já recebidos`} />
-        <Kpi label="Atrasado" val={brl(n(r.atrasado_valor))} hint={`${n(r.atrasado_pedidos)} pedido(s) passaram da média`} cor="text-orange-300" />
+        <Kpi label="Tempo médio" val={`${n(r.media_geral_dias)} dias`} hint={`90% cai em até ${n(r.p90_dias)}d · base ${int(n(r.base_amostra))}`} />
+        <Kpi label="Atrasado" val={brl(n(r.atrasado_valor))} hint={`${int(n(r.atrasado_pedidos))} pedido(s) passaram de ${n(r.p90_dias)} dias sem cair`} cor="text-orange-300" />
       </div>
 
       <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6">
@@ -976,19 +980,35 @@ async function Previsao({ lojas }: { lojas: string[] | null }) {
         )}
       </div>
 
-      {porUf.length > 0 && (
-        <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-6">
-          <h2 className="mb-4 text-xl font-bold">Tempo médio de recebimento por região</h2>
-          <div className="flex flex-wrap gap-2">
-            {porUf.map((u) => (
-              <span key={u.uf} className="rounded-lg bg-slate-800 px-3 py-2 text-sm">
-                <b>{u.uf}</b> · {u.dias} dias <span className="text-slate-500">({u.amostra} amostra)</span>
+      <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-6">
+        <h2 className="mb-1 text-xl font-bold">Tempo de recebimento por estado</h2>
+        <p className="mb-4 text-xs text-slate-500">
+          Dias médios do pedido até o dinheiro cair, por UF (do mais rápido ao mais lento). Todos os 27 estados —
+          os que ainda não têm amostra aparecem apagados.
+        </p>
+        {ufComDados.length > 0 && (
+          <div className="mb-4 flex flex-wrap gap-2">
+            {ufComDados.map((u) => (
+              <span key={u.uf} className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm">
+                <b>{u.uf}</b> · <span className="text-emerald-300">{u.dias}d</span>{" "}
+                <span className="text-slate-500">({int(u.amostra)})</span>
               </span>
             ))}
           </div>
-          <p className="mt-3 text-xs text-slate-500">Vai ficando mais preciso conforme a base de região enche.</p>
-        </div>
-      )}
+        )}
+        {ufSemDados.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {ufSemDados.map((uf) => (
+              <span key={uf} className="rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-600">
+                {uf}
+              </span>
+            ))}
+          </div>
+        )}
+        <p className="mt-3 text-xs text-slate-500">
+          Vai ficando mais preciso conforme a base de cada estado enche. Estados sem amostra usam a média geral na previsão.
+        </p>
+      </div>
     </div>
   );
 }
