@@ -17,6 +17,23 @@ language sql stable as $$
 $$;
 grant execute on function carteira_saldos(uuid[]) to anon, authenticated;
 
+-- Movimento LÍQUIDO por dia da semana: tudo que entrou (valor>0: vendas +
+-- antecipação) e tudo que saiu (valor<0: saques/PIX + ads + reembolsos).
+-- O líquido = entrou + saiu (saiu já é negativo).
+create or replace function carteira_movimento_dia(p_loja_ids uuid[] default null, p_dias int default 60)
+returns table(dow int, entrou numeric, saiu numeric)
+language sql stable as $$
+  select
+    extract(dow from criado_em at time zone 'America/Sao_Paulo')::int as dow,
+    coalesce(sum(valor) filter (where valor > 0), 0) as entrou,
+    coalesce(sum(valor) filter (where valor < 0), 0) as saiu
+  from carteira_transacoes
+  where criado_em >= now() - (p_dias || ' days')::interval
+    and (p_loja_ids is null or loja_id = any(p_loja_ids))
+  group by 1;
+$$;
+grant execute on function carteira_movimento_dia(uuid[], int) to anon, authenticated;
+
 -- Heatmap das ENTRADAS (renda) por dia-da-semana (0=Dom..6=Sáb) × hora (BRT),
 -- nos últimos p_dias. Cada célula: total em R$ e quantidade.
 create or replace function carteira_entrada_heatmap(p_loja_ids uuid[] default null, p_dias int default 60)

@@ -360,30 +360,36 @@ async function Divergencias({ lojas, periodo }: { lojas: string[] | null; period
 
 // ---------------- CARTEIRA ----------------
 async function Carteira({ lojas }: { lojas: string[] | null }) {
-  const [{ data: saldosRaw }, { data: heatRaw }] = await Promise.all([
+  const [{ data: saldosRaw }, { data: movRaw }, { data: heatRaw }] = await Promise.all([
     supabase.rpc("carteira_saldos", { p_loja_ids: lojas }),
+    supabase.rpc("carteira_movimento_dia", { p_loja_ids: lojas, p_dias: 60 }),
     supabase.rpc("carteira_entrada_heatmap", { p_loja_ids: lojas, p_dias: 60 }),
   ]);
   const carteiras =
     (saldosRaw as { loja_id: string; nome: string; saldo: number; atualizado_em: string }[]) || [];
+  const mov = (movRaw as { dow: number; entrou: number; saiu: number }[]) || [];
   const cells = (heatRaw as { dow: number; hora: number; total: number; qtd: number }[]) || [];
   const totalGeral = carteiras.reduce((s, c) => s + n(c.saldo), 0);
 
-  // Agrega por dia da semana e por hora (a partir das células dow×hora).
   const diasLbl: Record<number, string> = { 0: "Dom", 1: "Seg", 2: "Ter", 3: "Qua", 4: "Qui", 5: "Sex", 6: "Sáb" };
   const diasOrd = [1, 2, 3, 4, 5, 6, 0]; // segunda-primeiro
-  const perDay = new Array(7).fill(0);
-  const perDayQtd = new Array(7).fill(0);
-  const perHour = new Array(24).fill(0);
-  for (const c of cells) {
-    perDay[c.dow] += n(c.total);
-    perDayQtd[c.dow] += n(c.qtd);
-    perHour[c.hora] += n(c.total);
+
+  // Movimento líquido por dia: entrou (valor>0) e saiu (|valor<0|).
+  const entrouDia = new Array(7).fill(0);
+  const saiuDia = new Array(7).fill(0);
+  for (const m of mov) {
+    entrouDia[m.dow] = n(m.entrou);
+    saiuDia[m.dow] = Math.abs(n(m.saiu));
   }
-  const maxDay = Math.max(1, ...perDay);
+  const maxAbs = Math.max(1, ...entrouDia, ...saiuDia);
+  const temMov = mov.length > 0;
+
+  // Horário em que as vendas caem (renda) por hora do dia.
+  const perHour = new Array(24).fill(0);
+  for (const c of cells) perHour[c.hora] += n(c.total);
   const maxHour = Math.max(1, ...perHour);
-  const temDados = cells.length > 0;
-  const horaPico = temDados ? perHour.indexOf(Math.max(...perHour)) : null;
+  const temHora = cells.length > 0;
+  const horaPico = temHora ? perHour.indexOf(Math.max(...perHour)) : null;
   const horas = Array.from({ length: 24 }, (_, h) => h);
 
   return (
@@ -413,47 +419,72 @@ async function Carteira({ lojas }: { lojas: string[] | null }) {
         )}
       </div>
 
-      {/* Recebimento por dia da semana */}
+      {/* Movimento líquido por dia da semana */}
       <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-        <h2 className="mb-1 text-xl font-bold">Recebimento por dia da semana</h2>
+        <h2 className="mb-1 text-xl font-bold">Movimento por dia da semana</h2>
         <p className="mb-5 text-xs text-slate-500">
-          Quanto a Shopee credita em cada dia (últimos 60 dias). A Shopee <b>não credita no fim de semana</b> —
-          o acúmulo de sábado e domingo cai na <b>segunda</b>, por isso ela aparece bem maior.
+          Tudo que <span className="text-emerald-300">entrou</span> (vendas + antecipação) menos tudo que{" "}
+          <span className="text-red-300">saiu</span> (saques/PIX + ads + reembolsos), últimos 60 dias. A Shopee
+          não credita vendas no fim de semana, então o acúmulo cai na <b>segunda</b>.
         </p>
-        {!temDados ? (
-          <p className="text-slate-400">Sem entradas no período. Rode a sincronização da carteira.</p>
+        {!temMov ? (
+          <p className="text-slate-400">Sem movimento no período. Rode a sincronização da carteira.</p>
         ) : (
           <div className="space-y-2">
-            {diasOrd.map((d) => (
-              <div key={d} className="flex items-center gap-3">
-                <span className="w-10 shrink-0 text-sm text-slate-400">{diasLbl[d]}</span>
-                <div className="h-6 flex-1 overflow-hidden rounded-md bg-slate-800">
-                  <div
-                    className="h-full rounded-md bg-emerald-600"
-                    style={{ width: `${(perDay[d] / maxDay) * 100}%` }}
-                  />
+            {diasOrd.map((d) => {
+              const ent = entrouDia[d];
+              const sai = saiuDia[d];
+              const liq = ent - sai;
+              return (
+                <div key={d} className="flex items-center gap-3">
+                  <span className="w-10 shrink-0 text-sm text-slate-400">{diasLbl[d]}</span>
+                  <div className="flex flex-1 items-center">
+                    <div className="flex w-1/2 justify-end">
+                      <div
+                        className="h-5 rounded-l-md bg-red-500/80"
+                        style={{ width: `${(sai / maxAbs) * 100}%` }}
+                        title={`Saiu: ${brl(sai)}`}
+                      />
+                    </div>
+                    <div className="h-6 w-px bg-slate-600" />
+                    <div className="flex w-1/2 justify-start">
+                      <div
+                        className="h-5 rounded-r-md bg-emerald-500/85"
+                        style={{ width: `${(ent / maxAbs) * 100}%` }}
+                        title={`Entrou: ${brl(ent)}`}
+                      />
+                    </div>
+                  </div>
+                  <span
+                    className={`w-28 shrink-0 text-right text-sm tabular-nums ${liq >= 0 ? "text-emerald-300" : "text-red-300"}`}
+                  >
+                    {liq >= 0 ? "+ " : "− "}
+                    {brl(Math.abs(liq))}
+                  </span>
                 </div>
-                <span className="w-28 shrink-0 text-right text-sm tabular-nums text-slate-200">
-                  {brl(perDay[d])}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
+        <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+          <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-500/85" /> entrou</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-red-500/80" /> saiu</span>
+          <span>· o valor à direita é o líquido do dia</span>
+        </div>
       </div>
 
-      {/* Recebimento por hora do dia */}
-      {temDados && (
+      {/* Horário em que as vendas caem (por hora) */}
+      {temHora && (
         <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-6">
           <div className="mb-1 flex items-baseline justify-between gap-3">
-            <h2 className="text-xl font-bold">Recebimento por hora</h2>
+            <h2 className="text-xl font-bold">Horário em que as vendas caem</h2>
             {horaPico != null && (
               <span className="text-sm text-slate-400">
                 pico às <b className="text-emerald-300">{horaPico}h</b>
               </span>
             )}
           </div>
-          <p className="mb-5 text-xs text-slate-500">Concentração das entradas ao longo do dia (soma dos 60 dias).</p>
+          <p className="mb-5 text-xs text-slate-500">Que horas a Shopee credita as vendas (renda), soma dos 60 dias.</p>
           <div className="overflow-x-auto">
             <div className="min-w-[560px]">
               <div className="flex h-28 items-end gap-[3px]">
