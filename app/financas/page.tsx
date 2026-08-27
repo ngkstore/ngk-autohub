@@ -360,46 +360,107 @@ async function Divergencias({ lojas, periodo }: { lojas: string[] | null; period
 
 // ---------------- CARTEIRA ----------------
 async function Carteira({ lojas }: { lojas: string[] | null }) {
-  let q = supabase
-    .from("carteira_transacoes")
-    .select("criado_em, descricao, order_sn, categoria, valor, saldo, money_flow")
-    .order("criado_em", { ascending: false })
-    .limit(60);
-  if (lojas) q = q.in("loja_id", lojas);
-  const { data } = await q;
-  const txs = (data as Record<string, unknown>[]) || [];
-  const saldo = txs.length > 0 ? n(txs[0].saldo) : null;
+  const [{ data: saldosRaw }, { data: heatRaw }] = await Promise.all([
+    supabase.rpc("carteira_saldos", { p_loja_ids: lojas }),
+    supabase.rpc("carteira_entrada_heatmap", { p_loja_ids: lojas, p_dias: 60 }),
+  ]);
+  const carteiras =
+    (saldosRaw as { loja_id: string; nome: string; saldo: number; atualizado_em: string }[]) || [];
+  const cells = (heatRaw as { dow: number; hora: number; total: number; qtd: number }[]) || [];
+  const totalGeral = carteiras.reduce((s, c) => s + n(c.saldo), 0);
+
+  // Monta a grade dia×hora e acha o pico.
+  const grid = new Map<string, number>();
+  const porHora = new Array(24).fill(0);
+  let maxCell = 0;
+  for (const c of cells) {
+    const v = n(c.total);
+    grid.set(`${c.dow}-${c.hora}`, v);
+    porHora[c.hora] += v;
+    if (v > maxCell) maxCell = v;
+  }
+  const horaPico = porHora.some((v) => v > 0) ? porHora.indexOf(Math.max(...porHora)) : null;
+  const diasOrd = [1, 2, 3, 4, 5, 6, 0]; // segunda-primeiro
+  const diasLbl: Record<number, string> = { 0: "Dom", 1: "Seg", 2: "Ter", 3: "Qua", 4: "Qui", 5: "Sex", 6: "Sáb" };
+  const horas = Array.from({ length: 24 }, (_, h) => h);
 
   return (
     <div>
-      {saldo != null && (
-        <div className="mb-6 inline-block rounded-2xl border border-emerald-700 bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Saldo atual da carteira</p>
-          <p className="mt-1 text-3xl font-bold text-emerald-300">{brl(saldo)}</p>
+      {/* Saldo por carteira (uma por loja) */}
+      <div className="mb-8">
+        <div className="mb-3 flex items-baseline justify-between gap-3">
+          <h2 className="text-xl font-bold">Saldo por carteira</h2>
+          {carteiras.length > 1 && (
+            <span className="text-sm text-slate-400">
+              Total: <b className="text-emerald-300">{brl(totalGeral)}</b>
+            </span>
+          )}
         </div>
-      )}
-      <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-800 text-xs uppercase text-slate-400">
-            <tr><th className="p-3">Data</th><th className="p-3">Descrição</th><th className="p-3">Pedido</th><th className="p-3">Tipo</th><th className="p-3 text-right">Valor</th><th className="p-3 text-right">Saldo</th></tr>
-          </thead>
-          <tbody>
-            {txs.length === 0 ? (
-              <tr><td className="p-4 text-slate-400" colSpan={6}>Sem movimentos ainda. Rode a sincronização da carteira.</td></tr>
-            ) : txs.map((t, i) => (
-              <tr key={i} className="border-t border-slate-800">
-                <td className="p-3 text-slate-400">{dt(t.criado_em as string)}</td>
-                <td className="p-3 text-slate-300">{String(t.descricao || "—")}</td>
-                <td className="p-3 font-mono text-xs">{String(t.order_sn || "—")}</td>
-                <td className="p-3"><span className="text-slate-400">{String(t.categoria)}</span></td>
-                <td className={`p-3 text-right ${n(t.valor) < 0 ? "text-red-300" : "text-emerald-300"}`}>
-                  {n(t.valor) < 0 ? `− ${brl(Math.abs(n(t.valor)))}` : `+ ${brl(n(t.valor))}`}
-                </td>
-                <td className="p-3 text-right">{brl(n(t.saldo))}</td>
-              </tr>
+        {carteiras.length === 0 ? (
+          <p className="text-slate-400">Sem carteira sincronizada ainda. Rode a sincronização da carteira.</p>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {carteiras.map((c) => (
+              <div key={c.loja_id} className="rounded-2xl border border-emerald-800 bg-slate-900 p-5">
+                <p className="text-sm text-slate-400">👛 {c.nome}</p>
+                <p className="mt-1 text-3xl font-bold text-emerald-300">{brl(n(c.saldo))}</p>
+                <p className="mt-1 text-xs text-slate-500">atualizado {dt(c.atualizado_em)}</p>
+              </div>
             ))}
-          </tbody>
-        </table>
+          </div>
+        )}
+      </div>
+
+      {/* Heatmap: quando o dinheiro entra */}
+      <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
+        <div className="mb-1 flex items-baseline justify-between gap-3">
+          <h2 className="text-xl font-bold">Quando o dinheiro entra</h2>
+          {horaPico != null && (
+            <span className="text-sm text-slate-400">
+              pico às <b className="text-emerald-300">{horaPico}h</b>
+            </span>
+          )}
+        </div>
+        <p className="mb-5 text-xs text-slate-500">
+          Entradas na carteira por dia da semana × hora (últimos 60 dias). Mostra quando a Shopee te credita.
+        </p>
+        {maxCell === 0 ? (
+          <p className="text-slate-400">Sem entradas no período.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <div className="min-w-[620px]">
+              <div className="mb-1 flex items-center gap-1 pl-10">
+                {horas.map((h) => (
+                  <div key={h} className="w-5 text-center text-[9px] text-slate-500">
+                    {h % 3 === 0 ? h : ""}
+                  </div>
+                ))}
+              </div>
+              {diasOrd.map((d) => (
+                <div key={d} className="mb-1 flex items-center gap-1">
+                  <div className="w-9 shrink-0 pr-1 text-right text-[11px] text-slate-400">{diasLbl[d]}</div>
+                  {horas.map((h) => {
+                    const v = grid.get(`${d}-${h}`) || 0;
+                    const alpha = v > 0 ? (0.14 + 0.82 * Math.pow(v / maxCell, 0.6)).toFixed(3) : "0";
+                    return (
+                      <div
+                        key={h}
+                        title={v > 0 ? `${diasLbl[d]} ${h}h · ${brl(v)}` : `${diasLbl[d]} ${h}h · —`}
+                        className="h-5 w-5 shrink-0 rounded-[3px]"
+                        style={{
+                          backgroundColor: v > 0 ? `rgba(16,185,129,${alpha})` : "rgba(148,163,184,0.08)",
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        <p className="mt-4 text-xs text-slate-500">
+          Célula mais forte = mais dinheiro entrou naquele dia/hora. Passe o mouse pra ver o valor.
+        </p>
       </div>
     </div>
   );
