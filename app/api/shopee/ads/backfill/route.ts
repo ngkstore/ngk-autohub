@@ -12,19 +12,13 @@ export const maxDuration = 300;
 //   ?ate=YYYY-MM -> mês final   (padrão: mês atual)
 // Cada mês = 1 chamada na API, então é leve.
 
-function primeiroDia(ano: number, mes: number) {
-  return `${ano}-${String(mes).padStart(2, "0")}-01`;
-}
-function ultimoDia(ano: number, mes: number) {
-  const d = new Date(Date.UTC(ano, mes, 0)).getUTCDate(); // dia 0 do mês seguinte
-  return `${ano}-${String(mes).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-}
+const dia = (t: number) => new Date(t).toISOString().slice(0, 10);
 
 export async function GET(request: NextRequest) {
   const sp = request.nextUrl.searchParams;
   const loja = sp.get("loja");
-  const de = sp.get("de") || "2026-01";
-  const ate = sp.get("ate") || de; // se não passar 'ate', faz só o mês 'de'
+  const de = sp.get("de") || "2026-01"; // YYYY-MM inicial
+  const ate = sp.get("ate") || de; // YYYY-MM final (inclusive)
 
   const [ay, am] = de.split("-").map(Number);
   const [by, bm] = ate.split("-").map(Number);
@@ -32,14 +26,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ sucesso: false, erro: "de/ate devem ser YYYY-MM" }, { status: 400 });
   }
 
-  // Lista de meses [de..ate].
-  const meses: { ano: number; mes: number }[] = [];
-  let y = ay, m = am;
-  let guard = 0;
-  while ((y < by || (y === by && m <= bm)) && guard++ < 36) {
-    meses.push({ ano: y, mes: m });
-    m++;
-    if (m > 12) { m = 1; y++; }
+  // Janelas de 14 dias (a API do Ads recusa > ~1 mês; 14 é sempre seguro).
+  // Do 1º dia do mês 'de' ao último dia do mês 'ate'.
+  const inicio = Date.UTC(ay, am - 1, 1);
+  const fimTotal = Date.UTC(by, bm, 0); // dia 0 do mês seguinte = último dia de 'ate'
+  const PASSO = 14 * 864e5;
+  const janelas: { ini: string; fim: string }[] = [];
+  for (let t = inicio, guard = 0; t <= fimTotal && guard < 60; t += PASSO, guard++) {
+    janelas.push({ ini: dia(t), fim: dia(Math.min(t + 13 * 864e5, fimTotal)) });
   }
 
   let lojas = await listarLojasShopeeAtivas();
@@ -47,15 +41,11 @@ export async function GET(request: NextRequest) {
 
   const resultados: Record<string, unknown>[] = [];
   for (const l of lojas) {
-    for (const { ano, mes } of meses) {
-      const r = await sincronizarAdsLoja({
-        lojaId: l.lojaId,
-        ini: primeiroDia(ano, mes),
-        fim: ultimoDia(ano, mes),
-      });
-      resultados.push({ loja: l.lojaId, mes: `${ano}-${String(mes).padStart(2, "0")}`, ...r });
+    for (const j of janelas) {
+      const r = await sincronizarAdsLoja({ lojaId: l.lojaId, ini: j.ini, fim: j.fim });
+      resultados.push({ loja: l.lojaId, janela: `${j.ini}..${j.fim}`, ...r });
     }
   }
   const importados = resultados.reduce((t, r) => t + (Number(r.importados) || 0), 0);
-  return NextResponse.json({ sucesso: true, importados, meses: meses.length, lojas: lojas.length, resultados });
+  return NextResponse.json({ sucesso: true, importados, janelas: janelas.length, lojas: lojas.length, resultados });
 }
