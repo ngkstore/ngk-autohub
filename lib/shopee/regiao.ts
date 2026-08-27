@@ -144,23 +144,28 @@ export async function enriquecerRegiaoLoja({
 
   if (!pedidos || pedidos.length === 0) return { lojaId, processados: 0, comUf: 0 };
 
+  // Processa em lotes paralelos (backfill ~4x mais rápido, sem forçar rate limit).
   let comUf = 0;
-  for (const p of pedidos) {
-    try {
-      // UF + datas do rastreio (get_tracking_info) numa chamada só — cobre bem
-      // mais que o sort_code do documento de envio (que falhava ~84%).
-      const datas = await buscarDatas(token, p.pedido_externo_id);
-      // Só grava o que achou — re-try que falhar não apaga o que já existe
-      // (só marca regiao_atualizada_em pra ir pro fim da fila).
-      const payload: Record<string, unknown> = { regiao_atualizada_em: new Date().toISOString() };
-      if (datas.uf) payload.uf = datas.uf;
-      if (datas.enviado_em) payload.enviado_em = datas.enviado_em;
-      if (datas.entregue_em) payload.entregue_em = datas.entregue_em;
-      await supabase.from("pedidos").update(payload).eq("id", p.id);
-      if (datas.uf) comUf++;
-    } catch {
-      // pula este pedido; tenta na próxima rodada
-    }
+  const LOTE = 4;
+  for (let i = 0; i < pedidos.length; i += LOTE) {
+    await Promise.all(
+      pedidos.slice(i, i + LOTE).map(async (p) => {
+        try {
+          // UF + datas do rastreio (get_tracking_info) numa chamada só — cobre
+          // bem mais que o sort_code do documento de envio (que falhava ~84%).
+          const datas = await buscarDatas(token, p.pedido_externo_id);
+          // Só grava o que achou — re-try que falhar não apaga o que já existe.
+          const payload: Record<string, unknown> = { regiao_atualizada_em: new Date().toISOString() };
+          if (datas.uf) payload.uf = datas.uf;
+          if (datas.enviado_em) payload.enviado_em = datas.enviado_em;
+          if (datas.entregue_em) payload.entregue_em = datas.entregue_em;
+          await supabase.from("pedidos").update(payload).eq("id", p.id);
+          if (datas.uf) comUf++;
+        } catch {
+          // pula este pedido; tenta na próxima rodada
+        }
+      })
+    );
   }
 
   return { lojaId, processados: pedidos.length, comUf };
