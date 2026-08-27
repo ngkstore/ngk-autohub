@@ -421,11 +421,13 @@ async function Carteira({ lojas }: { lojas: string[] | null }) {
 
       {/* Movimento líquido por dia da semana */}
       <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-        <h2 className="mb-1 text-xl font-bold">Movimento por dia da semana</h2>
+        <h2 className="mb-1 text-xl font-bold">
+          Movimento por dia da semana <span className="text-sm font-normal text-slate-500">· média por dia</span>
+        </h2>
         <p className="mb-5 text-xs text-slate-500">
-          Tudo que <span className="text-emerald-300">entrou</span> (vendas + antecipação) menos tudo que{" "}
-          <span className="text-red-300">saiu</span> (saques/PIX + ads + reembolsos), últimos 60 dias. A Shopee
-          não credita vendas no fim de semana, então o acúmulo cai na <b>segunda</b>.
+          Média de um dia típico (base: últimos 60 dias). Tudo que <span className="text-emerald-300">entrou</span>{" "}
+          (vendas + antecipação) menos tudo que <span className="text-red-300">saiu</span> (saques/PIX + ads +
+          reembolsos). A Shopee não credita vendas no fim de semana, então o acúmulo cai na <b>segunda</b>.
         </p>
         {!temMov ? (
           <p className="text-slate-400">Sem movimento no período. Rode a sincronização da carteira.</p>
@@ -469,7 +471,7 @@ async function Carteira({ lojas }: { lojas: string[] | null }) {
         <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
           <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-500/85" /> entrou</span>
           <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-red-500/80" /> saiu</span>
-          <span>· o valor à direita é o líquido do dia</span>
+          <span>· o valor à direita é o líquido médio do dia</span>
         </div>
       </div>
 

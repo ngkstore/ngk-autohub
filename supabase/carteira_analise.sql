@@ -17,20 +17,36 @@ language sql stable as $$
 $$;
 grant execute on function carteira_saldos(uuid[]) to anon, authenticated;
 
--- Movimento LÍQUIDO por dia da semana: tudo que entrou (valor>0: vendas +
--- antecipação) e tudo que saiu (valor<0: saques/PIX + ads + reembolsos).
--- O líquido = entrou + saiu (saiu já é negativo).
+-- Movimento LÍQUIDO por dia da semana, como MÉDIA de um dia típico (não a
+-- soma do período — senão infla). entrou (valor>0: vendas + antecipação) e
+-- saiu (valor<0: saques/PIX + ads + reembolsos), divididos pelo nº de vezes
+-- que aquele dia-da-semana apareceu no período (calendário).
 create or replace function carteira_movimento_dia(p_loja_ids uuid[] default null, p_dias int default 60)
 returns table(dow int, entrou numeric, saiu numeric)
 language sql stable as $$
-  select
-    extract(dow from criado_em at time zone 'America/Sao_Paulo')::int as dow,
-    coalesce(sum(valor) filter (where valor > 0), 0) as entrou,
-    coalesce(sum(valor) filter (where valor < 0), 0) as saiu
-  from carteira_transacoes
-  where criado_em >= now() - (p_dias || ' days')::interval
-    and (p_loja_ids is null or loja_id = any(p_loja_ids))
-  group by 1;
+  with cal as (
+    select extract(dow from d)::int as dow, count(*)::numeric as n
+    from generate_series(
+      ((now() - (p_dias || ' days')::interval) at time zone 'America/Sao_Paulo')::date,
+      (now() at time zone 'America/Sao_Paulo')::date,
+      interval '1 day'
+    ) d
+    group by 1
+  ),
+  agg as (
+    select
+      extract(dow from criado_em at time zone 'America/Sao_Paulo')::int as dow,
+      coalesce(sum(valor) filter (where valor > 0), 0) as entrou,
+      coalesce(sum(valor) filter (where valor < 0), 0) as saiu
+    from carteira_transacoes
+    where criado_em >= now() - (p_dias || ' days')::interval
+      and (p_loja_ids is null or loja_id = any(p_loja_ids))
+    group by 1
+  )
+  select c.dow,
+    round(coalesce(a.entrou, 0) / greatest(c.n, 1), 2) as entrou,
+    round(coalesce(a.saiu, 0)   / greatest(c.n, 1), 2) as saiu
+  from cal c left join agg a on a.dow = c.dow;
 $$;
 grant execute on function carteira_movimento_dia(uuid[], int) to anon, authenticated;
 
