@@ -19,6 +19,7 @@ const ROTAS_CRON = [
   "/api/shopee/pedidos/resumo-diario",
   "/api/shopee/escrow/debug",
   "/api/shopee/rastreio/debug",
+  "/api/shopee/produtos/sincronizar-todos",
   "/api/tiktok/pedidos/sincronizar",
 ];
 

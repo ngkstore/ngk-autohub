@@ -57,12 +57,16 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const escopo = await escopoDoUsuario();
-    if (!podeVerLoja(escopo, lojaId)) {
-      return NextResponse.json(
-        { sucesso: false, erro: "Loja fora da sua conta." },
-        { status: 403 }
-      );
+    const auth = request.headers.get("authorization");
+    const viaCron = !!process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`;
+    if (!viaCron) {
+      const escopo = await escopoDoUsuario();
+      if (!podeVerLoja(escopo, lojaId)) {
+        return NextResponse.json(
+          { sucesso: false, erro: "Loja fora da sua conta." },
+          { status: 403 }
+        );
+      }
     }
 
     if (statusIdx >= STATUSES.length) {
