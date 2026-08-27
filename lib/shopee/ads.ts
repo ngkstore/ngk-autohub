@@ -36,7 +36,8 @@ function ddmmyyyy(d: Date) {
 // pela sincronização). Janela [hoje-dias, hoje].
 export async function buscarAdsBruto(
   lojaId: string,
-  dias = 29
+  dias = 29,
+  rango?: { ini: string; fim: string }
 ): Promise<{ ok: boolean; erro?: string; response?: unknown }> {
   const token = await obterToken(lojaId);
   if (!token) return { ok: false, erro: "sem token ativo" };
@@ -44,9 +45,18 @@ export async function buscarAdsBruto(
   const partnerKey = process.env.SHOPEE_PARTNER_KEY!;
   const ts = Math.floor(Date.now() / 1000);
   const sign = assinar(partnerId, partnerKey, token.accessToken, token.shopId, ts);
-  const fim = new Date();
-  const ini = new Date();
-  ini.setDate(fim.getDate() - dias);
+  // Intervalo explícito (ini/fim = 'YYYY-MM-DD') tem prioridade — usado no
+  // backfill mês a mês (a API do Ads não aceita janela > 1 mês). Sem rango, cai
+  // no modo do cron ao vivo: [hoje-dias, hoje].
+  let ini: Date, fim: Date;
+  if (rango) {
+    ini = new Date(`${rango.ini}T12:00:00-03:00`);
+    fim = new Date(`${rango.fim}T12:00:00-03:00`);
+  } else {
+    fim = new Date();
+    ini = new Date();
+    ini.setDate(fim.getDate() - dias);
+  }
   const url =
     `${BASE_URL}${PATH}?partner_id=${partnerId}&timestamp=${ts}` +
     `&access_token=${encodeURIComponent(token.accessToken)}&shop_id=${token.shopId}&sign=${sign}` +
@@ -95,11 +105,15 @@ export type ResultadoAds = { lojaId: string; importados: number; erro?: string }
 export async function sincronizarAdsLoja({
   lojaId,
   dias = 29,
+  ini,
+  fim,
 }: {
   lojaId: string;
   dias?: number;
+  ini?: string;
+  fim?: string;
 }): Promise<ResultadoAds> {
-  const bruto = await buscarAdsBruto(lojaId, dias);
+  const bruto = await buscarAdsBruto(lojaId, dias, ini && fim ? { ini, fim } : undefined);
   if (!bruto.ok) return { lojaId, importados: 0, erro: bruto.erro };
 
   const lista = extrairLista(bruto.response);

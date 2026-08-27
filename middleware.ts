@@ -18,6 +18,7 @@ const ROTAS_CRON = [
   "/api/shopee/carteira/sincronizar",
   "/api/shopee/regiao/enriquecer",
   "/api/shopee/ads/sincronizar",
+  "/api/shopee/ads/backfill",
   "/api/shopee/pedidos/resumo-diario",
   "/api/shopee/escrow/debug",
   "/api/shopee/rastreio/debug",

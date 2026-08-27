@@ -21,8 +21,10 @@ export async function GET(request: NextRequest) {
   const loja = request.nextUrl.searchParams.get("loja");
 
   if (request.nextUrl.searchParams.get("debug") === "1") {
-    const bruto = await buscarAdsBruto(loja || "", dias);
-    return NextResponse.json({ debug: true, loja, ...bruto });
+    const ini = request.nextUrl.searchParams.get("ini");
+    const fim = request.nextUrl.searchParams.get("fim");
+    const bruto = await buscarAdsBruto(loja || "", dias, ini && fim ? { ini, fim } : undefined);
+    return NextResponse.json({ debug: true, loja, ini, fim, ...bruto });
   }
 
   let lojas = await listarLojasShopeeAtivas();
