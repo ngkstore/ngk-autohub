@@ -62,6 +62,9 @@ function diaLabel(s: string) {
     month: "2-digit",
   });
 }
+function mesLabel(m: string) {
+  return new Date(`${m}-01T12:00:00-03:00`).toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }).replace(".", "");
+}
 function addDiasBRT(nd: number) {
   const s = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
   const [y, m, d] = s.split("-").map(Number);
@@ -151,21 +154,25 @@ type Periodo = { inicio: string; fim: string } | null;
 
 // ---------------- BALANÇO (DRE) ----------------
 async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; periodo: Periodo; conta: string | null }) {
-  const [{ data }, { data: dataCmv }] = await Promise.all([
-    supabase.rpc("resumo_financas", {
-      p_loja_ids: lojas,
-      p_inicio: periodo?.inicio ?? null,
-      p_fim: periodo?.fim ?? null,
-      p_conta: conta,
-    }),
-    supabase.rpc("resumo_cmv", {
-      p_loja_ids: lojas,
-      p_inicio: periodo?.inicio ?? null,
-      p_fim: periodo?.fim ?? null,
-    }),
+  // Período anterior (mesma duração, imediatamente antes) pra comparar KPIs.
+  let prevPer: { inicio: string; fim: string } | null = null;
+  if (periodo) {
+    const ini = new Date(periodo.inicio).getTime();
+    const len = new Date(periodo.fim).getTime() - ini;
+    prevPer = { inicio: new Date(ini - len).toISOString(), fim: periodo.inicio };
+  }
+  const [{ data }, { data: dataCmv }, { data: dataEvo }, { data: dataPrev }] = await Promise.all([
+    supabase.rpc("resumo_financas", { p_loja_ids: lojas, p_inicio: periodo?.inicio ?? null, p_fim: periodo?.fim ?? null, p_conta: conta }),
+    supabase.rpc("resumo_cmv", { p_loja_ids: lojas, p_inicio: periodo?.inicio ?? null, p_fim: periodo?.fim ?? null }),
+    supabase.rpc("evolucao_mensal", { p_loja_ids: lojas, p_meses: 6 }),
+    prevPer
+      ? supabase.rpc("resumo_financas", { p_loja_ids: lojas, p_inicio: prevPer.inicio, p_fim: prevPer.fim, p_conta: conta })
+      : Promise.resolve({ data: null }),
   ]);
   const r = (data as Record<string, unknown>) || {};
   const c = (dataCmv as Record<string, unknown>) || {};
+  const evo = (dataEvo as { mes: string; receita: number; resultado: number; margem_pct: number; pedidos: number }[]) || [];
+  const rp = (dataPrev as Record<string, unknown>) || {};
   const receita = n(r.receita_bruta);
   const taxaServAfiliado = Math.abs(n(r.taxa_servico_afiliado)); // taxa de serviço de afiliado
   const taxas = Math.abs(n(r.taxas)) - taxaServAfiliado; // taxas Shopee SEM a de afiliado (separada)
@@ -185,6 +192,13 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
   const cobertura = itensTotal > 0 ? (itensComCusto / itensTotal) * 100 : 0;
   const lucro = resultado - cmv;
   const margemLucro = receita > 0 ? (lucro / receita) * 100 : 0;
+
+  // Comparação com o período anterior (mesma duração).
+  const receitaPrev = n(rp.receita_bruta);
+  const resultadoPrev = n(rp.receita_liquida) - n(rp.ads) - n(rp.reembolsos) - n(rp.imposto);
+  const deltaReceita = receitaPrev > 0 ? ((receita - receitaPrev) / receitaPrev) * 100 : null;
+  const deltaResultado = Math.abs(resultadoPrev) > 0 ? ((resultado - resultadoPrev) / Math.abs(resultadoPrev)) * 100 : null;
+  const maxEvoR = Math.max(1, ...evo.map((e) => n(e.receita)));
 
   const linhas = [
     { l: "Receita (pedidos pagos)", v: receita, tot: false },
@@ -207,10 +221,41 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
         <Kpi label="Lucro líquido" val={cobertura > 0 ? brl(lucro) : "—"} hint={cobertura > 0 ? `margem ${margemLucro.toFixed(1)}% · ${cobertura.toFixed(0)}% dos itens c/ custo` : "cadastre os custos p/ ver"} cor={lucro >= 0 ? "text-emerald-300" : "text-red-300"} />
         <Kpi label="Recebido" val={brl(n(r.recebido))} hint={`${n(r.qtd_recebido)} pedido(s)`} cor="text-emerald-300" />
         <Kpi label="Falta receber" val={brl(n(r.a_receber))} hint={`${n(r.qtd_a_receber)} pedido(s)`} cor="text-blue-300" />
-        <Kpi label="Resultado" val={brl(resultado)} hint="antes do custo da mercadoria" />
+        <Kpi label="Resultado" val={brl(resultado)} hint="antes do custo da mercadoria" trend={deltaResultado} />
         <Kpi label="Afiliado pago" val={brl(afiliado)} hint={`${n(r.qtd_afiliado)} pedido(s) · custo opcional`} cor="text-violet-300" />
         <Kpi label="Cupom próprio" val={brl(cupom)} hint={`${n(r.qtd_cupom)} pedido(s)`} cor="text-orange-300" />
       </div>
+
+      {evo.length > 1 && (
+        <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6">
+          <h2 className="mb-1 text-xl font-bold">Evolução (últimos meses)</h2>
+          <p className="mb-5 text-xs text-slate-500">
+            Receita por mês e a <b>margem de contribuição</b> (receita − taxas − afiliado − cupom − custo). Pra ver se
+            está crescendo e se a margem se mantém.
+          </p>
+          <div className="space-y-3">
+            {evo.map((e) => (
+              <div key={e.mes} className="flex items-center gap-3">
+                <span className="w-14 shrink-0 text-sm text-slate-400">{mesLabel(e.mes)}</span>
+                <div className="h-7 flex-1 overflow-hidden rounded-md bg-slate-800">
+                  <div
+                    className="flex h-full items-center justify-end rounded-md bg-emerald-600 pr-2 text-xs font-semibold text-white"
+                    style={{ width: `${Math.max(8, (n(e.receita) / maxEvoR) * 100)}%` }}
+                  >
+                    {brl(n(e.receita))}
+                  </div>
+                </div>
+                <span className="w-24 shrink-0 text-right text-sm">
+                  <span className={`font-semibold ${n(e.margem_pct) >= 12 ? "text-emerald-300" : n(e.margem_pct) >= 0 ? "text-orange-300" : "text-red-300"}`}>
+                    {n(e.margem_pct)}%
+                  </span>
+                  <span className="ml-1 text-xs text-slate-500">margem</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6">
         <h2 className="mb-2 text-xl font-bold">Do bruto ao resultado</h2>
@@ -248,7 +293,7 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
               </span>
             ))}
           </div>
-          <p className="mt-3 text-xs text-slate-500">Região vem do código de triagem (sort_code) do envio.</p>
+          <p className="mt-3 text-xs text-slate-500">Região vem do rastreio do envio (destino do pedido).</p>
         </div>
       )}
     </div>
@@ -1099,12 +1144,19 @@ async function Previsao({ lojas, ufTend, sufixo }: { lojas: string[] | null; ufT
 }
 
 // ---------------- UI helpers ----------------
-function Kpi({ label, val, hint, cor }: { label: string; val: string; hint?: string; cor?: string }) {
+function Kpi({ label, val, hint, cor, trend }: { label: string; val: string; hint?: string; cor?: string; trend?: number | null }) {
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
       <p className="text-sm text-slate-400">{label}</p>
       <p className={`mt-2 text-2xl font-bold ${cor || "text-white"}`}>{val}</p>
-      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
+      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+        {trend != null && (
+          <span className={`text-xs font-semibold ${trend >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+            {trend >= 0 ? "▲" : "▼"} {Math.abs(trend).toFixed(0)}%
+          </span>
+        )}
+        {hint && <span className="text-xs text-slate-500">{hint}</span>}
+      </div>
     </div>
   );
 }
