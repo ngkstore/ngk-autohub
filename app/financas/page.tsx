@@ -262,33 +262,30 @@ async function Conciliacao({ lojas, periodo }: { lojas: string[] | null; periodo
   if (lojas) qAud = qAud.in("loja_id", lojas);
   if (periodo) qAud = qAud.gte("data_pedido", periodo.inicio).lt("data_pedido", periodo.fim);
 
-  const [{ data: pedRaw }, { data: audResRaw }, { data: audListRaw }] = await Promise.all([
-    qPed,
-    supabase.rpc("auditoria_resumo", {
-      p_loja_ids: lojas,
-      p_inicio: periodo?.inicio ?? null,
-      p_fim: periodo?.fim ?? null,
-    }),
-    qAud,
-  ]);
+  const argsPer = { p_loja_ids: lojas, p_inicio: periodo?.inicio ?? null, p_fim: periodo?.fim ?? null };
+  const [{ data: pedRaw }, { data: conRaw }, { data: divRaw }, { data: audResRaw }, { data: audListRaw }] =
+    await Promise.all([
+      qPed,
+      supabase.rpc("resumo_conciliacao", argsPer),
+      supabase.rpc("divergencias_recebimento", { ...argsPer, p_limite: 200 }),
+      supabase.rpc("auditoria_resumo", argsPer),
+      qAud,
+    ]);
 
   const pedidos = (pedRaw as Record<string, unknown>[]) || [];
+  const con = (conRaw as Record<string, unknown>) || {};
+  const divergencias =
+    (divRaw as { pedido_externo_id: string; cliente_nome: string | null; esperado: number; recebido: number; dif: number }[]) || [];
   const aud = (audResRaw as Record<string, unknown>) || {};
   const audList = ((audListRaw as Record<string, unknown>[]) || []).filter((a) => n(a.taxa_diferenca) > 0.5);
-  const divergencias = pedidos.filter((p) => {
-    const esperado = n(p.valor_liquido) || n(p.valor_total);
-    return p.recebido_em && Math.abs(n(p.valor_recebido) - esperado) > 0.5;
-  });
-  const qtdRecebido = pedidos.filter((p) => p.recebido_em).length;
-  const qtdAReceber = pedidos.length - qtdRecebido;
   const expLoja = lojas && lojas.length === 1 ? `?loja=${lojas[0]}` : "";
 
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi label="Recebidos" val={int(qtdRecebido)} hint="já caíram na carteira" cor="text-emerald-300" />
-        <Kpi label="A receber" val={int(qtdAReceber)} hint="ainda não caíram" cor="text-blue-300" />
-        <Kpi label="Divergência no recebido" val={int(divergencias.length)} hint="caiu valor diferente" cor={divergencias.length ? "text-red-300" : undefined} />
+        <Kpi label="Recebidos" val={int(n(con.recebidos))} hint={`de ${int(n(con.total))} no período`} cor="text-emerald-300" />
+        <Kpi label="A receber" val={int(n(con.a_receber))} hint="ainda não caíram" cor="text-blue-300" />
+        <Kpi label="Divergência no recebido" val={int(n(con.divergentes))} hint={n(con.divergentes) > 0 ? brl(n(con.diverg_valor)) : "tudo certo"} cor={n(con.divergentes) ? "text-red-300" : undefined} />
         <Kpi label="Taxa cobrada a mais" val={brl(n(aud.cobrado_a_mais))} hint={`${int(aud.divergentes)} fora da sua tabela`} cor="text-orange-300" />
       </div>
 
@@ -330,9 +327,10 @@ async function Conciliacao({ lojas, periodo }: { lojas: string[] | null; periodo
             </tbody>
           </table>
         </div>
-        {pedidos.length > 120 && (
-          <p className="mt-2 text-xs text-slate-500">Mostrando os 120 mais recentes de {int(pedidos.length)}.</p>
-        )}
+        <p className="mt-2 text-xs text-slate-500">
+          Amostra dos {Math.min(120, pedidos.length)} pedidos mais recentes — o período inteiro tem{" "}
+          <b>{int(n(con.total))}</b> pedidos, e os KPIs acima e as divergências abaixo já cobrem todos eles.
+        </p>
       </section>
 
       {/* 2 — Divergências de recebimento */}
@@ -348,7 +346,10 @@ async function Conciliacao({ lojas, periodo }: { lojas: string[] | null; periodo
             </a>
           )}
         </div>
-        <p className="mb-3 text-xs text-slate-500">Pedidos que caíram na carteira com valor diferente do que o escrow prometeu.</p>
+        <p className="mb-3 text-xs text-slate-500">
+          Pedidos que caíram na carteira com valor diferente do que o escrow prometeu, no período inteiro
+          (maiores primeiro). Boa parte é afiliado/ajuste aplicado após a captura.
+        </p>
         {divergencias.length === 0 ? (
           <p className="text-slate-400">Nenhuma divergência de recebimento no período. 🎉</p>
         ) : (
@@ -358,21 +359,17 @@ async function Conciliacao({ lojas, periodo }: { lojas: string[] | null; periodo
                 <tr><th className="p-3">Pedido</th><th className="p-3">Cliente</th><th className="p-3 text-right">Esperado</th><th className="p-3 text-right">Recebido</th><th className="p-3 text-right">Diferença</th></tr>
               </thead>
               <tbody>
-                {divergencias.slice(0, 100).map((p, i) => {
-                  const esperado = n(p.valor_liquido) || n(p.valor_total);
-                  const dif = n(p.valor_recebido) - esperado;
-                  return (
-                    <tr key={i} className="border-t border-slate-800">
-                      <td className="p-3 font-mono text-xs">{String(p.pedido_externo_id)}</td>
-                      <td className="p-3 text-slate-300">{String(p.cliente_nome || "—")}</td>
-                      <td className="p-3 text-right">{brl(esperado)}</td>
-                      <td className="p-3 text-right">{brl(n(p.valor_recebido))}</td>
-                      <td className={`p-3 text-right ${dif < 0 ? "text-red-300" : "text-emerald-300"}`}>
-                        {dif < 0 ? "− " : "+ "}{brl(Math.abs(dif))}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {divergencias.slice(0, 100).map((p, i) => (
+                  <tr key={i} className="border-t border-slate-800">
+                    <td className="p-3 font-mono text-xs">{String(p.pedido_externo_id)}</td>
+                    <td className="p-3 text-slate-300">{String(p.cliente_nome || "—")}</td>
+                    <td className="p-3 text-right">{brl(n(p.esperado))}</td>
+                    <td className="p-3 text-right">{brl(n(p.recebido))}</td>
+                    <td className={`p-3 text-right ${n(p.dif) < 0 ? "text-red-300" : "text-emerald-300"}`}>
+                      {n(p.dif) < 0 ? "− " : "+ "}{brl(Math.abs(n(p.dif)))}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
