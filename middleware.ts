@@ -8,6 +8,8 @@ const ROTAS_CRON = [
   "/api/shopee/pedidos/enriquecer-detalhes",
   "/api/shopee/pedidos/enriquecer-financeiro",
   "/api/shopee/pedidos/resync-status",
+  "/api/shopee/pedidos/processar-backfill",
+  "/api/shopee/pedidos/enriquecer-backfill",
   "/api/shopee/avaliacoes/responder",
   "/api/shopee/avaliacoes/sincronizar",
   "/api/shopee/chat/sincronizar",

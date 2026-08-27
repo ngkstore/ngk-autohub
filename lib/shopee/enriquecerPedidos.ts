@@ -266,7 +266,8 @@ export async function enriquecerPedidosPendentes({
   limite = 300,
   lojaIds = null,
   resync = false,
-}: { limite?: number; lojaIds?: string[] | null; resync?: boolean } = {}): Promise<ResultadoEnriquecimento> {
+  backfill = false,
+}: { limite?: number; lojaIds?: string[] | null; resync?: boolean; backfill?: boolean } = {}): Promise<ResultadoEnriquecimento> {
   const partnerId = process.env.SHOPEE_PARTNER_ID;
   const partnerKey = process.env.SHOPEE_PARTNER_KEY;
   const baseUrl = process.env.SHOPEE_API_BASE_URL || BASE_URL_PADRAO;
@@ -296,9 +297,15 @@ export async function enriquecerPedidosPendentes({
     query = query.eq("status", "UNPAID").order("data_pedido", {
       ascending: false,
       nullsFirst: false,
-    });
+    }).is("origem", null);
+  } else if (backfill) {
+    // Drenador do backfill histórico: só os pedidos antigos importados
+    // (origem='backfill') sem detalhe. Roda por um endpoint próprio, devagar,
+    // separado do cron ao vivo.
+    query = query.is("data_pedido", null).eq("origem", "backfill");
   } else {
-    query = query.is("data_pedido", null);
+    // Ao vivo: ignora os do backfill pra não starvar o faturamento de hoje.
+    query = query.is("data_pedido", null).is("origem", null);
   }
   if (lojaIds) query = query.in("loja_id", lojaIds);
   const { data: pedidos } = await query.limit(limite);
@@ -409,9 +416,13 @@ export async function enriquecerPedidosPendentes({
     .select("id", { count: "exact", head: true })
     .eq("marketplace", "shopee")
     .not("pedido_externo_id", "like", "SH-%");
-  countQuery = resync
-    ? countQuery.eq("status", "UNPAID")
-    : countQuery.is("data_pedido", null);
+  if (resync) {
+    countQuery = countQuery.eq("status", "UNPAID").is("origem", null);
+  } else if (backfill) {
+    countQuery = countQuery.is("data_pedido", null).eq("origem", "backfill");
+  } else {
+    countQuery = countQuery.is("data_pedido", null).is("origem", null);
+  }
   if (lojaIds) countQuery = countQuery.in("loja_id", lojaIds);
   const { count } = await countQuery;
 

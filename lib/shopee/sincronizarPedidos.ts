@@ -137,7 +137,10 @@ type SyncJob = {
  * lote, grava/atualiza em `pedidos` e marca o lote como concluído ou com erro.
  * Nunca lança exceção — sempre retorna um ResultadoLote.
  */
-export async function processarUmLote(job: SyncJob): Promise<ResultadoLote> {
+export async function processarUmLote(
+  job: SyncJob,
+  opts: { origem?: string | null } = {}
+): Promise<ResultadoLote> {
   const inicioExecucao = new Date().toISOString();
 
   const partnerId = process.env.SHOPEE_PARTNER_ID;
@@ -314,6 +317,7 @@ export async function processarUmLote(job: SyncJob): Promise<ResultadoLote> {
               cliente_nome: null,
               valor_total: 0,
               criado_em: agoraIso,
+              origem: opts.origem ?? null,
             }))
           );
 
@@ -455,6 +459,53 @@ export async function processarLotesPendentes({
     if (!job) break;
 
     const resultado = await processarUmLote(job as SyncJob);
+    resultados.push(resultado);
+    totalPedidos += resultado.total;
+  }
+
+  return {
+    lotesProcessados: resultados.length,
+    totalPedidos,
+    resultados,
+  };
+}
+
+// Processa a fila do BACKFILL histórico (tipo='pedidos_backfill'), separada da
+// fila ao vivo. Os pedidos entram carimbados com origem='backfill' pra o cron
+// de detalhe ao vivo ignorá-los. maxLotes baixo de propósito: o backfill é lento
+// e não pode competir com a operação do dia nem estourar o rate limit da Shopee.
+// Ordem cronológica (data_inicio asc) só pra ficar previsível.
+export async function processarLotesBackfill({
+  maxLotes = 3,
+}: { maxLotes?: number } = {}) {
+  const resultados: ResultadoLote[] = [];
+  let totalPedidos = 0;
+
+  // Auto-cura: lote preso em 'processando' há mais de 10 min volta pra fila.
+  await supabase
+    .from("sync_jobs")
+    .update({ status: "pendente", atualizado_em: new Date().toISOString() })
+    .eq("marketplace", "shopee")
+    .eq("tipo", "pedidos_backfill")
+    .eq("status", "processando")
+    .lt("atualizado_em", new Date(Date.now() - 10 * 60 * 1000).toISOString());
+
+  while (resultados.length < maxLotes) {
+    const { data: job } = await supabase
+      .from("sync_jobs")
+      .select("id, loja_id, data_inicio, data_fim")
+      .eq("marketplace", "shopee")
+      .eq("tipo", "pedidos_backfill")
+      .eq("status", "pendente")
+      .order("data_inicio", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (!job) break;
+
+    // processarUmLote já marca 'processando' no início e 'concluido' no fim;
+    // a auto-cura acima devolve pra fila se a função morrer no meio.
+    const resultado = await processarUmLote(job as SyncJob, { origem: "backfill" });
     resultados.push(resultado);
     totalPedidos += resultado.total;
   }
