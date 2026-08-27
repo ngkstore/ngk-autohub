@@ -29,12 +29,17 @@ $$;
 grant execute on function resumo_conciliacao(uuid[], timestamptz, timestamptz) to anon, authenticated;
 
 -- Lista das divergências de recebimento do período (maiores primeiro).
+-- p_offset permite paginar de dentro do RPC (o PostgREST capa a resposta em
+-- 1000 linhas e ignora Range/offset em função, então o export pagina via
+-- p_offset em blocos de 1000).
 drop function if exists divergencias_recebimento(uuid[], timestamptz, timestamptz, int);
+drop function if exists divergencias_recebimento(uuid[], timestamptz, timestamptz, int, int);
 create or replace function divergencias_recebimento(
   p_loja_ids uuid[] default null,
   p_inicio timestamptz default null,
   p_fim timestamptz default null,
-  p_limite int default 200
+  p_limite int default 200,
+  p_offset int default 0
 )
 returns table(pedido_externo_id text, cliente_nome text, uf text, esperado numeric, recebido numeric, dif numeric, data_pedido timestamptz)
 language sql stable as $$
@@ -49,7 +54,8 @@ language sql stable as $$
     and (p_loja_ids is null or loja_id = any(p_loja_ids))
     and (p_inicio is null or data_pedido >= p_inicio)
     and (p_fim is null or data_pedido < p_fim)
-  order by abs(coalesce(valor_recebido, 0) - coalesce(valor_liquido, valor_total)) desc
+  order by abs(coalesce(valor_recebido, 0) - coalesce(valor_liquido, valor_total)) desc, pedido_externo_id
+  offset p_offset
   limit p_limite;
 $$;
-grant execute on function divergencias_recebimento(uuid[], timestamptz, timestamptz, int) to anon, authenticated;
+grant execute on function divergencias_recebimento(uuid[], timestamptz, timestamptz, int, int) to anon, authenticated;

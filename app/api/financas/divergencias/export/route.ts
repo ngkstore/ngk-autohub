@@ -26,13 +26,22 @@ export async function GET(request: NextRequest) {
     sufixo = mes;
   }
 
-  const { data } = await supabase.rpc("divergencias_recebimento", {
-    p_loja_ids: lojas,
-    p_inicio: inicio,
-    p_fim: fim,
-    p_limite: 100000,
-  });
-  const divs = (data as Record<string, unknown>[]) || [];
+  // O PostgREST capa a resposta em 1000 linhas (e ignora Range em função),
+  // então paginamos via p_offset em blocos de 1000 até acabar.
+  const PAGE = 1000;
+  const divs: Record<string, unknown>[] = [];
+  for (let offset = 0; offset < 200000; offset += PAGE) {
+    const { data } = await supabase.rpc("divergencias_recebimento", {
+      p_loja_ids: lojas,
+      p_inicio: inicio,
+      p_fim: fim,
+      p_limite: PAGE,
+      p_offset: offset,
+    });
+    const page = (data as Record<string, unknown>[]) || [];
+    divs.push(...page);
+    if (page.length < PAGE) break;
+  }
 
   const num = (v: unknown) => Number(v || 0);
   const c = (s: unknown) => `"${String(s ?? "").replace(/"/g, '""')}"`;
