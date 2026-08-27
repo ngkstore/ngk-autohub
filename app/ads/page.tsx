@@ -4,9 +4,9 @@ import AdsFiltros from "../components/AdsFiltros";
 
 export const dynamic = "force-dynamic";
 
-type Props = { searchParams: Promise<{ loja?: string; dias?: string }> };
+type Props = { searchParams: Promise<{ loja?: string; per?: string }> };
 type AdsLoja = {
-  loja: string; gasto: number; gmv_direto: number; roas_direto: number;
+  loja: string; gasto: number; gmv_direto: number; roas_direto: number; roas_efetivo: number;
   receita: number; tacos: number; ped_direto: number; ctr: number;
 };
 
@@ -20,19 +20,32 @@ export default async function AdsPage({ searchParams }: Props) {
   const params = await searchParams;
   const escopo = await escopoDoUsuario();
   const lojas = filtroLojas(escopo, params.loja);
-  const dias = Math.min(365, Math.max(1, Number(params.dias) || 30));
-  const desde = new Date(Date.now() - dias * 864e5).toISOString().slice(0, 10);
+  // Período: "30d" (últimos N dias) ou "2026-08" (mês específico). Padrão 30d.
+  const per = params.per || "30d";
+  let ini: string, fim: string, labelPer: string;
+  const mMes = per.match(/^(\d{4})-(\d{2})$/);
+  if (mMes) {
+    const y = Number(mMes[1]), mo = Number(mMes[2]);
+    ini = `${mMes[1]}-${mMes[2]}-01`;
+    fim = new Date(Date.UTC(y, mo, 0)).toISOString().slice(0, 10); // último dia do mês
+    labelPer = new Date(`${per}-01T12:00:00-03:00`).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  } else {
+    const nd = Math.min(365, Math.max(1, Number((per.match(/^(\d+)d$/) || [])[1]) || 30));
+    ini = new Date(Date.now() - nd * 864e5).toISOString().slice(0, 10);
+    fim = new Date().toISOString().slice(0, 10);
+    labelPer = `últimos ${nd} dias`;
+  }
 
   // Lojas Shopee do escopo, pro seletor.
   const escopoLojas = filtroLojas(escopo, undefined);
   let qLojas = supabase.from("lojas").select("id, nome").eq("marketplace", "shopee").order("nome");
   if (escopoLojas) qLojas = qLojas.in("id", escopoLojas);
 
-  let qDiario = supabase.from("ads_diario").select("dia, gasto, gmv_direto").gte("dia", desde).order("dia");
+  let qDiario = supabase.from("ads_diario").select("dia, gasto, gmv_direto").gte("dia", ini).lte("dia", fim).order("dia");
   if (lojas) qDiario = qDiario.in("loja_id", lojas);
 
   const [{ data: resumoRaw }, { data: diarioRaw }, { data: lojasRaw }] = await Promise.all([
-    supabase.rpc("resumo_ads", { p_loja_ids: lojas, p_dias: dias }),
+    supabase.rpc("resumo_ads", { p_loja_ids: lojas, p_ini: ini, p_fim: fim }),
     qDiario,
     qLojas,
   ]);
@@ -56,10 +69,18 @@ export default async function AdsPage({ searchParams }: Props) {
     (a, l) => ({ gasto: a.gasto + n(l.gasto), gmv: a.gmv + n(l.gmv_direto), receita: a.receita + n(l.receita), ped: a.ped + n(l.ped_direto) }),
     { gasto: 0, gmv: 0, receita: 0, ped: 0 }
   );
-  const roasTot = tot.gasto > 0 ? tot.gmv / tot.gasto : 0;
+  const roasEfetivo = tot.gasto > 0 ? tot.receita / tot.gasto : 0; // faturamento REAL ÷ gasto
+  const roasAtribuido = tot.gasto > 0 ? tot.gmv / tot.gasto : 0; // o que o Ads diz (atribuição Shopee)
   const tacosTot = tot.receita > 0 ? (tot.gasto / tot.receita) * 100 : 0;
   const margemContrib = 0.13; // margem de contribuição média (~13%, do Balanço)
   const roasEquilibrio = 1 / margemContrib; // ≈ 7,7× — abaixo disso, o anúncio dá prejuízo
+
+  const meses = Array.from({ length: 6 }, (_, i) => {
+    const h = new Date();
+    const d = new Date(h.getFullYear(), h.getMonth() - i, 1);
+    const v = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    return { v, l: d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }) };
+  });
 
   const Kpi = ({ label, val, hint, cor }: { label: string; val: string; hint?: string; cor?: string }) => (
     <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
@@ -78,20 +99,20 @@ export default async function AdsPage({ searchParams }: Props) {
             Gasto, retorno e tendência dos anúncios (nível loja, direto da API da Shopee). A análise por anúncio fica no <b>Raio-X</b>.
           </p>
         </div>
-        <AdsFiltros lojas={lojasList} lojaAtual={params.loja || "todas"} dias={String(dias)} />
+        <AdsFiltros lojas={lojasList} lojaAtual={params.loja || "todas"} per={per} meses={meses} />
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Kpi label={`Gasto em Ads (${dias}d)`} val={brl(tot.gasto)} hint={`${linhas.length} loja(s)`} cor="text-orange-300" />
-        <Kpi label="ROAS (direto)" val={`${roasTot.toFixed(1)}×`} hint={`equilíbrio na margem ≈ ${roasEquilibrio.toFixed(1)}×`} cor="text-emerald-300" />
-        <Kpi label="TACOS" val={`${tacosTot.toFixed(1)}%`} hint="gasto ÷ receita total" cor="text-blue-300" />
-        <Kpi label="Pedidos via Ads" val={String(tot.ped)} hint="atribuição direta" />
+        <Kpi label="Gasto em Ads" val={brl(tot.gasto)} hint={labelPer} cor="text-orange-300" />
+        <Kpi label="ROAS efetivo" val={`${roasEfetivo.toFixed(1)}×`} hint={`faturamento real ÷ gasto · equilíbrio ≈ ${roasEquilibrio.toFixed(1)}×`} cor="text-emerald-300" />
+        <Kpi label="TACOS" val={`${tacosTot.toFixed(1)}%`} hint="gasto ÷ faturamento real" cor="text-blue-300" />
+        <Kpi label="Faturamento (real)" val={brl(tot.receita)} hint={`ROAS atribuído do Ads: ${roasAtribuido.toFixed(1)}×`} cor="text-violet-300" />
       </div>
 
       {porDia.length > 0 && (
         <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6">
           <div className="mb-1 flex flex-wrap items-baseline justify-between gap-3">
-            <h2 className="text-xl font-bold">Gasto por dia ({dias} dias)</h2>
+            <h2 className="text-xl font-bold">Gasto por dia · {labelPer}</h2>
             {diaPico && (
               <span className="text-sm text-slate-400">
                 dia campeão: <b className="text-orange-300">{diaLabel(diaPico.dia)}</b> · {brl(diaPico.gasto)}
@@ -122,8 +143,8 @@ export default async function AdsPage({ searchParams }: Props) {
             <tr>
               <th className="p-3">Loja</th>
               <th className="p-3 text-right">Gasto</th>
-              <th className="p-3 text-right">GMV (ads)</th>
-              <th className="p-3 text-right">ROAS</th>
+              <th className="p-3 text-right">Faturamento</th>
+              <th className="p-3 text-right">ROAS efet.</th>
               <th className="p-3 text-right">TACOS</th>
               <th className="p-3 text-right">CTR</th>
               <th className="p-3 text-right">Pedidos</th>
@@ -136,8 +157,8 @@ export default async function AdsPage({ searchParams }: Props) {
               <tr key={l.loja} className="border-t border-slate-800">
                 <td className="p-3">{l.loja}</td>
                 <td className="p-3 text-right">{brl(n(l.gasto))}</td>
-                <td className="p-3 text-right">{brl(n(l.gmv_direto))}</td>
-                <td className="p-3 text-right text-emerald-300">{n(l.roas_direto).toFixed(1)}×</td>
+                <td className="p-3 text-right">{brl(n(l.receita))}</td>
+                <td className="p-3 text-right text-emerald-300">{n(l.roas_efetivo).toFixed(1)}×</td>
                 <td className={`p-3 text-right ${n(l.tacos) > 15 ? "text-red-300" : n(l.tacos) > 8 ? "text-orange-300" : "text-emerald-300"}`}>
                   {n(l.tacos).toFixed(1)}%
                 </td>
@@ -150,9 +171,10 @@ export default async function AdsPage({ searchParams }: Props) {
       </div>
 
       <p className="mt-4 text-xs text-slate-500">
-        <b>ROAS de equilíbrio</b> ≈ {roasEquilibrio.toFixed(1)}× (com margem de contribuição ~{(margemContrib * 100).toFixed(0)}%):
-        abaixo disso o anúncio custa mais do que a margem que gera. Seu ROAS está bem acima — anúncio saudável.
-        <b> TACOS</b> = gasto ÷ receita total. Análise por anúncio (funil, ATC) fica no <b>Raio-X</b>, que precisa do coletor/CSV.
+        <b>ROAS efetivo</b> = faturamento REAL (pedidos pagos) ÷ gasto — usa seu número de verdade, não a atribuição do Ads
+        (que costuma inflar; aqui o GMV atribuído chegou a passar o faturamento total). <b>TACOS</b> = gasto ÷ faturamento real.
+        <b> Equilíbrio</b> ≈ {roasEquilibrio.toFixed(1)}× (margem de contribuição ~{(margemContrib * 100).toFixed(0)}%): abaixo
+        disso o gasto come toda a margem. Obs: o ROAS efetivo é &quot;blended&quot; (inclui venda orgânica). Análise por anúncio fica no <b>Raio-X</b>.
       </p>
     </div>
   );
