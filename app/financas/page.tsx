@@ -45,9 +45,8 @@ function periodoFiltro(periodo: string): { inicio: string; fim: string } | null 
 
 const ABAS = [
   { k: "balanco", r: "📊 Balanço" },
-  { k: "conciliacao", r: "🧮 Conciliação" },
+  { k: "conciliacao", r: "🧮 Conciliação & Taxas" },
   { k: "previsao", r: "📅 Previsão" },
-  { k: "divergencias", r: "⚠️ Divergências" },
   { k: "carteira", r: "👛 Carteira" },
   { k: "ads", r: "📢 Ads" },
   { k: "produtos", r: "🏷️ Produtos & Margem" },
@@ -123,9 +122,8 @@ export default async function FinancasPage({ searchParams }: Props) {
 
       <div className="mt-8">
         {aba === "balanco" && <Balanco lojas={lojas} periodo={periodo} conta={escopo.contaId} />}
-        {aba === "conciliacao" && <Conciliacao lojas={lojas} periodo={periodo} />}
+        {(aba === "conciliacao" || aba === "divergencias") && <Conciliacao lojas={lojas} periodo={periodo} />}
         {aba === "previsao" && <Previsao lojas={lojas} />}
-        {aba === "divergencias" && <Divergencias lojas={lojas} periodo={periodo} />}
         {aba === "carteira" && <Carteira lojas={lojas} />}
         {aba === "ads" && <Ads lojas={lojas} />}
         {aba === "produtos" && <Produtos lojas={lojas} />}
@@ -244,119 +242,186 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
   );
 }
 
-// ---------------- CONCILIAÇÃO ----------------
+// -------- CONCILIAÇÃO & TAXAS (recebimento + divergências + auditoria) --------
 async function Conciliacao({ lojas, periodo }: { lojas: string[] | null; periodo: Periodo }) {
-  let q = supabase
+  let qPed = supabase
     .from("pedidos")
-    .select("pedido_externo_id, cliente_nome, valor_total, valor_liquido, valor_recebido, recebido_em, cupom_loja, status, uf")
+    .select("pedido_externo_id, cliente_nome, valor_total, valor_liquido, valor_recebido, recebido_em, status, uf")
     .eq("marketplace", "shopee")
     .eq("pedido_efetivado", true)
     .order("data_pedido", { ascending: false })
-    .limit(150);
-  if (lojas) q = q.in("loja_id", lojas);
-  if (periodo) q = q.gte("data_pedido", periodo.inicio).lt("data_pedido", periodo.fim);
-  const { data } = await q;
-  const pedidos = (data as Record<string, unknown>[]) || [];
+    .limit(400);
+  if (lojas) qPed = qPed.in("loja_id", lojas);
+  if (periodo) qPed = qPed.gte("data_pedido", periodo.inicio).lt("data_pedido", periodo.fim);
 
-  return (
-    <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900">
-      <table className="w-full text-left text-sm">
-        <thead className="bg-slate-800 text-xs uppercase text-slate-400">
-          <tr>
-            <th className="p-3">Pedido</th><th className="p-3">Cliente</th><th className="p-3">UF</th>
-            <th className="p-3 text-right">Esperado</th><th className="p-3 text-right">Recebido</th>
-            <th className="p-3 text-right">Cupom próprio</th><th className="p-3">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {pedidos.length === 0 ? (
-            <tr><td className="p-4 text-slate-400" colSpan={7}>Nenhum pedido no período. (A coluna "Recebido" aparece após sincronizar a carteira.)</td></tr>
-          ) : pedidos.map((p, i) => {
-            const esperado = n(p.valor_liquido) || n(p.valor_total);
-            const recebido = p.recebido_em ? n(p.valor_recebido) : null;
-            const diverg = recebido != null && Math.abs(recebido - esperado) > 0.5;
-            return (
-              <tr key={i} className="border-t border-slate-800">
-                <td className="p-3 font-mono text-xs">{String(p.pedido_externo_id)}</td>
-                <td className="p-3 text-slate-300">{String(p.cliente_nome || "—")}</td>
-                <td className="p-3 text-slate-400">{String(p.uf || "—")}</td>
-                <td className="p-3 text-right">{brl(esperado)}</td>
-                <td className="p-3 text-right">{recebido != null ? brl(recebido) : "—"}</td>
-                <td className="p-3 text-right">{n(p.cupom_loja) > 0 ? brl(n(p.cupom_loja)) : "—"}</td>
-                <td className="p-3">
-                  {recebido == null ? <Chip cor="info">A receber</Chip>
-                    : diverg ? <Chip cor="neg">Divergente</Chip>
-                    : <Chip cor="pos">Recebido</Chip>}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
+  let qAud = supabase
+    .from("pedidos_auditoria")
+    .select("pedido_externo_id, cliente_nome, valor_total, taxa_esperada, taxa_real, taxa_diferenca")
+    .order("taxa_diferenca", { ascending: false })
+    .limit(25);
+  if (lojas) qAud = qAud.in("loja_id", lojas);
+  if (periodo) qAud = qAud.gte("data_pedido", periodo.inicio).lt("data_pedido", periodo.fim);
 
-// ---------------- DIVERGÊNCIAS ----------------
-async function Divergencias({ lojas, periodo }: { lojas: string[] | null; periodo: Periodo }) {
-  let q = supabase
-    .from("pedidos")
-    .select("pedido_externo_id, cliente_nome, valor_total, valor_liquido, valor_recebido, recebido_em")
-    .eq("marketplace", "shopee")
-    .eq("pedido_efetivado", true)
-    .not("recebido_em", "is", null)
-    .order("data_pedido", { ascending: false })
-    .limit(500);
-  if (lojas) q = q.in("loja_id", lojas);
-  if (periodo) q = q.gte("data_pedido", periodo.inicio).lt("data_pedido", periodo.fim);
-  const { data } = await q;
-  const pedidos = ((data as Record<string, unknown>[]) || []).filter((p) => {
+  const [{ data: pedRaw }, { data: audResRaw }, { data: audListRaw }] = await Promise.all([
+    qPed,
+    supabase.rpc("auditoria_resumo", {
+      p_loja_ids: lojas,
+      p_inicio: periodo?.inicio ?? null,
+      p_fim: periodo?.fim ?? null,
+    }),
+    qAud,
+  ]);
+
+  const pedidos = (pedRaw as Record<string, unknown>[]) || [];
+  const aud = (audResRaw as Record<string, unknown>) || {};
+  const audList = ((audListRaw as Record<string, unknown>[]) || []).filter((a) => n(a.taxa_diferenca) > 0.5);
+  const divergencias = pedidos.filter((p) => {
     const esperado = n(p.valor_liquido) || n(p.valor_total);
-    return Math.abs(n(p.valor_recebido) - esperado) > 0.5;
+    return p.recebido_em && Math.abs(n(p.valor_recebido) - esperado) > 0.5;
   });
+  const qtdRecebido = pedidos.filter((p) => p.recebido_em).length;
+  const qtdAReceber = pedidos.length - qtdRecebido;
+  const expLoja = lojas && lojas.length === 1 ? `?loja=${lojas[0]}` : "";
 
   return (
-    <div>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <p className="text-slate-300">
-          {pedidos.length === 0
-            ? "Nenhuma divergência no período. 🎉"
-            : `${pedidos.length} pedido(s) receberam valor diferente do esperado.`}
-        </p>
-        <a
-          href={`/api/financas/divergencias/export${lojas ? `?loja=${lojas[0]}` : ""}`}
-          className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
-        >
-          ⬇ Exportar (CSV)
-        </a>
+    <div className="space-y-8">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Kpi label="Recebidos" val={int(qtdRecebido)} hint="já caíram na carteira" cor="text-emerald-300" />
+        <Kpi label="A receber" val={int(qtdAReceber)} hint="ainda não caíram" cor="text-blue-300" />
+        <Kpi label="Divergência no recebido" val={int(divergencias.length)} hint="caiu valor diferente" cor={divergencias.length ? "text-red-300" : undefined} />
+        <Kpi label="Taxa cobrada a mais" val={brl(n(aud.cobrado_a_mais))} hint={`${int(aud.divergentes)} fora da sua tabela`} cor="text-orange-300" />
       </div>
-      {pedidos.length > 0 && (
+
+      {/* 1 — Recebimento */}
+      <section>
+        <h2 className="mb-1 text-xl font-bold">Recebimento</h2>
+        <p className="mb-3 text-xs text-slate-500">
+          Pedido × carteira: o que o escrow prometeu (esperado) vs o que caiu (recebido). A coluna
+          &quot;Recebido&quot; aparece após a sincronização da carteira.
+        </p>
         <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-800 text-xs uppercase text-slate-400">
-              <tr><th className="p-3">Pedido</th><th className="p-3">Cliente</th><th className="p-3 text-right">Esperado</th><th className="p-3 text-right">Recebido</th><th className="p-3 text-right">Diferença</th></tr>
+              <tr>
+                <th className="p-3">Pedido</th><th className="p-3">Cliente</th><th className="p-3">UF</th>
+                <th className="p-3 text-right">Esperado</th><th className="p-3 text-right">Recebido</th><th className="p-3">Status</th>
+              </tr>
             </thead>
             <tbody>
-              {pedidos.map((p, i) => {
+              {pedidos.length === 0 ? (
+                <tr><td className="p-4 text-slate-400" colSpan={6}>Nenhum pedido no período.</td></tr>
+              ) : pedidos.slice(0, 120).map((p, i) => {
                 const esperado = n(p.valor_liquido) || n(p.valor_total);
-                const dif = n(p.valor_recebido) - esperado;
+                const recebido = p.recebido_em ? n(p.valor_recebido) : null;
+                const diverg = recebido != null && Math.abs(recebido - esperado) > 0.5;
                 return (
                   <tr key={i} className="border-t border-slate-800">
                     <td className="p-3 font-mono text-xs">{String(p.pedido_externo_id)}</td>
                     <td className="p-3 text-slate-300">{String(p.cliente_nome || "—")}</td>
+                    <td className="p-3 text-slate-400">{String(p.uf || "—")}</td>
                     <td className="p-3 text-right">{brl(esperado)}</td>
-                    <td className="p-3 text-right">{brl(n(p.valor_recebido))}</td>
-                    <td className="p-3 text-right text-red-300">− {brl(Math.abs(dif))}</td>
+                    <td className="p-3 text-right">{recebido != null ? brl(recebido) : "—"}</td>
+                    <td className="p-3">
+                      {recebido == null ? <Chip cor="info">A receber</Chip> : diverg ? <Chip cor="neg">Divergente</Chip> : <Chip cor="pos">Recebido</Chip>}
+                    </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
-      )}
+        {pedidos.length > 120 && (
+          <p className="mt-2 text-xs text-slate-500">Mostrando os 120 mais recentes de {int(pedidos.length)}.</p>
+        )}
+      </section>
+
+      {/* 2 — Divergências de recebimento */}
+      <section>
+        <div className="mb-1 flex items-center justify-between gap-3">
+          <h2 className="text-xl font-bold">Divergências de recebimento</h2>
+          {divergencias.length > 0 && (
+            <a
+              href={`/api/financas/divergencias/export${expLoja}`}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+            >
+              ⬇ Exportar (CSV)
+            </a>
+          )}
+        </div>
+        <p className="mb-3 text-xs text-slate-500">Pedidos que caíram na carteira com valor diferente do que o escrow prometeu.</p>
+        {divergencias.length === 0 ? (
+          <p className="text-slate-400">Nenhuma divergência de recebimento no período. 🎉</p>
+        ) : (
+          <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-800 text-xs uppercase text-slate-400">
+                <tr><th className="p-3">Pedido</th><th className="p-3">Cliente</th><th className="p-3 text-right">Esperado</th><th className="p-3 text-right">Recebido</th><th className="p-3 text-right">Diferença</th></tr>
+              </thead>
+              <tbody>
+                {divergencias.slice(0, 100).map((p, i) => {
+                  const esperado = n(p.valor_liquido) || n(p.valor_total);
+                  const dif = n(p.valor_recebido) - esperado;
+                  return (
+                    <tr key={i} className="border-t border-slate-800">
+                      <td className="p-3 font-mono text-xs">{String(p.pedido_externo_id)}</td>
+                      <td className="p-3 text-slate-300">{String(p.cliente_nome || "—")}</td>
+                      <td className="p-3 text-right">{brl(esperado)}</td>
+                      <td className="p-3 text-right">{brl(n(p.valor_recebido))}</td>
+                      <td className={`p-3 text-right ${dif < 0 ? "text-red-300" : "text-emerald-300"}`}>
+                        {dif < 0 ? "− " : "+ "}{brl(Math.abs(dif))}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* 3 — Auditoria de Taxas */}
+      <section>
+        <h2 className="mb-1 text-xl font-bold">Auditoria de Taxas</h2>
+        <p className="mb-4 text-xs text-slate-500">
+          Confere a taxa que a Shopee cobrou (comissão + serviço) contra a <b>esperada pela sua tabela</b>. Parte das
+          divergências pode ser regra que a tabela não captura — use como sinal pra revisar/contestar os casos grandes.
+        </p>
+        <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="rounded-xl border border-slate-800 bg-slate-900 p-4"><p className="text-xs text-slate-400">Taxa esperada</p><p className="mt-1 text-lg font-bold">{brl(n(aud.taxa_esperada_total))}</p></div>
+          <div className="rounded-xl border border-slate-800 bg-slate-900 p-4"><p className="text-xs text-slate-400">Taxa cobrada</p><p className="mt-1 text-lg font-bold">{brl(n(aud.taxa_real_total))}</p></div>
+          <div className="rounded-xl border border-slate-800 bg-slate-900 p-4"><p className="text-xs text-slate-400">Cobrado a mais</p><p className="mt-1 text-lg font-bold text-orange-300">{brl(n(aud.cobrado_a_mais))}</p></div>
+          <div className="rounded-xl border border-slate-800 bg-slate-900 p-4"><p className="text-xs text-slate-400">Cobrado a menos</p><p className="mt-1 text-lg font-bold text-emerald-300">{brl(Math.abs(n(aud.cobrado_a_menos)))}</p></div>
+        </div>
+        <p className="mb-3 text-sm text-slate-300">Maiores diferenças (Shopee cobrou <b>a mais</b> que a sua tabela):</p>
+        {audList.length === 0 ? (
+          <p className="text-slate-400">Sem divergências relevantes de taxa no período. 🎉</p>
+        ) : (
+          <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-800 text-xs uppercase text-slate-400">
+                <tr><th className="p-3">Pedido</th><th className="p-3">Cliente</th><th className="p-3 text-right">Venda</th><th className="p-3 text-right">Esperada</th><th className="p-3 text-right">Cobrada</th><th className="p-3 text-right">Diferença</th></tr>
+              </thead>
+              <tbody>
+                {audList.map((a, i) => (
+                  <tr key={i} className="border-t border-slate-800">
+                    <td className="p-3 font-mono text-xs">{String(a.pedido_externo_id)}</td>
+                    <td className="p-3 text-slate-300">{String(a.cliente_nome || "—")}</td>
+                    <td className="p-3 text-right">{brl(n(a.valor_total))}</td>
+                    <td className="p-3 text-right">{brl(n(a.taxa_esperada))}</td>
+                    <td className="p-3 text-right">{brl(n(a.taxa_real))}</td>
+                    <td className="p-3 text-right text-orange-300">+ {brl(n(a.taxa_diferenca))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
+
+// (Divergências virou seção dentro de Conciliação — ver componente Conciliacao acima.)
 
 // ---------------- CARTEIRA ----------------
 async function Carteira({ lojas }: { lojas: string[] | null }) {
