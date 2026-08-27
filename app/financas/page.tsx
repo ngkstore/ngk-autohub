@@ -76,6 +76,17 @@ function n(v: unknown) {
 function int(v: unknown) {
   return (Number(v) || 0).toLocaleString("pt-BR");
 }
+function mesesRecentes(qtd = 12) {
+  const out: { v: string; l: string }[] = [];
+  const h = new Date();
+  for (let i = 0; i < qtd; i++) {
+    const d = new Date(h.getFullYear(), h.getMonth() - i, 1);
+    const v = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const l = d.toLocaleDateString("pt-BR", { month: "short", year: "numeric" }).replace(".", "");
+    out.push({ v, l });
+  }
+  return out;
+}
 function dt(s?: string | null) {
   return s ? new Date(s).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
 }
@@ -278,7 +289,7 @@ async function Conciliacao({ lojas, periodo }: { lojas: string[] | null; periodo
     (divRaw as { pedido_externo_id: string; cliente_nome: string | null; esperado: number; recebido: number; dif: number }[]) || [];
   const aud = (audResRaw as Record<string, unknown>) || {};
   const audList = ((audListRaw as Record<string, unknown>[]) || []).filter((a) => n(a.taxa_diferenca) > 0.5);
-  const expLoja = lojas && lojas.length === 1 ? `?loja=${lojas[0]}` : "";
+  const meses = mesesRecentes();
 
   return (
     <div className="space-y-8">
@@ -335,16 +346,27 @@ async function Conciliacao({ lojas, periodo }: { lojas: string[] | null; periodo
 
       {/* 2 — Divergências de recebimento */}
       <section>
-        <div className="mb-1 flex items-center justify-between gap-3">
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-bold">Divergências de recebimento</h2>
-          {divergencias.length > 0 && (
-            <a
-              href={`/api/financas/divergencias/export${expLoja}`}
+          <form action="/api/financas/divergencias/export" method="get" className="flex items-center gap-2">
+            {lojas && lojas.length === 1 && <input type="hidden" name="loja" value={lojas[0]} />}
+            <label className="text-xs text-slate-400">Mês:</label>
+            <select
+              name="mes"
+              defaultValue={meses[0].v}
+              className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
+            >
+              {meses.map((m) => (
+                <option key={m.v} value={m.v}>{m.l}</option>
+              ))}
+            </select>
+            <button
+              type="submit"
               className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
             >
               ⬇ Exportar (CSV)
-            </a>
-          )}
+            </button>
+          </form>
         </div>
         <p className="mb-3 text-xs text-slate-500">
           Pedidos que caíram na carteira com valor diferente do que o escrow prometeu, no período inteiro

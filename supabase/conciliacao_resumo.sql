@@ -29,18 +29,20 @@ $$;
 grant execute on function resumo_conciliacao(uuid[], timestamptz, timestamptz) to anon, authenticated;
 
 -- Lista das divergências de recebimento do período (maiores primeiro).
+drop function if exists divergencias_recebimento(uuid[], timestamptz, timestamptz, int);
 create or replace function divergencias_recebimento(
   p_loja_ids uuid[] default null,
   p_inicio timestamptz default null,
   p_fim timestamptz default null,
   p_limite int default 200
 )
-returns table(pedido_externo_id text, cliente_nome text, esperado numeric, recebido numeric, dif numeric)
+returns table(pedido_externo_id text, cliente_nome text, uf text, esperado numeric, recebido numeric, dif numeric, data_pedido timestamptz)
 language sql stable as $$
-  select pedido_externo_id, cliente_nome,
+  select pedido_externo_id, cliente_nome, uf,
     round(coalesce(valor_liquido, valor_total)::numeric, 2) as esperado,
     round(coalesce(valor_recebido, 0)::numeric, 2) as recebido,
-    round((coalesce(valor_recebido, 0) - coalesce(valor_liquido, valor_total))::numeric, 2) as dif
+    round((coalesce(valor_recebido, 0) - coalesce(valor_liquido, valor_total))::numeric, 2) as dif,
+    data_pedido
   from pedidos
   where marketplace = 'shopee' and pedido_efetivado and recebido_em is not null
     and abs(coalesce(valor_recebido, 0) - coalesce(valor_liquido, valor_total)) > 0.5
