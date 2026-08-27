@@ -369,19 +369,21 @@ async function Carteira({ lojas }: { lojas: string[] | null }) {
   const cells = (heatRaw as { dow: number; hora: number; total: number; qtd: number }[]) || [];
   const totalGeral = carteiras.reduce((s, c) => s + n(c.saldo), 0);
 
-  // Monta a grade dia×hora e acha o pico.
-  const grid = new Map<string, number>();
-  const porHora = new Array(24).fill(0);
-  let maxCell = 0;
-  for (const c of cells) {
-    const v = n(c.total);
-    grid.set(`${c.dow}-${c.hora}`, v);
-    porHora[c.hora] += v;
-    if (v > maxCell) maxCell = v;
-  }
-  const horaPico = porHora.some((v) => v > 0) ? porHora.indexOf(Math.max(...porHora)) : null;
-  const diasOrd = [1, 2, 3, 4, 5, 6, 0]; // segunda-primeiro
+  // Agrega por dia da semana e por hora (a partir das células dow×hora).
   const diasLbl: Record<number, string> = { 0: "Dom", 1: "Seg", 2: "Ter", 3: "Qua", 4: "Qui", 5: "Sex", 6: "Sáb" };
+  const diasOrd = [1, 2, 3, 4, 5, 6, 0]; // segunda-primeiro
+  const perDay = new Array(7).fill(0);
+  const perDayQtd = new Array(7).fill(0);
+  const perHour = new Array(24).fill(0);
+  for (const c of cells) {
+    perDay[c.dow] += n(c.total);
+    perDayQtd[c.dow] += n(c.qtd);
+    perHour[c.hora] += n(c.total);
+  }
+  const maxDay = Math.max(1, ...perDay);
+  const maxHour = Math.max(1, ...perHour);
+  const temDados = cells.length > 0;
+  const horaPico = temDados ? perHour.indexOf(Math.max(...perHour)) : null;
   const horas = Array.from({ length: 24 }, (_, h) => h);
 
   return (
@@ -411,57 +413,70 @@ async function Carteira({ lojas }: { lojas: string[] | null }) {
         )}
       </div>
 
-      {/* Heatmap: quando o dinheiro entra */}
+      {/* Recebimento por dia da semana */}
       <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-        <div className="mb-1 flex items-baseline justify-between gap-3">
-          <h2 className="text-xl font-bold">Quando o dinheiro entra</h2>
-          {horaPico != null && (
-            <span className="text-sm text-slate-400">
-              pico às <b className="text-emerald-300">{horaPico}h</b>
-            </span>
-          )}
-        </div>
+        <h2 className="mb-1 text-xl font-bold">Recebimento por dia da semana</h2>
         <p className="mb-5 text-xs text-slate-500">
-          Entradas na carteira por dia da semana × hora (últimos 60 dias). Mostra quando a Shopee te credita.
+          Quanto a Shopee credita em cada dia (últimos 60 dias). A Shopee <b>não credita no fim de semana</b> —
+          o acúmulo de sábado e domingo cai na <b>segunda</b>, por isso ela aparece bem maior.
         </p>
-        {maxCell === 0 ? (
-          <p className="text-slate-400">Sem entradas no período.</p>
+        {!temDados ? (
+          <p className="text-slate-400">Sem entradas no período. Rode a sincronização da carteira.</p>
         ) : (
+          <div className="space-y-2">
+            {diasOrd.map((d) => (
+              <div key={d} className="flex items-center gap-3">
+                <span className="w-10 shrink-0 text-sm text-slate-400">{diasLbl[d]}</span>
+                <div className="h-6 flex-1 overflow-hidden rounded-md bg-slate-800">
+                  <div
+                    className="h-full rounded-md bg-emerald-600"
+                    style={{ width: `${(perDay[d] / maxDay) * 100}%` }}
+                  />
+                </div>
+                <span className="w-28 shrink-0 text-right text-sm tabular-nums text-slate-200">
+                  {brl(perDay[d])}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Recebimento por hora do dia */}
+      {temDados && (
+        <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-6">
+          <div className="mb-1 flex items-baseline justify-between gap-3">
+            <h2 className="text-xl font-bold">Recebimento por hora</h2>
+            {horaPico != null && (
+              <span className="text-sm text-slate-400">
+                pico às <b className="text-emerald-300">{horaPico}h</b>
+              </span>
+            )}
+          </div>
+          <p className="mb-5 text-xs text-slate-500">Concentração das entradas ao longo do dia (soma dos 60 dias).</p>
           <div className="overflow-x-auto">
-            <div className="min-w-[620px]">
-              <div className="mb-1 flex items-center gap-1 pl-10">
+            <div className="min-w-[560px]">
+              <div className="flex h-28 items-end gap-[3px]">
                 {horas.map((h) => (
-                  <div key={h} className="w-5 text-center text-[9px] text-slate-500">
+                  <div
+                    key={h}
+                    title={`${h}h · ${brl(perHour[h])}`}
+                    className="flex-1 rounded-t bg-emerald-500/80"
+                    style={{ height: `${Math.max(2, (perHour[h] / maxHour) * 100)}%` }}
+                  />
+                ))}
+              </div>
+              <div className="mt-1 flex gap-[3px]">
+                {horas.map((h) => (
+                  <div key={h} className="flex-1 text-center text-[9px] text-slate-500">
                     {h % 3 === 0 ? h : ""}
                   </div>
                 ))}
               </div>
-              {diasOrd.map((d) => (
-                <div key={d} className="mb-1 flex items-center gap-1">
-                  <div className="w-9 shrink-0 pr-1 text-right text-[11px] text-slate-400">{diasLbl[d]}</div>
-                  {horas.map((h) => {
-                    const v = grid.get(`${d}-${h}`) || 0;
-                    const alpha = v > 0 ? (0.14 + 0.82 * Math.pow(v / maxCell, 0.6)).toFixed(3) : "0";
-                    return (
-                      <div
-                        key={h}
-                        title={v > 0 ? `${diasLbl[d]} ${h}h · ${brl(v)}` : `${diasLbl[d]} ${h}h · —`}
-                        className="h-5 w-5 shrink-0 rounded-[3px]"
-                        style={{
-                          backgroundColor: v > 0 ? `rgba(16,185,129,${alpha})` : "rgba(148,163,184,0.08)",
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-              ))}
             </div>
           </div>
-        )}
-        <p className="mt-4 text-xs text-slate-500">
-          Célula mais forte = mais dinheiro entrou naquele dia/hora. Passe o mouse pra ver o valor.
-        </p>
-      </div>
+        </div>
+      )}
     </div>
   );
 }
