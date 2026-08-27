@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Fragment } from "react";
 import { supabase } from "@/lib/supabase";
 import { escopoDoUsuario, filtroLojas } from "@/lib/conta";
 import CustoInput from "../components/CustoInput";
@@ -10,7 +11,7 @@ import SeletorEstado from "../components/SeletorEstado";
 export const dynamic = "force-dynamic";
 
 type Props = {
-  searchParams: Promise<{ aba?: string; periodo?: string; loja?: string; ufTend?: string }>;
+  searchParams: Promise<{ aba?: string; periodo?: string; loja?: string; ufTend?: string; pMargem?: string }>;
 };
 
 // ---------- período (Brasília, fim exclusivo) ----------
@@ -51,7 +52,6 @@ const ABAS = [
   { k: "carteira", r: "👛 Carteira" },
   { k: "ads", r: "📢 Ads" },
   { k: "produtos", r: "🏷️ Produtos & Margem" },
-  { k: "variacoes", r: "🧩 Custo por variação" },
   { k: "impostos", r: "🧾 Impostos" },
 ];
 
@@ -138,8 +138,9 @@ export default async function FinancasPage({ searchParams }: Props) {
         {aba === "previsao" && <Previsao lojas={lojas} ufTend={params.ufTend} sufixo={sufixo} />}
         {aba === "carteira" && <Carteira lojas={lojas} />}
         {aba === "ads" && <Ads lojas={lojas} />}
-        {aba === "produtos" && <Produtos lojas={lojas} />}
-        {aba === "variacoes" && <Variacoes lojas={lojas} />}
+        {(aba === "produtos" || aba === "variacoes") && (
+          <Produtos lojas={lojas} pagina={Math.max(0, Number(params.pMargem) || 0)} sufixo={sufixo} />
+        )}
         {aba === "impostos" && <Impostos conta={escopo.contaId} />}
       </div>
     </div>
@@ -820,70 +821,103 @@ async function Variacoes({ lojas }: { lojas: string[] | null }) {
 }
 
 // ---------------- PRODUTOS & MARGEM ----------------
-async function Produtos({ lojas }: { lojas: string[] | null }) {
-  let q = supabase
-    .from("produtos")
-    .select("id, nome, sku, preco, custo")
-    // sem custo primeiro (maior preço antes) — preenche o que falta e o que mais pesa
-    .order("custo", { ascending: true, nullsFirst: true })
-    .order("preco", { ascending: false })
-    .limit(400);
-  if (lojas) q = q.in("loja_id", lojas);
-  const { data } = await q;
-  const prods = (data as Record<string, unknown>[]) || [];
-  const total = prods.length;
-  const comCusto = prods.filter((p) => p.custo != null && n(p.custo) > 0).length;
-  const faltando = total - comCusto;
-  const pct = total > 0 ? Math.round((comCusto / total) * 100) : 0;
+type CatRow = {
+  loja_id: string; item_id: string; produto: string; model_sku: string; variacao: string | null;
+  unidades: number; preco: number; custo: number | null; taxa_pct: number;
+  margem_valor: number; margem_pct: number; sem_custo: boolean; total_linhas: number;
+};
+
+async function Produtos({ lojas, pagina, sufixo }: { lojas: string[] | null; pagina: number; sufixo: string }) {
+  const LIM = 100;
+  const { data } = await supabase.rpc("margem_catalogo", { p_loja_ids: lojas, p_offset: pagina * LIM, p_limite: LIM });
+  const rows = (data as CatRow[]) || [];
+  const total = rows[0] ? n(rows[0].total_linhas) : 0;
+  const totalPaginas = Math.max(1, Math.ceil(total / LIM));
+  const semCustoPag = rows.filter((r) => r.custo == null).length;
+  const linkPag = (p: number) => `/financas?aba=produtos&pMargem=${p}${sufixo}`;
+
+  let ultimoItem = "";
+  let idx = 0;
 
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-slate-400">
-          💡 Digite o custo por unidade e aperte <b>Enter</b> pra pular pra próxima. A margem e o lucro recalculam.
+        <p className="max-w-xl text-sm text-slate-400">
+          💡 <b>Margem real por venda</b> = preço − taxa Shopee do item − 6% (ads+afiliado+imposto) − custo. Digite o
+          custo e aperte <b>Enter</b> pra salvar e pular pra próxima linha.
         </p>
-        <div className="flex items-center gap-3 text-sm">
-          <span className="text-slate-300">
-            <b className="text-emerald-300">{comCusto}</b> / {total} com custo
-            {faltando > 0 && <span className="text-orange-300"> · faltam {faltando}</span>}
-          </span>
-          <div className="h-2 w-32 overflow-hidden rounded-full bg-slate-800">
-            <div className="h-full bg-emerald-500" style={{ width: `${pct}%` }} />
-          </div>
-        </div>
+        <span className="text-sm text-slate-300">
+          {int(total)} variações · pág. {pagina + 1}/{totalPaginas}
+        </span>
       </div>
+      {semCustoPag > 0 && (
+        <p className="mb-3 text-xs text-orange-300">
+          ⚠ {semCustoPag} variação(ões) desta página sem custo — a margem delas ainda não conta o custo.
+        </p>
+      )}
       <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900">
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-800 text-xs uppercase text-slate-400">
-            <tr><th className="p-3">SKU</th><th className="p-3">Produto</th><th className="p-3 text-right">Preço</th><th className="p-3 text-right">Custo</th><th className="p-3 text-right">Margem</th><th className="p-3">Situação</th></tr>
+            <tr>
+              <th className="p-3">Variação (SKU)</th>
+              <th className="p-3 text-right">Vendas</th>
+              <th className="p-3 text-right">Preço</th>
+              <th className="p-3 text-right">Taxa</th>
+              <th className="p-3 text-right">Custo</th>
+              <th className="p-3 text-right">Margem R$</th>
+              <th className="p-3 text-right">Margem %</th>
+            </tr>
           </thead>
           <tbody>
-            {prods.length === 0 ? (
-              <tr><td className="p-4 text-slate-400" colSpan={6}>Nenhum produto. Sincronize os produtos primeiro.</td></tr>
-            ) : prods.map((p, i) => {
-              const preco = n(p.preco);
-              const custo = p.custo != null ? n(p.custo) : null;
-              const margem = preco > 0 && custo != null ? ((preco - custo) / preco) * 100 : null;
+            {rows.length === 0 ? (
+              <tr><td className="p-4 text-slate-400" colSpan={7}>Nenhuma variação com vendas no escopo.</td></tr>
+            ) : rows.map((r) => {
+              const novoGrupo = r.item_id !== ultimoItem;
+              ultimoItem = r.item_id;
+              idx++;
+              const m = n(r.margem_pct);
+              const cor = r.custo == null ? "text-slate-500" : m < 0 ? "text-red-300" : m < 10 ? "text-orange-300" : "text-emerald-300";
               return (
-                <tr key={String(p.id)} className="border-t border-slate-800">
-                  <td className="p-3 font-mono text-xs">{String(p.sku || "—")}</td>
-                  <td className="p-3">{String(p.nome || "—")}</td>
-                  <td className="p-3 text-right">{brl(preco)}</td>
-                  <td className="p-3 text-right"><CustoInput produtoId={String(p.id)} inicial={custo} idx={i} /></td>
-                  <td className={`p-3 text-right ${margem == null ? "text-slate-500" : margem < 0 ? "text-red-300" : margem < 15 ? "text-orange-300" : "text-emerald-300"}`}>
-                    {margem == null ? "—" : `${margem.toFixed(0)}%`}
-                  </td>
-                  <td className="p-3">
-                    {margem == null ? <span className="text-slate-500 text-xs">sem custo</span>
-                      : margem < 0 ? <Chip cor="neg">Prejuízo</Chip>
-                      : margem < 15 ? <Chip cor="warn">Atenção</Chip>
-                      : <Chip cor="pos">Lucro</Chip>}
-                  </td>
-                </tr>
+                <Fragment key={`${r.loja_id}-${r.model_sku}`}>
+                  {novoGrupo && (
+                    <tr className="border-t-2 border-slate-700 bg-slate-800/40">
+                      <td className="px-3 py-2 font-semibold text-slate-200" colSpan={7}>{r.produto}</td>
+                    </tr>
+                  )}
+                  <tr className="border-t border-slate-800">
+                    <td className="p-3">
+                      <span className="text-slate-300">{r.variacao || "—"}</span>
+                      <span className="ml-2 font-mono text-xs text-slate-500">{r.model_sku}</span>
+                    </td>
+                    <td className="p-3 text-right text-slate-400">{int(r.unidades)}</td>
+                    <td className="p-3 text-right">{brl(n(r.preco))}</td>
+                    <td className="p-3 text-right text-slate-400">{n(r.taxa_pct)}%</td>
+                    <td className="p-3 text-right">
+                      <CustoVariacaoInput lojaId={r.loja_id} modelSku={r.model_sku} inicial={r.custo != null ? n(r.custo) : null} idx={idx} />
+                    </td>
+                    <td className={`p-3 text-right ${cor}`}>{r.custo == null ? "—" : brl(n(r.margem_valor))}</td>
+                    <td className={`p-3 text-right font-semibold ${cor}`}>{r.custo == null ? "—" : `${m.toFixed(0)}%`}</td>
+                  </tr>
+                </Fragment>
               );
             })}
           </tbody>
         </table>
+      </div>
+      <div className="mt-4 flex items-center justify-between">
+        <a
+          href={linkPag(Math.max(0, pagina - 1))}
+          className={`rounded-lg px-4 py-2 text-sm ${pagina === 0 ? "pointer-events-none text-slate-600" : "bg-slate-800 text-white hover:bg-slate-700"}`}
+        >
+          ← Anterior
+        </a>
+        <span className="text-sm text-slate-400">página {pagina + 1} de {totalPaginas}</span>
+        <a
+          href={linkPag(pagina + 1)}
+          className={`rounded-lg px-4 py-2 text-sm ${pagina + 1 >= totalPaginas ? "pointer-events-none text-slate-600" : "bg-slate-800 text-white hover:bg-slate-700"}`}
+        >
+          Próxima →
+        </a>
       </div>
     </div>
   );
