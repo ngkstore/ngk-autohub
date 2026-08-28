@@ -313,6 +313,11 @@ export async function enriquecerEscrowPendentes({
           desconto_vendedor: n(income.order_seller_discount),
           comissao_afiliado: n(income.order_ams_commission_fee), // Programa de Afiliados (comissão)
           escrow_atualizado_em: new Date().toISOString(),
+          // Reversão: escrow líquido zerado = cancelado/devolvido depois do
+          // pagamento -> tira do faturamento (senão fica contado como venda).
+          ...(n(income.escrow_amount) <= 0
+            ? { pedido_efetivado: false, entra_faturamento: false }
+            : {}),
         })
         .eq("id", pedido.id);
 
