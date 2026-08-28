@@ -11,8 +11,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 const CHAVE_ATIVO = "responder_avaliacoes_ativo";
-const POR_MINUTO = 20; // avaliações por minuto por loja na janela ativa
-const FIM_JANELA_ATIVA = 30; // minutos 0-29 = sprint; 30-59 = pausa
+const POR_MINUTO = 100; // avaliações por minuto por loja (maioria é template, barato)
+const FIM_JANELA_ATIVA = 60; // roda a hora inteira (sem pausa) — respostas são leves
 
 // POST: execução manual (teste), só nas lojas da conta do usuário logado.
 export async function POST(request: NextRequest) {
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
 
 // GET: usado pelo cron (a cada minuto). Só age se o robô estiver ligado e
 // dentro da janela de sprint (primeiros 30 min de cada hora).
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const minuto = new Date().getUTCMinutes();
     if (minuto >= FIM_JANELA_ATIVA) {
@@ -64,6 +64,12 @@ export async function GET() {
       });
     }
 
+    // ?limite= permite burst manual (limpar backlog); senão usa POR_MINUTO.
+    const limite = Math.min(
+      500,
+      Math.max(1, Number(request.nextUrl.searchParams.get("limite")) || POR_MINUTO)
+    );
+
     // Processa todas as lojas, mas só as cujas CONTAS têm o robô ligado.
     const lojas = await listarLojasShopeeAtivas();
     const ativos = await flagsPorConta(CHAVE_ATIVO);
@@ -73,7 +79,7 @@ export async function GET() {
       if (!loja.contaId || !ativos[loja.contaId]) continue;
       resultados.push({
         lojaId: loja.lojaId,
-        ...(await responderAvaliacoesLote({ lojaId: loja.lojaId, limite: POR_MINUTO })),
+        ...(await responderAvaliacoesLote({ lojaId: loja.lojaId, limite })),
       });
     }
     return NextResponse.json({ sucesso: true, lojas: resultados });
