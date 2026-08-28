@@ -231,45 +231,53 @@ export async function responderAvaliacoesLote({
     };
   }
 
-  await publicarRespostas(
-    token,
-    aPublicar.map(({ comment_id, comment }) => ({ comment_id, comment }))
-  );
-
-  // Marca como respondidas (crítico — não inclui respondida_em, que pode não
-  // existir ainda; assim a marcação nunca falha e evita resposta duplicada).
+  // Publica em BLOCOS — o reply_comment da Shopee limita a qtd por chamada
+  // (limite=400 dava "comment_list must contain at most..."). Bloco que falhar
+  // fica pendente pra próxima rodada; os outros seguem.
+  const BLOCO = 50;
   const agoraIso = new Date().toISOString();
-  for (const item of aPublicar) {
+  let publicados = 0;
+  for (let i = 0; i < aPublicar.length; i += BLOCO) {
+    const bloco = aPublicar.slice(i, i + BLOCO);
+    try {
+      await publicarRespostas(
+        token,
+        bloco.map(({ comment_id, comment }) => ({ comment_id, comment }))
+      );
+    } catch {
+      continue; // bloco falhou -> deixa pendente
+    }
+    // Marca só os do bloco publicado (crítico: evita resposta duplicada).
+    for (const item of bloco) {
+      await supabase
+        .from("avaliacoes")
+        .update({
+          ja_respondida: true,
+          status: "respondida",
+          resposta_shopee: item.comment,
+        })
+        .eq("id", item.id);
+    }
     await supabase
       .from("avaliacoes")
-      .update({
-        ja_respondida: true,
-        status: "respondida",
-        resposta_shopee: item.comment,
-      })
-      .eq("id", item.id);
+      .update({ respondida_em: agoraIso })
+      .in("id", bloco.map((i) => i.id));
+    publicados += bloco.length;
   }
 
-  // Carimbo de horário — best-effort (ignora erro se a coluna ainda não existe).
-  await supabase
-    .from("avaliacoes")
-    .update({ respondida_em: agoraIso })
-    .in(
-      "id",
-      aPublicar.map((i) => i.id)
-    );
-
   // Registra a rodada no histórico (para acompanhar o ritmo).
-  await supabase.from("sincronizacoes").insert({
-    loja_id: token.lojaId,
-    marketplace: "shopee",
-    tipo: "avaliacoes-resposta",
-    status: "sucesso",
-    registros_importados: aPublicar.length,
-    mensagem: `${aPublicar.length} resposta(s) publicada(s) (modelo: ${comModelo} • IA: ${comIA}).`,
-    iniciado_em: agoraIso,
-    finalizado_em: new Date().toISOString(),
-  });
+  if (publicados > 0) {
+    await supabase.from("sincronizacoes").insert({
+      loja_id: token.lojaId,
+      marketplace: "shopee",
+      tipo: "avaliacoes-resposta",
+      status: "sucesso",
+      registros_importados: publicados,
+      mensagem: `${publicados} resposta(s) publicada(s) (modelo: ${comModelo} • IA: ${comIA}).`,
+      iniciado_em: agoraIso,
+      finalizado_em: new Date().toISOString(),
+    });
+  }
 
   const { count } = await supabase
     .from("avaliacoes")
@@ -281,7 +289,7 @@ export async function responderAvaliacoesLote({
 
   return {
     processados: pendentes.length,
-    publicados: aPublicar.length,
+    publicados,
     comModelo,
     comIA,
     restantes: count ?? 0,
