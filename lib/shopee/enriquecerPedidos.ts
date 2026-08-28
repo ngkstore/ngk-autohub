@@ -267,7 +267,8 @@ export async function enriquecerPedidosPendentes({
   lojaIds = null,
   resync = false,
   backfill = false,
-}: { limite?: number; lojaIds?: string[] | null; resync?: boolean; backfill?: boolean } = {}): Promise<ResultadoEnriquecimento> {
+  revisar = false,
+}: { limite?: number; lojaIds?: string[] | null; resync?: boolean; backfill?: boolean; revisar?: boolean } = {}): Promise<ResultadoEnriquecimento> {
   const partnerId = process.env.SHOPEE_PARTNER_ID;
   const partnerKey = process.env.SHOPEE_PARTNER_KEY;
   const baseUrl = process.env.SHOPEE_API_BASE_URL || BASE_URL_PADRAO;
@@ -298,6 +299,17 @@ export async function enriquecerPedidosPendentes({
       ascending: false,
       nullsFirst: false,
     }).is("origem", null);
+  } else if (revisar) {
+    // Revisão de status: pedidos efetivados presos num status NÃO-terminal
+    // (ex.: "READY_TO_SHIP" há semanas) — o sistema não re-sincroniza status de
+    // pedido antigo, então cancelamento tardio ficava contado como pago. Re-puxa
+    // o status atual; se virou CANCELLED, sai do faturamento. Recentes primeiro.
+    query = query
+      .eq("pedido_efetivado", true)
+      .is("origem", null)
+      .not("data_pedido", "is", null)
+      .not("status", "in", "(COMPLETED,CANCELLED,TO_RETURN)")
+      .order("data_pedido", { ascending: false, nullsFirst: false });
   } else if (backfill) {
     // Drenador do backfill histórico: só os pedidos antigos importados
     // (origem='backfill') sem detalhe. Roda por um endpoint próprio, devagar,
@@ -375,16 +387,20 @@ export async function enriquecerPedidosPendentes({
         // dados_pedido/cliente/data — reescrever a coluna gorda dados_pedido
         // a cada re-checagem gera bloat/WAL e satura o Nano (autovacuum).
         const payload: Record<string, unknown> = {
-          valor_total: valorVenda,
           status: statusShopee,
-          data_pagamento: detalhe.pay_time
-            ? new Date(detalhe.pay_time * 1000).toISOString()
-            : null,
           pedido_efetivado: classificacao.pedido_efetivado,
           entra_faturamento: classificacao.entra_faturamento,
           atualizado_em: new Date().toISOString(),
         };
-        if (!resync) {
+        if (!revisar) {
+          // revisar mexe SÓ em status/flags — preserva valor_total e
+          // data_pagamento que o escrow já gravou (mais precisos que o detalhe).
+          payload.valor_total = valorVenda;
+          payload.data_pagamento = detalhe.pay_time
+            ? new Date(detalhe.pay_time * 1000).toISOString()
+            : null;
+        }
+        if (!resync && !revisar) {
           // Enriquecimento inicial (pedido sem detalhe): grava tudo, 1ª vez.
           payload.dados_pedido = detalhe;
           payload.cliente_nome = detalhe.buyer_username ?? null;
@@ -418,6 +434,12 @@ export async function enriquecerPedidosPendentes({
     .not("pedido_externo_id", "like", "SH-%");
   if (resync) {
     countQuery = countQuery.eq("status", "UNPAID").is("origem", null);
+  } else if (revisar) {
+    countQuery = countQuery
+      .eq("pedido_efetivado", true)
+      .is("origem", null)
+      .not("data_pedido", "is", null)
+      .not("status", "in", "(COMPLETED,CANCELLED,TO_RETURN)");
   } else if (backfill) {
     countQuery = countQuery.is("data_pedido", null).eq("origem", "backfill");
   } else {
