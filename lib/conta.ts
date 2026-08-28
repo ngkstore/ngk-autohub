@@ -1,6 +1,15 @@
 import { supabase } from "@/lib/supabase";
 import { criarSupabaseServer } from "@/lib/supabase/server";
 
+// Email do dono (admin real). Só ele pega o fallback de acesso total se a
+// consulta de contas falhar — qualquer outro usuário é fail-closed (sem acesso),
+// pra NUNCA um perfil novo/errado enxergar todas as lojas.
+const DONO_EMAIL = "acesso.ngk.store@gmail.com";
+
+// UUID que não casa com nenhuma loja — usado como filtro quando o usuário não
+// tem NENHUMA loja, pra garantir "vê nada" (nunca "vê tudo").
+const SENTINELA_SEM_LOJA = "00000000-0000-0000-0000-000000000000";
+
 export type Escopo = {
   email: string | null;
   admin: boolean;
@@ -34,9 +43,13 @@ export async function escopoDoUsuario(): Promise<Escopo> {
       .maybeSingle();
 
     if (error) {
-      // Tabela ainda não existe (pré-migração): mantém o dono com acesso total.
-      preSetup = true;
-      admin = true;
+      // Erro na consulta de contas (ex.: pré-migração). SÓ o dono não fica
+      // trancado; qualquer outro usuário fica SEM acesso (fail-closed) —
+      // nunca "vê tudo" por causa de um erro.
+      if (email === DONO_EMAIL) {
+        preSetup = true;
+        admin = true;
+      }
     } else if (membro) {
       admin = !!membro.admin;
       contaId = membro.conta_id ?? null;
@@ -71,7 +84,10 @@ export function filtroLojas(
   lojaParam?: string
 ): string[] | null {
   if (lojaParam && escopo.lojaIds.includes(lojaParam)) return [lojaParam];
-  return escopo.lojaIds; // sempre escopa pela conta do usuário (vazio = nenhuma)
+  // Sem NENHUMA loja: devolve a sentinela (não casa nada), nunca [] — porque
+  // várias queries tratam lista vazia como "sem filtro = todas as lojas".
+  if (escopo.lojaIds.length === 0) return [SENTINELA_SEM_LOJA];
+  return escopo.lojaIds; // escopa pela conta do usuário
 }
 
 // O usuário pode operar/ver esta loja? Admin vê tudo; senão só as da conta.
