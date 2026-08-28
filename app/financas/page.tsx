@@ -319,13 +319,14 @@ async function Conciliacao({ lojas, periodo }: { lojas: string[] | null; periodo
   if (periodo) qAud = qAud.gte("data_pedido", periodo.inicio).lt("data_pedido", periodo.fim);
 
   const argsPer = { p_loja_ids: lojas, p_inicio: periodo?.inicio ?? null, p_fim: periodo?.fim ?? null };
-  const [{ data: pedRaw }, { data: conRaw }, { data: divRaw }, { data: audResRaw }, { data: audListRaw }] =
+  const [{ data: pedRaw }, { data: conRaw }, { data: divRaw }, { data: audResRaw }, { data: audListRaw }, { data: agingRaw }] =
     await Promise.all([
       qPed,
       supabase.rpc("resumo_conciliacao", argsPer),
       supabase.rpc("divergencias_recebimento", { ...argsPer, p_limite: 200 }),
       supabase.rpc("auditoria_resumo", argsPer),
       qAud,
+      supabase.rpc("recebimento_aging", { p_loja_ids: lojas }),
     ]);
 
   const pedidos = (pedRaw as Record<string, unknown>[]) || [];
@@ -334,6 +335,7 @@ async function Conciliacao({ lojas, periodo }: { lojas: string[] | null; periodo
     (divRaw as { pedido_externo_id: string; cliente_nome: string | null; esperado: number; recebido: number; dif: number }[]) || [];
   const aud = (audResRaw as Record<string, unknown>) || {};
   const audList = ((audListRaw as Record<string, unknown>[]) || []).filter((a) => n(a.taxa_diferenca) > 0.5);
+  const ag = (agingRaw as Record<string, unknown>) || {};
   const meses = mesesRecentes();
 
   return (
@@ -344,6 +346,27 @@ async function Conciliacao({ lojas, periodo }: { lojas: string[] | null; periodo
         <Kpi label="Divergência no recebido" val={int(n(con.divergentes))} hint={n(con.divergentes) > 0 ? brl(n(con.diverg_valor)) : "tudo certo"} cor={n(con.divergentes) ? "text-red-300" : undefined} />
         <Kpi label="Taxa cobrada a mais" val={brl(n(aud.cobrado_a_mais))} hint={`${int(aud.divergentes)} fora da sua tabela`} cor="text-orange-300" />
       </div>
+
+      {/* Aging de recebimento: pagos que ainda não caíram, por tempo de espera */}
+      <section>
+        <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-xl font-bold">Aging de recebimento</h2>
+          {n(ag.b60_qtd) === 0 ? (
+            <span className="text-xs font-semibold text-emerald-300">nada vencido ✓</span>
+          ) : (
+            <span className="text-xs font-semibold text-red-300">⚠ {int(n(ag.b60_qtd))} vencido(s)</span>
+          )}
+        </div>
+        <p className="mb-3 text-xs text-slate-500">
+          Pedidos pagos que ainda não caíram na carteira, por tempo de espera. A maioria liquida em ~60 dias —
+          acima disso já passou do prazo normal (vale cobrar a Shopee). Só lojas conectadas, a partir do início da carteira de cada uma.
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <Kpi label="A caminho (até 30d)" val={brl(n(ag.b0_30_val))} hint={`${int(n(ag.b0_30_qtd))} pedidos · normal`} cor="text-blue-300" />
+          <Kpi label="Atrasando (30–60d)" val={brl(n(ag.b30_60_val))} hint={`${int(n(ag.b30_60_qtd))} pedidos · de olho`} cor="text-orange-300" />
+          <Kpi label="Vencido (+60d)" val={brl(n(ag.b60_val))} hint={n(ag.b60_qtd) > 0 ? `${int(n(ag.b60_qtd))} pedidos · cobrar Shopee` : "tudo em dia"} cor={n(ag.b60_qtd) > 0 ? "text-red-300" : "text-emerald-300"} />
+        </div>
+      </section>
 
       {/* 1 — Recebimento */}
       <section>
