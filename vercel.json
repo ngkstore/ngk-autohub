@@ -69,6 +69,10 @@
       "schedule": "40 6 * * *"
     },
     {
+      "path": "/api/shopee/ads/relatorio-semanal",
+      "schedule": "30 11 * * 1"
+    },
+    {
       "path": "/api/shopee/pedidos/processar-backfill?max=3",
       "schedule": "3,13,23,33,43,53 * * * *"
     },

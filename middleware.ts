@@ -23,6 +23,7 @@ const ROTAS_CRON = [
   "/api/shopee/ads/backfill",
   "/api/shopee/ads/probe-gms",
   "/api/shopee/ads/coletar",
+  "/api/shopee/ads/relatorio-semanal",
   "/api/shopee/pedidos/resumo-diario",
   "/api/shopee/escrow/debug",
   "/api/shopee/rastreio/debug",
