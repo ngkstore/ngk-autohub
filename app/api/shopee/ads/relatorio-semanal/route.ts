@@ -15,7 +15,8 @@ type Rec = {
 };
 const brl = (v: unknown) => (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const n = (v: unknown) => Number(v || 0);
-const x1 = (v: unknown) => `${n(v).toFixed(1)}×`;
+const d1 = (v: unknown) => n(v).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const x1 = (v: unknown) => `${d1(v)}×`;
 const ROTULO: Record<string, string> = {
   campeao: "campeões", abaixo_do_minimo: "abaixo do mínimo", meta_desalinhada: "meta desalinhada",
   aprendizado: "em aprendizado", sem_margem: "sem custo", saudavel: "saudáveis",
@@ -48,15 +49,16 @@ async function montarTexto(lojaId: string, nomeLoja: string): Promise<string | n
   const L: string[] = [];
   L.push(`🎯 Controle GMV Max — ${nomeLoja}`);
   L.push(`Semana: ROAS real ${x1(sem)} ${seta} (anterior ${x1(ant)} · média 4 sem ${x1(r.roas_media4s)})`);
-  L.push(`Gasto ${brl(r.gasto_semana)} · em risco ${brl(r.gasto_risco)} · saldo ${brl(r.saldo)} (~${saldoDias} dia${saldoDias === 1 ? "" : "s"})`);
+  L.push(`Gasto ${brl(r.gasto_semana)} · em risco ${brl(r.gasto_risco)} · saldo ${brl(r.saldo)} (~${d1(saldoDias)} dia${saldoDias === 1 ? "" : "s"})`);
   L.push(`Situação: ` + porClasse.map((c) => `${c.qtd} ${ROTULO[c.classificacao] || c.classificacao}`).join(" · "));
 
   const alertas: string[] = [];
-  if (saldoDias > 0 && saldoDias < 7) alertas.push(`saldo cobre só ~${saldoDias} dia(s) de gasto`);
+  if (saldoDias > 0 && saldoDias < 7) alertas.push(`saldo cobre só ~${d1(saldoDias)} dia(s) de gasto`);
   const despencando = recs.filter((x) => x.alerta_roas);
   if (despencando.length) alertas.push(`${despencando.length} item(ns) com ROAS < 0,7×mínimo há 3 dias`);
   const fat = ((fatRaw as Record<string, unknown>[]) || [])[0];
-  if (fat && n(fat.divergencia_pct) > 10) alertas.push(`fator D+30 divergiu ${n(fat.divergencia_pct).toFixed(0)}% (estimado ${n(fat.fator_estimado).toFixed(3)} vs consolidado ${n(fat.fator_consolidado).toFixed(3)}) — recalibrar`);
+  const d3 = (v: unknown) => n(v).toLocaleString("pt-BR", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+  if (fat && n(fat.divergencia_pct) > 10) alertas.push(`fator D+30 divergiu ${n(fat.divergencia_pct).toFixed(0)}% (estimado ${d3(fat.fator_estimado)} vs consolidado ${d3(fat.fator_consolidado)}) — recalibrar`);
   if (alertas.length) { L.push(""); L.push("🚨 Alertas:"); alertas.forEach((a) => L.push(`• ${a}`)); }
 
   const acoes = recs.filter((x) => PRIORIDADE.includes(x.classificacao)).slice(0, 6);
