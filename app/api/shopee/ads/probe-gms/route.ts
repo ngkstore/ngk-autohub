@@ -23,7 +23,15 @@ async function obterToken(lojaId: string) {
   return { at: String(data.access_token), shop: String(data.shop_id) };
 }
 
-async function chamar(path: string, at: string, shop: string, extra = ""): Promise<unknown> {
+// Auth (partner_id, timestamp, access_token, shop_id, sign) vai na URL; se `body`
+// for passado, é POST com os params de negócio no body JSON (padrão dos GMS).
+async function chamar(
+  path: string,
+  at: string,
+  shop: string,
+  extra = "",
+  body?: Record<string, unknown>
+): Promise<unknown> {
   const pid = process.env.SHOPEE_PARTNER_ID!;
   const pkey = process.env.SHOPEE_PARTNER_KEY!;
   const ts = Math.floor(Date.now() / 1000);
@@ -32,7 +40,11 @@ async function chamar(path: string, at: string, shop: string, extra = ""): Promi
     `${BASE}${path}?partner_id=${pid}&timestamp=${ts}` +
     `&access_token=${encodeURIComponent(at)}&shop_id=${shop}&sign=${sign}${extra}`;
   try {
-    const r = await fetch(url, { cache: "no-store" });
+    const r = await fetch(url, {
+      method: body ? "POST" : "GET",
+      cache: "no-store",
+      ...(body ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}),
+    });
     return await r.json();
   } catch (e) {
     return { erro_fetch: e instanceof Error ? e.message : "erro" };
@@ -62,7 +74,6 @@ export async function GET(request: NextRequest) {
   const ontem = new Date(Date.now() - 864e5);
   const start = request.nextUrl.searchParams.get("start") || fmt(ontem);
   const end = request.nextUrl.searchParams.get("end") || fmt(hoje);
-  const janela = `&start_date=${start}&end_date=${end}`;
 
   const balance = await chamar("/api/v2/ads/get_total_balance", t.at, t.shop);
   const campanhas = await chamar(
@@ -71,13 +82,17 @@ export async function GET(request: NextRequest) {
     t.shop,
     "&offset=0&limit=50&ad_type=all"
   );
-  const gmsCampanha = await chamar("/api/v2/ads/get_gms_campaign_performance", t.at, t.shop, janela);
-  const gmsItem = await chamar(
-    "/api/v2/ads/get_gms_item_performance",
-    t.at,
-    t.shop,
-    janela + "&offset=0&limit=20"
-  );
+  // GMS = POST com body (start_date/end_date DD-MM-YYYY, máx 3 meses).
+  const gmsCampanha = await chamar("/api/v2/ads/get_gms_campaign_performance", t.at, t.shop, "", {
+    start_date: start,
+    end_date: end,
+  });
+  const gmsItem = await chamar("/api/v2/ads/get_gms_item_performance", t.at, t.shop, "", {
+    start_date: start,
+    end_date: end,
+    offset: 0,
+    limit: 20,
+  });
 
   return NextResponse.json({
     sucesso: true,
