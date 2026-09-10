@@ -124,9 +124,12 @@ export async function coletarAdsLoja({
   }
   if (ids.length === 0) return { lojaId, campanhas: 0, linhasPerf: 0, linhasConfig: 0, saldo };
 
-  // 3) Config (meta ROAS, orçamento, item_id) — em blocos de 100. Guarda o mapa
-  //    campaign_id -> item_id pra atribuir a performance ao item.
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  // 3) Config (meta ROAS, orçamento, item_id) — em blocos de 100. Guarda os mapas
+  //    campaign_id -> item_id / status (pra atribuir item e filtrar ativas).
   const itemDeCampanha = new Map<number, number | null>();
+  const statusDeCampanha = new Map<number, string>();
   let linhasConfig = 0;
   for (let i = 0; i < ids.length; i += 100) {
     const bloco = ids.slice(i, i + 100);
@@ -143,7 +146,9 @@ export async function coletarAdsLoja({
       const itemList = (common.item_id_list as unknown[]) || [];
       const item = num(itemList[0]); // 1 item por campanha de produto
       const cid = Number(c.campaign_id);
+      const st = String(common.campaign_status ?? "");
       itemDeCampanha.set(cid, item);
+      statusDeCampanha.set(cid, st);
       return {
         loja_id: lojaId,
         dia: hojeIso,
@@ -167,12 +172,19 @@ export async function coletarAdsLoja({
       await supabase.from("ads_campaign_config_daily").upsert(linhas, { onConflict: "loja_id,dia,campaign_id" });
       linhasConfig += linhas.length;
     }
+    await sleep(400);
   }
 
-  // 4) Performance por campanha/dia (blocos de 100, o range de uma vez).
+  // 4) Performance por campanha/dia — SÓ das campanhas ATIVAS (ongoing/paused/
+  //    scheduled). As fechadas/encerradas não têm gasto e só gastariam cota do
+  //    rate limit. Espaça as chamadas. Range de uma vez (metrics_list por dia).
+  const ativos = ids.filter((id) =>
+    ["ongoing", "paused", "scheduled"].includes(statusDeCampanha.get(id) || "")
+  );
+  await sleep(1500);
   let linhasPerf = 0;
-  for (let i = 0; i < ids.length; i += 100) {
-    const bloco = ids.slice(i, i + 100);
+  for (let i = 0; i < ativos.length; i += 100) {
+    const bloco = ativos.slice(i, i + 100);
     const r = await chamar(
       "/api/v2/ads/get_product_campaign_daily_performance",
       tok,
