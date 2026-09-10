@@ -139,7 +139,9 @@ export async function coletarAdsLoja({
     const linhas = lista.map((c) => {
       const common = (c.common_info as Record<string, unknown>) || {};
       const manual = (c.manual_bidding_info as Record<string, unknown>) || {};
-      const item = num(common.item_id ?? (c as Record<string, unknown>).item_id);
+      const auto = (c.auto_bidding_info as Record<string, unknown>) || {};
+      const itemList = (common.item_id_list as unknown[]) || [];
+      const item = num(itemList[0]); // 1 item por campanha de produto
       const cid = Number(c.campaign_id);
       itemDeCampanha.set(cid, item);
       return {
@@ -148,7 +150,8 @@ export async function coletarAdsLoja({
         campaign_id: cid,
         item_id: item,
         ad_type: String(common.ad_type ?? ""),
-        meta_roas: num(manual.roi_target ?? manual.roas_target),
+        // GMV Max (meta ROAS) fica no roi_target (auto ou manual bidding).
+        meta_roas: num(auto.roi_target ?? manual.roi_target ?? manual.roas_target),
         orcamento: num(common.campaign_budget ?? common.daily_budget),
         data_inicio: common.campaign_duration
           ? new Date(Number((common.campaign_duration as Record<string, unknown>).start_time) * 1000)
@@ -179,8 +182,7 @@ export async function coletarAdsLoja({
     const linhas: Record<string, unknown>[] = [];
     for (const c of lista) {
       const cid = Number(c.campaign_id);
-      const item = itemDeCampanha.get(cid) ?? null;
-      if (item == null) continue; // sem item mapeado -> pula (não quebra a chave)
+      const item = itemDeCampanha.get(cid) ?? null; // item pode faltar; chave é campaign_id
       const metrics = (c.metrics_list as Record<string, unknown>[]) || [];
       for (const m of metrics) {
         const dia = isoDia(String(m.date));
@@ -211,7 +213,7 @@ export async function coletarAdsLoja({
     // Upsert em blocos (evita payload gigante).
     for (let j = 0; j < linhas.length; j += 500) {
       const parte = linhas.slice(j, j + 500);
-      await supabase.from("ads_item_performance_daily").upsert(parte, { onConflict: "loja_id,dia,item_id,escopo" });
+      await supabase.from("ads_item_performance_daily").upsert(parte, { onConflict: "loja_id,dia,campaign_id,escopo" });
       linhasPerf += parte.length;
     }
   }
