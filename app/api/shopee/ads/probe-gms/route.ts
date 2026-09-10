@@ -55,6 +55,15 @@ export async function GET(request: NextRequest) {
   const t = await obterToken(loja || "");
   if (!t) return NextResponse.json({ sucesso: false, erro: "loja sem token ativo" });
 
+  // Datas: ontem e hoje em DD-MM-YYYY (a API de Ads usa esse formato).
+  const p = (n: number) => String(n).padStart(2, "0");
+  const fmt = (d: Date) => `${p(d.getDate())}-${p(d.getMonth() + 1)}-${d.getFullYear()}`;
+  const hoje = new Date();
+  const ontem = new Date(Date.now() - 864e5);
+  const start = request.nextUrl.searchParams.get("start") || fmt(ontem);
+  const end = request.nextUrl.searchParams.get("end") || fmt(hoje);
+  const janela = `&start_date=${start}&end_date=${end}`;
+
   const balance = await chamar("/api/v2/ads/get_total_balance", t.at, t.shop);
   const campanhas = await chamar(
     "/api/v2/ads/get_product_level_campaign_id_list",
@@ -62,11 +71,21 @@ export async function GET(request: NextRequest) {
     t.shop,
     "&offset=0&limit=50&ad_type=all"
   );
+  const gmsCampanha = await chamar("/api/v2/ads/get_gms_campaign_performance", t.at, t.shop, janela);
+  const gmsItem = await chamar(
+    "/api/v2/ads/get_gms_item_performance",
+    t.at,
+    t.shop,
+    janela + "&offset=0&limit=20"
+  );
 
   return NextResponse.json({
     sucesso: true,
     loja,
+    janela: { start, end },
     get_total_balance: cru ? balance : resumo(balance),
     get_product_level_campaign_id_list: cru ? campanhas : resumo(campanhas),
+    get_gms_campaign_performance: cru ? gmsCampanha : resumo(gmsCampanha),
+    get_gms_item_performance: cru ? gmsItem : resumo(gmsItem),
   });
 }
