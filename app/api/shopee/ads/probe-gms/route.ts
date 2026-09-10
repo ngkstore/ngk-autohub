@@ -82,25 +82,30 @@ export async function GET(request: NextRequest) {
     t.shop,
     "&offset=0&limit=50&ad_type=all"
   );
-  // GMS = POST com body (start_date/end_date DD-MM-YYYY, máx 3 meses).
-  const gmsCampanha = await chamar("/api/v2/ads/get_gms_campaign_performance", t.at, t.shop, "", {
-    start_date: start,
-    end_date: end,
-  });
-  const gmsItem = await chamar("/api/v2/ads/get_gms_item_performance", t.at, t.shop, "", {
-    start_date: start,
-    end_date: end,
-    offset: 0,
-    limit: 20,
-  });
+  // IDs das campanhas de produto (CPC), pra puxar a performance por campanha.
+  const lista = ((campanhas as Record<string, unknown>)?.response as Record<string, unknown>)?.campaign_list;
+  const ids = (Array.isArray(lista) ? lista : [])
+    .map((c) => (c as Record<string, unknown>).campaign_id)
+    .filter(Boolean)
+    .slice(0, 20)
+    .join(",");
+
+  // get_product_campaign_daily_performance (GET): campaign_id_list, start/end.
+  const perfCampanha = ids
+    ? await chamar(
+        "/api/v2/ads/get_product_campaign_daily_performance",
+        t.at,
+        t.shop,
+        `&campaign_id_list=${ids}&start_date=${start}&end_date=${end}`
+      )
+    : { erro: "sem campanhas" };
 
   return NextResponse.json({
     sucesso: true,
     loja,
     janela: { start, end },
+    ids_testados: ids,
     get_total_balance: cru ? balance : resumo(balance),
-    get_product_level_campaign_id_list: cru ? campanhas : resumo(campanhas),
-    get_gms_campaign_performance: cru ? gmsCampanha : resumo(gmsCampanha),
-    get_gms_item_performance: cru ? gmsItem : resumo(gmsItem),
+    get_product_campaign_daily_performance: cru ? perfCampanha : resumo(perfCampanha),
   });
 }
