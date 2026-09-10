@@ -155,8 +155,8 @@ export async function coletarAdsLoja({
         campaign_id: cid,
         item_id: item,
         ad_type: String(common.ad_type ?? ""),
-        // GMV Max (meta ROAS) fica no roi_target (auto ou manual bidding).
-        meta_roas: num(auto.roi_target ?? manual.roi_target ?? manual.roas_target),
+        // GMV Max (meta ROAS): auto_bidding_info.roas_target (bidding_method="auto").
+        meta_roas: num(auto.roas_target ?? manual.roas_target ?? auto.roi_target ?? manual.roi_target),
         orcamento: num(common.campaign_budget ?? common.daily_budget),
         data_inicio: common.campaign_duration
           ? new Date(Number((common.campaign_duration as Record<string, unknown>).start_time) * 1000)
