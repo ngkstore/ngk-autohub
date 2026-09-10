@@ -65,6 +65,10 @@
       "schedule": "5,35 * * * *"
     },
     {
+      "path": "/api/shopee/ads/coletar?dias=2",
+      "schedule": "40 6 * * *"
+    },
+    {
       "path": "/api/shopee/pedidos/processar-backfill?max=3",
       "schedule": "3,13,23,33,43,53 * * * *"
     },
