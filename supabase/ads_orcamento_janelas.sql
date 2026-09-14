@@ -126,6 +126,7 @@ begin
         range between interval '28 days' preceding and interval '1 day' preceding), 0) as p_base
     from pedido_itens
     where dia >= v_hoje-60 and (p_loja_ids is null or loja_id = any(p_loja_ids))
+      and (loja_id, item_id::bigint) in (select loja_id, item_id from perf)  -- só itens com Ads
     group by loja_id, item_id, dia
   ),
   promo_dia as (
@@ -175,14 +176,21 @@ begin
     from pedido_itens pi join pedidos p on p.id = pi.pedido_id
     where p.data_pedido >= now() - interval '90 days'
       and (p_loja_ids is null or pi.loja_id = any(p_loja_ids))
+      and (pi.loja_id, pi.item_id::bigint) in (select loja_id, item_id from perf)  -- só itens com Ads
     group by 1,2
   ),
-  fator_loja as (select loja_id, sum(efet)/nullif(sum(bruto),0) as f from fator_item group by 1),
+  -- Fallback "fator médio da loja" (item com <20 pedidos): o fator estimado da loja
+  -- inteira, já calculado por ads_fator_consolidar (mensal) — evita varrer todos os itens.
+  fator_loja as (
+    select distinct on (loja_id) loja_id, fator_estimado as f
+    from ads_fator_historico order by loja_id, competencia desc
+  ),
   custo_item as (
     select pi.loja_id, pi.item_id::bigint as item_id, avg(cv.custo) as custo
     from pedido_itens pi
     join custos_variacao cv on cv.loja_id=pi.loja_id and norm_sku(cv.model_sku)=norm_sku(pi.model_sku)
-    where (p_loja_ids is null or pi.loja_id = any(p_loja_ids))
+    where pi.dia >= v_hoje-90 and (p_loja_ids is null or pi.loja_id = any(p_loja_ids))
+      and (pi.loja_id, pi.item_id::bigint) in (select loja_id, item_id from perf)  -- só itens com Ads
     group by 1,2
   ),
   preco_item as (  -- promo do ITEM (7d vs 28d anteriores) — regra campeão
@@ -191,6 +199,7 @@ begin
       sum(qtd*preco) filter (where dia <  v_hoje-7) / nullif(sum(qtd) filter (where dia <  v_hoje-7),0) as p28
     from pedido_itens
     where dia >= v_hoje-35 and (p_loja_ids is null or loja_id = any(p_loja_ids))
+      and (loja_id, item_id::bigint) in (select loja_id, item_id from perf)  -- só itens com Ads
     group by 1,2
   ),
   cfg as (

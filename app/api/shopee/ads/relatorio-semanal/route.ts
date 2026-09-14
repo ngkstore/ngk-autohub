@@ -73,6 +73,7 @@ async function montarTexto(lojaId: string, nomeLoja: string): Promise<string | n
     const teto = recs.filter((x) => x.censurado_teto).length;
     const delta = ideal - cfg;
     L.push(`💰 Orçamento/dia: configurado ${brl(cfg)} → ideal ${brl(ideal)} (${delta >= 0 ? "+" : "−"}${brl(Math.abs(delta))})${teto ? ` · ${teto} item(ns) batendo no teto` : ""}`);
+    L.push(`   (ideal = 2,5× o gasto normal de dias sem promo/campanha; ideal < configurado = folga, não é corte — ação é quando bate no teto)`);
   }
 
   const alertas: string[] = [];
