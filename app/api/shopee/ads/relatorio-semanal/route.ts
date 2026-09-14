@@ -26,9 +26,10 @@ const ROTULO: Record<string, string> = {
   aprendizado: "em aprendizado", sem_margem: "sem custo", saudavel: "saudáveis",
   problema_anuncio: "problema no anúncio", problema_pagina: "problema na página", meta_nao_entregue: "meta não entregue",
   orcamento_esgotando: "orçamento esgotando", estabilizacao: "em estabilização", pronto_proximo_degrau: "prontos p/ próximo degrau",
+  retomar_meta: "retomar meta anterior",
 };
 // Ordem de prioridade das ações (gasto em risco primeiro).
-const PRIORIDADE = ["abaixo_do_minimo", "problema_anuncio", "problema_pagina", "meta_nao_entregue", "orcamento_esgotando", "pronto_proximo_degrau", "meta_desalinhada"];
+const PRIORIDADE = ["abaixo_do_minimo", "retomar_meta", "problema_anuncio", "problema_pagina", "meta_nao_entregue", "orcamento_esgotando", "pronto_proximo_degrau", "meta_desalinhada"];
 
 // " · orç. R$100 → R$250" quando há orçamento ideal calculado.
 function orc(x: Rec): string {

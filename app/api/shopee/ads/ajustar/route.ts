@@ -100,6 +100,14 @@ export async function POST(request: NextRequest) {
           },
           { onConflict: "loja_id,campaign_id,data_deteccao,campo" }
         );
+        // Reforço automático ativo hoje? O valor salvo manualmente vira a nova base
+        // (a reversão da meia-noite volta pra ele, não pro valor de antes do reforço).
+        if (r.campo === "orcamento") {
+          await supabase
+            .from("ads_reforcos")
+            .update({ orcamento_base: r.valor, orcamento_atual: r.valor })
+            .eq("loja_id", lojaId).eq("campaign_id", campaignId).eq("dia", hoje).is("revertido_em", null);
+        }
       }
     }
     if (!simular && item != null && resultados.some((r) => r.sucesso)) {

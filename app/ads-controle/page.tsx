@@ -22,12 +22,14 @@ const COR: Record<string, string> = {
   aprendizado: "text-blue-300", sem_margem: "text-slate-400", saudavel: "text-slate-300",
   problema_anuncio: "text-orange-300", problema_pagina: "text-orange-300", meta_nao_entregue: "text-orange-300",
   orcamento_esgotando: "text-amber-300", estabilizacao: "text-blue-300", pronto_proximo_degrau: "text-emerald-300",
+  retomar_meta: "text-red-300",
 };
 const ROTULO: Record<string, string> = {
   campeao: "Campeão", abaixo_do_minimo: "Abaixo do mínimo", meta_desalinhada: "Meta desalinhada",
   aprendizado: "Aprendizado", sem_margem: "Sem custo", saudavel: "Saudável",
   problema_anuncio: "Problema no anúncio", problema_pagina: "Problema na página", meta_nao_entregue: "Meta não entregue",
   orcamento_esgotando: "Orçamento esgotando", estabilizacao: "Estabilização", pronto_proximo_degrau: "Pronto p/ próximo degrau",
+  retomar_meta: "Retomar meta anterior",
 };
 const JANELA: Record<string, string> = { aprendizado: "🎓 aprendizado", estabilizacao: "⏳ estabilização", livre: "✓ livre" };
 
@@ -100,6 +102,8 @@ export default async function AdsControlePage({ searchParams }: Props) {
   if (nRisco) alertas.push(`${nRisco.qtd} item(ns) abaixo do ROAS mínimo — ${brl(nRisco.gasto)} em gasto no prejuízo.`);
   const nEsg = porClasse.find((c) => c.classificacao === "orcamento_esgotando");
   if (nEsg) alertas.push(`${nEsg.qtd} item(ns) com ROAS saudável batendo no teto do orçamento — vale subir 20-30%.`);
+  const nRet = porClasse.find((c) => c.classificacao === "retomar_meta");
+  if (nRet) alertas.push(`${nRet.qtd} item(ns) perderam volume e lucro depois de subir a meta — vale voltar à meta anterior (abra o item).`);
 
   return (
     <div className="p-8 text-white">

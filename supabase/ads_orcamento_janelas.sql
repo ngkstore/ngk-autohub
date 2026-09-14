@@ -85,6 +85,9 @@ alter table ads_recomendacoes add column if not exists orcamento_ideal numeric(1
 alter table ads_recomendacoes add column if not exists estado_janela text;
 alter table ads_recomendacoes add column if not exists dias_restantes_janela int;
 alter table ads_recomendacoes add column if not exists motivo_supressao text;
+-- v3.1 (14/set): gasto normal dos últimos 7 dias (item escalando) e avaliação pós-degrau.
+alter table ads_recomendacoes add column if not exists gasto_medio_normal_7d numeric(12,2);
+alter table ads_recomendacoes add column if not exists degrau_avaliacao jsonb;
 
 -- ---------------------------------------------------------------------------
 -- Motor v3 = v2 + orçamento ideal + relógio das janelas.
@@ -137,7 +140,8 @@ begin
   -- campanha Shopee. Agrega por DIA antes (item com 2+ campanhas soma as duas);
   -- dias sem gasto ficam de fora: a média é do dia ativo típico.
   normal as (
-    select loja_id, item_id, avg(gasto_dia) as gasto_medio, (count(*))::int as dias_normais
+    select loja_id, item_id, avg(gasto_dia) as gasto_medio, (count(*))::int as dias_normais,
+      avg(gasto_dia) filter (where dia >= v_hoje-7) as gasto_medio_7d  -- item escalando: a média de 28d atrasa
     from (
       select d.loja_id, d.item_id, d.dia, sum(d.gasto) as gasto_dia
       from ads_item_performance_daily d
@@ -213,6 +217,30 @@ begin
     select loja_id, campaign_id, max(data_deteccao) as ultima
     from ads_alteracoes where campo='meta_roas' group by 1,2
   ),
+  -- Avaliação pós-degrau (v3.1): última troca de META (≤21 dias, com ≥3 dias de dados
+  -- depois). Compara por dia-calendário os 7 dias ANTES (D-8..D-2) com os dias DEPOIS
+  -- (D..ontem); D-1 (dia em que a troca aconteceu) fica de fora.
+  degrau_alt as (
+    select distinct on (loja_id, campaign_id) loja_id, campaign_id, data_deteccao as data_troca,
+      nullif(valor_antigo,'')::numeric as meta_antes, nullif(valor_novo,'')::numeric as meta_depois
+    from ads_alteracoes
+    where campo='meta_roas' and data_deteccao >= v_hoje-21
+      and (p_loja_ids is null or loja_id = any(p_loja_ids))
+    order by loja_id, campaign_id, data_deteccao desc
+  ),
+  degrau as (
+    select da.loja_id, da.campaign_id, da.data_troca, da.meta_antes, da.meta_depois,
+      (v_hoje - da.data_troca)::int as dias_depois,
+      coalesce(sum(d.gmv)   filter (where d.dia < da.data_troca-1), 0) / 7.0 as gmv_dia_antes,
+      coalesce(sum(d.gasto) filter (where d.dia < da.data_troca-1), 0) / 7.0 as gasto_dia_antes,
+      coalesce(sum(d.gmv)   filter (where d.dia >= da.data_troca), 0) / (v_hoje - da.data_troca) as gmv_dia_depois,
+      coalesce(sum(d.gasto) filter (where d.dia >= da.data_troca), 0) / (v_hoje - da.data_troca) as gasto_dia_depois
+    from degrau_alt da
+    left join ads_item_performance_daily d on d.loja_id=da.loja_id and d.campaign_id=da.campaign_id
+      and d.escopo='direto' and d.dia between da.data_troca-8 and v_hoje-1 and d.dia <> da.data_troca-1
+    where da.data_troca <= v_hoje-3
+    group by 1,2,3,4,5
+  ),
   base as (
     select p.loja_id, p.item_id, coalesce(p.campaign_id, cfg.campaign_id) as campaign_id,
       p.gasto7, p.gmv7, p.gasto28, p.gmv28,
@@ -230,9 +258,11 @@ begin
       (pr.p7 is not null and pr.p28 is not null and pr.p7 < 0.95*pr.p28) as promo,
       cfg.meta_roas, cfg.data_inicio, cfg.orcamento as orc_config,
       (v_hoje - coalesce(cfg.data_inicio, v_hoje))::int as dias_campanha,
-      nm.gasto_medio as gasto_medio_normal, nm.dias_normais,
+      nm.gasto_medio as gasto_medio_normal, nm.dias_normais, nm.gasto_medio_7d as gasto_medio_normal_7d,
       coalesce(eg.dias_esgotados, 0) as dias_esgotados,
-      (v_hoje - am.ultima)::int as dias_desde_meta
+      (v_hoje - am.ultima)::int as dias_desde_meta,
+      dg.data_troca, dg.meta_antes, dg.meta_depois, dg.dias_depois,
+      dg.gmv_dia_antes, dg.gasto_dia_antes, dg.gmv_dia_depois, dg.gasto_dia_depois
     from perf p
     join cfg on cfg.loja_id=p.loja_id and cfg.item_id=p.item_id
     left join fator_item fi on fi.loja_id=p.loja_id and fi.item_id=p.item_id
@@ -242,6 +272,7 @@ begin
     left join normal nm on nm.loja_id=p.loja_id and nm.item_id=p.item_id
     left join esgot eg on eg.loja_id=p.loja_id and eg.campaign_id=coalesce(p.campaign_id, cfg.campaign_id)
     left join alt_meta am on am.loja_id=p.loja_id and am.campaign_id=coalesce(p.campaign_id, cfg.campaign_id)
+    left join degrau dg on dg.loja_id=p.loja_id and dg.campaign_id=coalesce(p.campaign_id, cfg.campaign_id)
     where p.gasto7 > 0
   ),
   calc as (
@@ -275,7 +306,14 @@ begin
     select *,
       (meta_roas is not null and roas_shopee < 0.7*meta_roas) as f_meta_nao_entregue,
       (meta_roas is not null and meta_calc is not null and abs(meta_roas - meta_calc) > 0.15*meta_calc) as f_meta_desalinhada,
-      (roas_real >= roas_min and roas_shopee >= 0.9*roas_shopee28) as perf_mantida
+      (roas_real >= roas_min and roas_shopee >= 0.9*roas_shopee28) as perf_mantida,
+      -- Pós-degrau: lucro/dia estimado = GMV × fator × margem − gasto. "Regrediu" quando a
+      -- meta SUBIU, o GMV/dia caiu >30% e o lucro/dia ficou menor que antes.
+      gmv_dia_antes*fator*margem - gasto_dia_antes   as lucro_dia_antes,
+      gmv_dia_depois*fator*margem - gasto_dia_depois as lucro_dia_depois,
+      coalesce(meta_depois > meta_antes and gasto_dia_antes >= 10 and gmv_dia_antes > 0
+        and gmv_dia_depois < 0.7*gmv_dia_antes
+        and (gmv_dia_depois*fator*margem - gasto_dia_depois) < (gmv_dia_antes*fator*margem - gasto_dia_antes), false) as f_degrau_regrediu
     from calc2
   ),
   classif as (
@@ -284,8 +322,11 @@ begin
         when dias_campanha < 14 then 'aprendizado'
         when margem is null or margem <= 0 then 'sem_margem'
         when roas_real < roas_min then 'abaixo_do_minimo'
-        when ctr7 < 0.8*ctr28 and cr_estavel then 'problema_anuncio'
-        when cr7  < 0.8*cr28  and ctr_estavel then 'problema_pagina'
+        when f_degrau_regrediu then 'retomar_meta'
+        -- problema_* só quando o item NÃO está confortável (ROAS real < 1,3× mín): item
+        -- escalando perde CTR/CR naturalmente; se segue lucrativo vira só observação.
+        when ctr7 < 0.8*ctr28 and cr_estavel and roas_real < 1.3*roas_min then 'problema_anuncio'
+        when cr7  < 0.8*cr28  and ctr_estavel and roas_real < 1.3*roas_min then 'problema_pagina'
         when f_meta_nao_entregue and estado_janela='estabilizacao' then 'estabilizacao'
         when f_meta_nao_entregue then 'meta_nao_entregue'
         when roas_real >= 1.3*roas_min and not promo then 'campeao'
@@ -314,13 +355,16 @@ begin
      meta_roas, meta_calculada, dias_campanha, classificacao, acao, detalhe,
      promo, alerta_roas, ctr_7d, ctr_28d, cr_7d, cr_28d,
      roas_28d, gasto_medio_normal_28d, dias_normais_28d, dias_esgotados_7d, censurado_teto,
-     orcamento_configurado, orcamento_ideal, estado_janela, dias_restantes_janela, motivo_supressao)
+     orcamento_configurado, orcamento_ideal, estado_janela, dias_restantes_janela, motivo_supressao,
+     gasto_medio_normal_7d, degrau_avaliacao)
   select loja_id, v_hoje, item_id, campaign_id, round(gasto7,2), round(roas_shopee,2), round(fator,4),
     round(roas_real,2), round(roas_min,2), meta_roas, round(meta_calc,2), dias_campanha, classificacao,
     case classificacao
       when 'aprendizado'           then format('Aguardar (aprendizado, faltam %s dia(s)); não editar meta', dias_restantes)
       when 'sem_margem'            then 'Cadastrar custo/checar margem (sem base pra ROAS mínimo)'
       when 'abaixo_do_minimo'      then 'Pausar OU revisar página/preço antes de reinvestir'
+      when 'retomar_meta'          then format('Voltar a meta para %s: desde a troca %s → %s (%s dias) o GMV/dia caiu de R$%s para R$%s e o lucro/dia de R$%s para R$%s — público esfriou',
+                                          meta_antes, meta_antes, meta_depois, dias_depois, round(gmv_dia_antes), round(gmv_dia_depois), round(lucro_dia_antes), round(lucro_dia_depois))
       when 'problema_anuncio'      then 'Trocar capa / revisar título e preço exibido (CTR caiu, CR estável)'
       when 'problema_pagina'       then 'Auditar preço vs concorrência, avaliações, estoque de variações (CR caiu)'
       when 'estabilizacao'         then format('Aguardar %s dia(s) — janela de estabilização (meta alterada há %s dias)', dias_restantes, dias_desde_meta)
@@ -331,11 +375,23 @@ begin
       when 'meta_desalinhada'      then 'Ajustar meta na Shopee (em degraus)'
       else 'Nenhuma ação'
     end,
-    format('ROAS real %s vs mín %s · meta %s · fator %s%s%s%s',
+    format('ROAS real %s vs mín %s · meta %s · fator %s%s%s%s%s%s',
       round(roas_real,1), round(roas_min,1), coalesce(meta_roas,0), round(fator,3),
       case when promo then ' · PROMO (não escalar)' else '' end,
       case when alerta_roas then ' · 🚨 3 dias abaixo de 0,7×mín' else '' end,
-      case when censurado then format(' · teto: %s/7 dias esgotados', dias_esgotados) else '' end),
+      case when censurado then format(' · teto: %s/7 dias esgotados', dias_esgotados) else '' end,
+      -- observações (v3.1): queda de CTR/CR num item que segue lucrativo; escala recente
+      case when classificacao not in ('problema_anuncio','problema_pagina','abaixo_do_minimo','sem_margem','aprendizado')
+             and ctr7 < 0.8*ctr28 and cr_estavel then format(' · ⚠️ CTR 7d %s%% vs 28d (segue lucrativo)', round(100*(ctr7/ctr28-1)))
+           when classificacao not in ('problema_anuncio','problema_pagina','abaixo_do_minimo','sem_margem','aprendizado')
+             and cr7 < 0.8*cr28 and ctr_estavel then format(' · ⚠️ CR 7d %s%% vs 28d (segue lucrativo%s)', round(100*(cr7/cr28-1)),
+               case when gasto_medio_normal_7d > 1.5*gasto_medio_normal then format('; gasto 7d %s× o normal de 28d', round(gasto_medio_normal_7d/gasto_medio_normal,1)) else '' end)
+           else '' end,
+      case when data_troca is not null and classificacao <> 'retomar_meta'
+           then format(' · degrau %s→%s há %sd: GMV/dia R$%s→R$%s, lucro/dia R$%s→R$%s (%s)', meta_antes, meta_depois, dias_depois,
+                       round(gmv_dia_antes), round(gmv_dia_depois), round(lucro_dia_antes), round(lucro_dia_depois),
+                       case when gmv_dia_depois < 0.7*gmv_dia_antes then 'volume caiu, lucro ok' else 'ok' end)
+           else '' end),
     promo, alerta_roas, round(ctr7,4), round(ctr28,4), round(cr7,4), round(cr28,4),
     round(roas_shopee28,2), round(gasto_medio_normal,2), dias_normais, dias_esgotados, censurado,
     orc_config,
@@ -344,7 +400,8 @@ begin
       when classificacao = 'abaixo_do_minimo' then 0
       when censurado and orc_config is not null then round(orc_config*1.25, 2)
       when mult is null or gasto_medio_normal is null then null
-      else round(mult*gasto_medio_normal, 2)
+      -- item escalando: usa o maior entre o normal de 28d e o normal dos últimos 7d
+      else round(mult*greatest(gasto_medio_normal, coalesce(gasto_medio_normal_7d, 0)), 2)
     end,
     estado_janela, dias_restantes,
     case
@@ -352,7 +409,16 @@ begin
       when classificacao = 'estabilizacao' then format('estabilização: faltam %s dia(s) (meta alterada há %s dias); suprimida: %s',
         dias_restantes, dias_desde_meta, case when f_meta_nao_entregue then 'meta_nao_entregue' else 'meta_desalinhada' end)
       else null
-    end
+    end,
+    round(gasto_medio_normal_7d, 2),
+    case when data_troca is not null then jsonb_build_object(
+      'data_troca', data_troca, 'meta_antes', meta_antes, 'meta_depois', meta_depois, 'dias_depois', dias_depois,
+      'gmv_dia_antes', round(gmv_dia_antes,2), 'gmv_dia_depois', round(gmv_dia_depois,2),
+      'gasto_dia_antes', round(gasto_dia_antes,2), 'gasto_dia_depois', round(gasto_dia_depois,2),
+      'roas_antes', round(gmv_dia_antes/nullif(gasto_dia_antes,0),1), 'roas_depois', round(gmv_dia_depois/nullif(gasto_dia_depois,0),1),
+      'lucro_dia_antes', round(lucro_dia_antes,2), 'lucro_dia_depois', round(lucro_dia_depois,2),
+      'veredito', case when f_degrau_regrediu then 'regrediu'
+                       when gmv_dia_depois < 0.7*gmv_dia_antes then 'volume_caiu_lucro_ok' else 'ok' end) end
   from fin;
 
   get diagnostics v_n = row_count;

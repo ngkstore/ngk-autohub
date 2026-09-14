@@ -24,9 +24,10 @@ const ROTULO: Record<string, string> = {
   aprendizado: "Aprendizado", sem_margem: "Sem custo", saudavel: "Saudável",
   problema_anuncio: "Problema no anúncio", problema_pagina: "Problema na página", meta_nao_entregue: "Meta não entregue",
   orcamento_esgotando: "Orçamento esgotando", estabilizacao: "Estabilização", pronto_proximo_degrau: "Pronto p/ próximo degrau",
+  retomar_meta: "Retomar meta anterior",
 };
 const COR: Record<string, string> = {
-  campeao: "text-emerald-300", pronto_proximo_degrau: "text-emerald-300", abaixo_do_minimo: "text-red-300",
+  campeao: "text-emerald-300", pronto_proximo_degrau: "text-emerald-300", abaixo_do_minimo: "text-red-300", retomar_meta: "text-red-300",
   aprendizado: "text-blue-300", estabilizacao: "text-blue-300", sem_margem: "text-slate-400", saudavel: "text-slate-300",
   orcamento_esgotando: "text-amber-300",
 };
@@ -121,6 +122,14 @@ export default async function AdsItemPage({ searchParams }: Props) {
     : null;
   const campaignId = n(rec?.campaign_id || cfg?.campaign_id);
   const janela = rec ? String(rec.estado_janela || "livre") : null;
+  // "usar degrau" só quando o motor recomenda mexer na meta (campeão = manter meta).
+  const sugerirDegrau = !!rec && ["pronto_proximo_degrau", "meta_desalinhada"].includes(String(rec.classificacao));
+  const degrau = (rec?.degrau_avaliacao as Row | null) || null;
+  const { data: refRaw } = campaignId > 0
+    ? await supabase.from("ads_reforcos").select("*").eq("loja_id", lojaId).eq("campaign_id", campaignId).order("dia", { ascending: false }).limit(5)
+    : { data: null };
+  const reforcos = (refRaw as Row[]) || [];
+  const reforcoHoje = reforcos.find((r) => String(r.dia) === hoje && !r.revertido_em) || null;
 
   return (
     <div className="p-8 text-white">
@@ -164,12 +173,46 @@ export default async function AdsItemPage({ searchParams }: Props) {
             <span className="rounded-full border border-slate-700 px-3 py-1">ROAS real <b>{x1(rec.roas_real)}</b> (Shopee {x1(rec.roas_shopee)} × fator {n(rec.fator).toFixed(3)})</span>
             <span className="rounded-full border border-slate-700 px-3 py-1">ROAS mínimo <b>{rec.roas_minimo != null ? x1(rec.roas_minimo) : "—"}</b></span>
             <span className="rounded-full border border-slate-700 px-3 py-1">Meta calculada <b>{metaCalc != null ? x1(metaCalc) : "—"}</b></span>
-            <span className="rounded-full border border-slate-700 px-3 py-1">Orçamento ideal <b>{rec.orcamento_ideal != null ? brl(rec.orcamento_ideal) : "—"}</b>{rec.censurado_teto ? " (no teto)" : ""} · gasto normal {rec.gasto_medio_normal_28d != null ? `${brl(rec.gasto_medio_normal_28d)}/dia` : "—"}</span>
+            <span className="rounded-full border border-slate-700 px-3 py-1">Orçamento ideal <b>{rec.orcamento_ideal != null ? brl(rec.orcamento_ideal) : "—"}</b>{rec.censurado_teto ? " (no teto)" : ""} · gasto normal/dia: 28d {rec.gasto_medio_normal_28d != null ? brl(rec.gasto_medio_normal_28d) : "—"} · 7d {rec.gasto_medio_normal_7d != null ? brl(rec.gasto_medio_normal_7d) : "—"}</span>
             {rec.promo ? <span className="rounded-full border border-amber-700 px-3 py-1 text-amber-300">🏷️ em promoção</span> : null}
           </div>
         </div>
       ) : (
         <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-5 text-sm text-slate-400">Sem recomendação hoje (item sem gasto nos últimos 7 dias ou campanha inativa).</div>
+      )}
+
+      {/* Avaliação pós-degrau: como o anúncio se moveu depois da última troca de meta */}
+      {degrau && (
+        <div className={`mt-4 rounded-2xl border p-5 ${degrau.veredito === "regrediu" ? "border-red-800 bg-red-950/30" : "border-slate-800 bg-slate-900"}`}>
+          <p className="text-xs text-slate-400">Movimento após a troca de meta {x1(degrau.meta_antes)} → {x1(degrau.meta_depois)} em {diaBr(String(degrau.data_troca))} ({int(degrau.dias_depois)} dias depois)</p>
+          <div className="mt-2 grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
+            <div><p className="text-[11px] text-slate-500">GMV/dia</p><p className="tabular-nums">{brl(degrau.gmv_dia_antes)} → <b>{brl(degrau.gmv_dia_depois)}</b></p></div>
+            <div><p className="text-[11px] text-slate-500">Gasto/dia</p><p className="tabular-nums">{brl(degrau.gasto_dia_antes)} → <b>{brl(degrau.gasto_dia_depois)}</b></p></div>
+            <div><p className="text-[11px] text-slate-500">ROAS Shopee</p><p className="tabular-nums">{x1(degrau.roas_antes)} → <b>{x1(degrau.roas_depois)}</b></p></div>
+            <div><p className="text-[11px] text-slate-500">Lucro/dia estimado</p><p className="tabular-nums">{brl(degrau.lucro_dia_antes)} → <b>{brl(degrau.lucro_dia_depois)}</b></p></div>
+          </div>
+          <p className={`mt-2 text-xs ${degrau.veredito === "regrediu" ? "text-red-300" : "text-slate-400"}`}>
+            {degrau.veredito === "regrediu"
+              ? "Perdeu volume e lucro depois de subir a meta: vale voltar à meta anterior pra reaquecer o público."
+              : degrau.veredito === "volume_caiu_lucro_ok"
+                ? "Volume caiu mais de 30%, mas o lucro/dia se manteve ou subiu: o degrau compensou."
+                : "Volume e lucro mantidos: o degrau foi bem absorvido."}
+            {" "}Lucro/dia = GMV × fator × margem − gasto.
+          </p>
+        </div>
+      )}
+
+      {/* Reforço automático do dia */}
+      {reforcoHoje && (
+        <div className="mt-4 rounded-2xl border border-amber-800 bg-amber-950/20 p-4 text-sm">
+          ⚡ <b>Reforço automático ativo hoje:</b> orçamento base {brl(reforcoHoje.orcamento_base)} → atual <b>{brl(reforcoHoje.orcamento_atual)}</b> ({int(reforcoHoje.reforcos)}× reforço). Volta ao base à meia-noite.
+          {Array.isArray(reforcoHoje.historico) && (reforcoHoje.historico as Row[]).length > 0 && (
+            <span className="text-xs text-slate-400"> · {(reforcoHoje.historico as Row[]).map((h) => `${h.hora}h: ${brl(h.de)}→${brl(h.para)} (gasto ${brl(h.gasto)}, ROAS ${x1(h.roas_hoje)})`).join(" · ")}</span>
+          )}
+        </div>
+      )}
+      {!reforcoHoje && reforcos.length > 0 && (
+        <p className="mt-3 text-xs text-slate-500">⚡ Reforços automáticos recentes: {reforcos.slice(0, 3).map((r) => `${diaBr(String(r.dia))} ${brl(r.orcamento_base)}→${brl(r.orcamento_atual)} (${int(r.reforcos)}×${r.revertido_em ? ", revertido" : ""})`).join(" · ")}</p>
       )}
 
       {/* KPIs 7 dias (28 no rodapé de cada card) */}
@@ -197,7 +240,9 @@ export default async function AdsItemPage({ searchParams }: Props) {
             orcamentoAtual={orcAtual}
             metaAtual={metaAtual}
             orcamentoSugerido={rec?.orcamento_ideal != null && n(rec.orcamento_ideal) > 0 ? n(rec.orcamento_ideal) : null}
-            metaSugerida={metaSugerida}
+            metaSugerida={sugerirDegrau ? metaSugerida : null}
+            metaAnterior={degrau && String(rec?.classificacao) === "retomar_meta" ? n(degrau.meta_antes) : null}
+            reforcoBase={reforcoHoje ? n(reforcoHoje.orcamento_base) : null}
             janela={janela}
             diasRestantes={rec ? n(rec.dias_restantes_janela) : null}
           />

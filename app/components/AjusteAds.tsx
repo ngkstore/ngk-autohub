@@ -13,6 +13,8 @@ export default function AjusteAds({
   metaAtual,
   orcamentoSugerido,
   metaSugerida,
+  metaAnterior = null,
+  reforcoBase = null,
   janela,
   diasRestantes,
 }: {
@@ -23,6 +25,8 @@ export default function AjusteAds({
   metaAtual: number | null;
   orcamentoSugerido: number | null;
   metaSugerida: number | null;
+  metaAnterior?: number | null; // "retomar meta": volta pra meta de antes do degrau
+  reforcoBase?: number | null;  // reforço automático ativo hoje (orçamento base)
   janela: string | null;
   diasRestantes: number | null;
 }) {
@@ -90,6 +94,9 @@ export default function AjusteAds({
             )}
           </div>
           <p className="mt-1 text-[11px] text-slate-500">atual: {orcamentoAtual != null ? `R$ ${fmt(orcamentoAtual)}` : "—"} (0 = sem limite na Shopee)</p>
+          {reforcoBase != null && (
+            <p className="mt-1 text-[11px] text-amber-300">⚡ reforço automático ativo hoje: base R$ {fmt(reforcoBase)}. O valor atual inclui o reforço; à meia-noite volta pra base. Se você salvar outro valor, ele vira a nova base.</p>
+          )}
         </div>
         <div>
           <label className="text-xs text-slate-400">Meta ROAS (×)</label>
@@ -98,6 +105,11 @@ export default function AjusteAds({
             {metaSugerida != null && (
               <button type="button" onClick={() => setMeta(fmt(metaSugerida))} className="rounded-lg border border-emerald-700/60 px-2 py-1 text-xs text-emerald-300 hover:bg-emerald-900/30">
                 usar degrau {fmt(metaSugerida)}×
+              </button>
+            )}
+            {metaAnterior != null && (
+              <button type="button" onClick={() => setMeta(fmt(metaAnterior))} className="rounded-lg border border-red-700/60 px-2 py-1 text-xs text-red-300 hover:bg-red-900/30">
+                voltar p/ {fmt(metaAnterior)}×
               </button>
             )}
           </div>
