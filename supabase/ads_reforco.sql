@@ -40,3 +40,7 @@ grant select, insert on ads_reforco_avisos to anon, authenticated;
 -- até eles autorizarem.
 update lojas set ads_reforco_auto = true
   where id in ('329df5fb-0d8f-4eb5-af36-ff216152cedf', '697c3bf2-2aea-48ba-90b1-c2beda4e4f1f');
+-- Essas duas contas têm recarga automática da Shopee quando o saldo bate R$50, então o
+-- piso fica em R$40: só bloqueia (e avisa) se a recarga automática falhar.
+update lojas set ads_reforco_saldo_min = 40
+  where id in ('329df5fb-0d8f-4eb5-af36-ff216152cedf', '697c3bf2-2aea-48ba-90b1-c2beda4e4f1f');
