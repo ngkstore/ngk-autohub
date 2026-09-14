@@ -2,6 +2,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { escopoDoUsuario, filtroLojas } from "@/lib/conta";
 import LojaSeletor from "../components/LojaSeletor";
+import AjusteInline from "../components/AjusteInline";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,17 @@ type Rec = {
   classificacao: string; acao: string; loja_id: string;
   orcamento_configurado: number | null; orcamento_ideal: number | null; censurado_teto: boolean;
   estado_janela: string | null; dias_restantes_janela: number | null; motivo_supressao: string | null;
+  meta_calculada: number | null; degrau_avaliacao: Record<string, unknown> | null;
 };
+// Próximo degrau da meta: 15% da meta atual na direção da meta calculada (nunca passa dela).
+// Só é oferecido quando o motor recomenda mexer na meta (campeão = manter meta).
+function proximoDegrau(x: Rec): number | null {
+  if (!["pronto_proximo_degrau", "meta_desalinhada"].includes(x.classificacao)) return null;
+  const meta = x.meta_roas != null ? Number(x.meta_roas) : null;
+  const calc = x.meta_calculada != null ? Number(x.meta_calculada) : null;
+  if (meta == null || calc == null || Math.abs(calc - meta) <= 0.15 * calc) return null;
+  return Math.round((meta + Math.sign(calc - meta) * Math.min(Math.abs(calc - meta), 0.15 * meta)) * 10) / 10;
+}
 
 const brl = (v: number) => (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const n = (v: unknown) => Number(v || 0);
@@ -62,11 +73,19 @@ export default async function AdsControlePage({ searchParams }: Props) {
   let qRec = supabase.from("ads_recomendacoes").select("*").eq("dia", hoje).order("gasto_7d", { ascending: false }).limit(300);
   if (lojas) qRec = qRec.in("loja_id", lojas);
 
-  const [{ data: resumoRaw }, { data: recsRaw }, { data: lojasRaw }] = await Promise.all([
+  let qRef = supabase.from("ads_reforcos").select("loja_id, campaign_id, orcamento_base").eq("dia", hoje).is("revertido_em", null);
+  if (lojas) qRef = qRef.in("loja_id", lojas);
+
+  const [{ data: resumoRaw }, { data: recsRaw }, { data: lojasRaw }, { data: refRaw }] = await Promise.all([
     supabase.rpc("ads_resumo_controle", { p_loja_ids: lojas }),
     qRec,
     qLojas,
+    qRef,
   ]);
+  // Reforço automático ativo hoje, por campanha (mostra ⚡ e a base na edição inline).
+  const reforcoBase: Record<string, number> = Object.fromEntries(
+    (((refRaw as { loja_id: string; campaign_id: number; orcamento_base: number }[]) || []).map((f) => [`${f.loja_id}-${f.campaign_id}`, Number(f.orcamento_base)]))
+  );
   const r = (resumoRaw as Record<string, unknown>) || {};
   const recs = (recsRaw as Rec[]) || [];
   const lojasList = ((lojasRaw as { id: string; nome: string; nome_publico: string | null; apelido: string | null }[]) || [])
@@ -155,7 +174,7 @@ export default async function AdsControlePage({ searchParams }: Props) {
               <th className="p-3 text-right">ROAS real</th>
               <th className="p-3 text-right">ROAS mín.</th>
               <th className="p-3 text-right">Meta</th>
-              <th className="p-3 text-right">Orç. config → ideal</th>
+              <th className="p-3 text-right">Orç. config → ideal <span className="normal-case text-slate-500">(✎ edita aqui)</span></th>
               <th className="p-3">Janela</th>
               <th className="p-3">Situação</th>
               <th className="p-3">Ação</th>
@@ -175,21 +194,20 @@ export default async function AdsControlePage({ searchParams }: Props) {
                 <td className="p-3 text-right tabular-nums">{brl(n(x.gasto_7d))}</td>
                 <td className="p-3 text-right tabular-nums">{n(x.roas_real).toFixed(1)}×</td>
                 <td className="p-3 text-right tabular-nums text-slate-400">{x.roas_minimo != null ? `${n(x.roas_minimo).toFixed(1)}×` : "—"}</td>
-                <td className="p-3 text-right tabular-nums text-slate-400">{x.meta_roas != null ? `${n(x.meta_roas).toFixed(1)}×` : "—"}</td>
-                <td className="p-3 text-right tabular-nums" title={x.censurado_teto ? "consumo no teto do orçamento (média censurada): degrau de +25%" : undefined}>
-                  {x.orcamento_ideal == null ? (
-                    <span className="text-slate-500">{x.orcamento_configurado != null ? brl(n(x.orcamento_configurado)) : "—"}</span>
-                  ) : (
-                    <>
-                      <span className="text-slate-400">{x.orcamento_configurado != null ? brl(n(x.orcamento_configurado)) : "—"}</span>
-                      <span className="text-slate-500"> → </span>
-                      <span className={n(x.orcamento_ideal) > n(x.orcamento_configurado) ? "text-emerald-300" : n(x.orcamento_ideal) < n(x.orcamento_configurado) ? "text-orange-300" : "text-slate-300"}>
-                        {brl(n(x.orcamento_ideal))}
-                      </span>
-                      {x.censurado_teto && <span className="ml-1 text-xs text-amber-300">teto</span>}
-                    </>
-                  )}
-                </td>
+                <AjusteInline
+                  lojaId={x.loja_id}
+                  campaignId={x.campaign_id}
+                  itemId={x.item_id}
+                  metaAtual={x.meta_roas != null ? n(x.meta_roas) : null}
+                  orcamentoAtual={x.orcamento_configurado != null ? n(x.orcamento_configurado) : null}
+                  orcamentoIdeal={x.orcamento_ideal != null ? n(x.orcamento_ideal) : null}
+                  metaSugerida={proximoDegrau(x)}
+                  metaAnterior={x.classificacao === "retomar_meta" && x.degrau_avaliacao?.meta_antes != null ? n(x.degrau_avaliacao.meta_antes) : null}
+                  janela={x.estado_janela}
+                  diasRestantes={x.dias_restantes_janela}
+                  censurado={!!x.censurado_teto}
+                  reforcoBase={x.campaign_id != null ? reforcoBase[`${x.loja_id}-${x.campaign_id}`] ?? null : null}
+                />
                 <td className="p-3 text-xs" title={x.motivo_supressao || undefined}>
                   <span className={x.estado_janela === "livre" ? "text-slate-500" : "text-blue-300"}>{JANELA[x.estado_janela || "livre"] || x.estado_janela}</span>
                   {x.estado_janela && x.estado_janela !== "livre" && <span className="text-slate-400"> · faltam {x.dias_restantes_janela ?? 0}d</span>}
