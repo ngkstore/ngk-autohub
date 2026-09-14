@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { escopoDoUsuario, filtroLojas } from "@/lib/conta";
+import LojaSeletor from "../components/LojaSeletor";
 
 export const dynamic = "force-dynamic";
 
@@ -29,21 +31,46 @@ const ROTULO: Record<string, string> = {
 };
 const JANELA: Record<string, string> = { aprendizado: "🎓 aprendizado", estabilizacao: "⏳ estabilização", livre: "✓ livre" };
 
+function Kpi({ label, val, hint, cor, trend }: { label: string; val: string; hint?: string; cor?: string; trend?: number | null }) {
+  return (
+    <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+      <p className="text-sm text-slate-400">{label}</p>
+      <p className={`mt-2 text-2xl font-bold ${cor || "text-white"}`}>{val}</p>
+      {trend != null && (
+        <p className={`mt-1 text-xs ${trend >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+          {trend >= 0 ? "▲" : "▼"} {Math.abs(trend).toFixed(0)}% vs semana anterior
+        </p>
+      )}
+      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
+    </div>
+  );
+}
+
 export default async function AdsControlePage({ searchParams }: Props) {
   const params = await searchParams;
   const escopo = await escopoDoUsuario();
   const lojas = filtroLojas(escopo, params.loja);
   const hoje = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 
+  // Lojas Shopee da conta, pro seletor e pra coluna "Loja".
+  const escopoLojas = filtroLojas(escopo, undefined);
+  let qLojas = supabase.from("lojas").select("id, nome, nome_publico, apelido").eq("marketplace", "shopee").order("nome");
+  if (escopoLojas) qLojas = qLojas.in("id", escopoLojas);
+
   let qRec = supabase.from("ads_recomendacoes").select("*").eq("dia", hoje).order("gasto_7d", { ascending: false }).limit(300);
   if (lojas) qRec = qRec.in("loja_id", lojas);
 
-  const [{ data: resumoRaw }, { data: recsRaw }] = await Promise.all([
+  const [{ data: resumoRaw }, { data: recsRaw }, { data: lojasRaw }] = await Promise.all([
     supabase.rpc("ads_resumo_controle", { p_loja_ids: lojas }),
     qRec,
+    qLojas,
   ]);
   const r = (resumoRaw as Record<string, unknown>) || {};
   const recs = (recsRaw as Rec[]) || [];
+  const lojasList = ((lojasRaw as { id: string; nome: string; nome_publico: string | null; apelido: string | null }[]) || [])
+    .map((l) => ({ id: l.id, nome: l.nome_publico || l.apelido || l.nome }));
+  const nomeLoja: Record<string, string> = Object.fromEntries(lojasList.map((l) => [l.id, l.nome]));
+  const mostrarLoja = !params.loja && lojasList.length > 1;
 
   // Nomes dos produtos (item_id -> nome).
   const nomes: Record<string, string> = {};
@@ -61,7 +88,6 @@ export default async function AdsControlePage({ searchParams }: Props) {
   const tend = roasAnterior > 0 ? ((roasSemana - roasAnterior) / roasAnterior) * 100 : null;
   const porClasse = (r.por_classificacao as { classificacao: string; qtd: number; gasto: number }[]) || [];
 
-  // Orçamento diário: configurado vs ideal (itens com ideal calculado).
   const comOrc = recs.filter((x) => x.orcamento_ideal != null && x.orcamento_configurado != null);
   const orcCfg = comOrc.reduce((s, x) => s + n(x.orcamento_configurado), 0);
   const orcIdeal = comOrc.reduce((s, x) => s + n(x.orcamento_ideal), 0);
@@ -75,26 +101,18 @@ export default async function AdsControlePage({ searchParams }: Props) {
   const nEsg = porClasse.find((c) => c.classificacao === "orcamento_esgotando");
   if (nEsg) alertas.push(`${nEsg.qtd} item(ns) com ROAS saudável batendo no teto do orçamento — vale subir 20-30%.`);
 
-  const Kpi = ({ label, val, hint, cor, trend }: { label: string; val: string; hint?: string; cor?: string; trend?: number | null }) => (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-      <p className="text-sm text-slate-400">{label}</p>
-      <p className={`mt-2 text-2xl font-bold ${cor || "text-white"}`}>{val}</p>
-      {trend != null && (
-        <p className={`mt-1 text-xs ${trend >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-          {trend >= 0 ? "▲" : "▼"} {Math.abs(trend).toFixed(0)}% vs semana anterior
-        </p>
-      )}
-      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
-    </div>
-  );
-
   return (
     <div className="p-8 text-white">
-      <h1 className="text-4xl font-bold">🎯 Controle de Ads (GMV Max)</h1>
-      <p className="mt-2 max-w-2xl text-slate-400">
-        ROAS <b>real</b> por item (corrigido pelo fator de efetivação) contra o ROAS <b>mínimo</b> (margem da conciliação) e a sua meta.
-        Orçamento ideal por item e o relógio das janelas (aprendizado / estabilização). Atualiza todo dia de madrugada.
-      </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-4xl font-bold">🎯 Controle de Ads (GMV Max)</h1>
+          <p className="mt-2 max-w-2xl text-slate-400">
+            ROAS <b>real</b> por item (corrigido pelo fator de efetivação) contra o ROAS <b>mínimo</b> (margem da conciliação) e a sua meta.
+            Clique no produto pra abrir o painel completo (conversão, CTR, custo por venda, GMV real) e ajustar orçamento/meta.
+          </p>
+        </div>
+        <LojaSeletor lojas={lojasList} atual={params.loja || "todas"} base="/ads-controle" />
+      </div>
 
       {alertas.length > 0 && (
         <div className="mt-6 space-y-2">
@@ -128,6 +146,7 @@ export default async function AdsControlePage({ searchParams }: Props) {
           <thead className="bg-slate-800 text-xs uppercase text-slate-400">
             <tr>
               <th className="p-3">Produto</th>
+              {mostrarLoja && <th className="p-3">Loja</th>}
               <th className="p-3 text-right">Gasto 7d</th>
               <th className="p-3 text-right">ROAS real</th>
               <th className="p-3 text-right">ROAS mín.</th>
@@ -140,12 +159,15 @@ export default async function AdsControlePage({ searchParams }: Props) {
           </thead>
           <tbody>
             {recs.length === 0 ? (
-              <tr><td className="p-4 text-slate-400" colSpan={9}>Sem recomendações ainda — o coletor roda de madrugada. Rode o backfill se acabou de configurar.</td></tr>
+              <tr><td className="p-4 text-slate-400" colSpan={mostrarLoja ? 10 : 9}>Sem recomendações ainda — o coletor roda de madrugada. Rode o backfill se acabou de configurar.</td></tr>
             ) : recs.map((x) => (
-              <tr key={`${x.loja_id}-${x.item_id}`} className="border-t border-slate-800">
+              <tr key={`${x.loja_id}-${x.item_id}`} className="border-t border-slate-800 hover:bg-slate-800/40">
                 <td className="p-3 max-w-xs truncate" title={nomes[String(x.item_id)] || String(x.item_id)}>
-                  {nomes[String(x.item_id)] || <span className="text-slate-500">item {x.item_id}</span>}
+                  <Link href={`/ads-controle/item?loja=${x.loja_id}&item=${x.item_id}`} className="text-white underline decoration-slate-600 underline-offset-2 hover:decoration-emerald-400">
+                    {nomes[String(x.item_id)] || <span className="text-slate-500">item {x.item_id}</span>}
+                  </Link>
                 </td>
+                {mostrarLoja && <td className="p-3 text-xs text-slate-400">{nomeLoja[x.loja_id] || "—"}</td>}
                 <td className="p-3 text-right tabular-nums">{brl(n(x.gasto_7d))}</td>
                 <td className="p-3 text-right tabular-nums">{n(x.roas_real).toFixed(1)}×</td>
                 <td className="p-3 text-right tabular-nums text-slate-400">{x.roas_minimo != null ? `${n(x.roas_minimo).toFixed(1)}×` : "—"}</td>
@@ -178,8 +200,9 @@ export default async function AdsControlePage({ searchParams }: Props) {
 
       <p className="mt-4 text-xs text-slate-500">
         <b>ROAS real</b> = ROAS Shopee × fator de efetivação. <b>ROAS mínimo</b> = 1 ÷ margem efetiva (taxa real do escrow + custo + 6%).
-        <b> Orçamento ideal</b> = multiplicador × gasto médio &quot;normal&quot; (28 dias, sem promoção e sem dia de campanha Shopee):
-        2,5× para campeão/saudável, 1,25× para aprendizado/estabilização/problemas, 0 abaixo do mínimo; item batendo no teto (≥95% do orçamento em ≥5 de 7 dias) com ROAS saudável sobe em degrau de +25%.
+        <b> Meta desalinhada</b> = sua meta ROAS na Shopee difere mais de 15% da meta calculada (máx. entre 30× e o ROAS mínimo, ÷ fator) — ajuste em degraus de ~15%.
+        <b> Orçamento ideal</b> = 2,5× o gasto médio &quot;normal&quot; (28 dias, sem promoção e sem dia de campanha Shopee) para campeão/saudável; 1,25× em aprendizado/estabilização/problemas; 0 abaixo do mínimo.
+        Ideal &lt; configurado = folga (orçamento não é o limitador); item batendo no teto (≥95% em ≥5 de 7 dias) com ROAS saudável sobe em degrau de +25%.
         <b> Janela</b>: aprendizado = 14 dias após o início; estabilização = 12 dias após alterar a meta — nesses períodos a recomendação de mexer na meta é suprimida.
       </p>
     </div>

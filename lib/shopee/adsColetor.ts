@@ -13,7 +13,7 @@ const BASE = process.env.SHOPEE_API_BASE_URL || "https://partner.shopeemobile.co
 
 type Tok = { at: string; shop: string };
 
-async function obterToken(lojaId: string): Promise<Tok | null> {
+export async function obterToken(lojaId: string): Promise<Tok | null> {
   const { data } = await supabase
     .from("marketplace_tokens")
     .select("access_token, shop_id")
@@ -27,7 +27,7 @@ async function obterToken(lojaId: string): Promise<Tok | null> {
 }
 
 // Chama a Shopee (auth na URL; body opcional = POST). Retry/backoff no rate limit.
-async function chamar(
+export async function chamar(
   path: string,
   tok: Tok,
   extra = "",
