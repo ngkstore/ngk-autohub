@@ -69,6 +69,7 @@ export default function AjusteInline(p: Props) {
     }
   }
 
+  const sobe = p.metaSugerida != null && p.metaAtual != null && p.metaSugerida > p.metaAtual;
   const corIdeal =
     p.orcamentoIdeal == null || p.orcamentoAtual == null ? "text-slate-300"
       : p.orcamentoIdeal > p.orcamentoAtual ? "text-emerald-300"
@@ -82,7 +83,11 @@ export default function AjusteInline(p: Props) {
       <>
         <td className="p-3 text-right tabular-nums text-slate-400 whitespace-nowrap">
           {p.metaAtual != null ? `${p.metaAtual.toFixed(1).replace(".", ",")}×` : "—"}
-          {p.metaSugerida != null && <span className="ml-1 text-xs text-emerald-300" title="próximo degrau sugerido">→ {fmt(p.metaSugerida)}×</span>}
+          {p.metaSugerida != null && (
+            sobe
+              ? <span className="ml-1 text-xs text-emerald-300" title="subir a meta em degrau">↑ {fmt(p.metaSugerida)}×</span>
+              : <span className="ml-1 text-xs text-orange-300" title="baixar a meta em degrau (meta não entregue)">↓ {fmt(p.metaSugerida)}×</span>
+          )}
           {p.metaAnterior != null && <span className="ml-1 text-xs text-red-300" title="voltar à meta anterior">← {fmt(p.metaAnterior)}×</span>}
         </td>
         <td className="p-3 text-right tabular-nums whitespace-nowrap" title={p.censurado ? "consumo no teto do orçamento (média censurada): degrau de +25%" : undefined}>
@@ -113,7 +118,7 @@ export default function AjusteInline(p: Props) {
           <input value={meta} onChange={(e) => setMeta(e.target.value)} inputMode="decimal" className={cls} placeholder="meta" autoFocus />
           <span className="text-xs text-slate-500">×</span>
           {p.metaSugerida != null && (
-            <button type="button" onClick={() => setMeta(fmt(p.metaSugerida))} className={`${mini} border-emerald-700/60 text-emerald-300 hover:bg-emerald-900/30`} title="usar próximo degrau">degrau {fmt(p.metaSugerida)}</button>
+            <button type="button" onClick={() => setMeta(fmt(p.metaSugerida))} className={`${mini} ${sobe ? "border-emerald-700/60 text-emerald-300 hover:bg-emerald-900/30" : "border-orange-700/60 text-orange-300 hover:bg-orange-900/30"}`} title={sobe ? "subir a meta em degrau" : "baixar a meta em degrau (meta não entregue)"}>{sobe ? "↑" : "↓"} {fmt(p.metaSugerida)}</button>
           )}
           {p.metaAnterior != null && (
             <button type="button" onClick={() => setMeta(fmt(p.metaAnterior))} className={`${mini} border-red-700/60 text-red-300 hover:bg-red-900/30`} title="voltar à meta anterior">voltar {fmt(p.metaAnterior)}</button>

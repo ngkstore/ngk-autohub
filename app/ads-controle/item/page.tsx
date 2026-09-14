@@ -116,14 +116,12 @@ export default async function AdsItemPage({ searchParams }: Props) {
   const metaAtual = cfg?.meta_roas != null ? n(cfg.meta_roas) : null;
   const orcAtual = cfg?.orcamento != null ? n(cfg.orcamento) : null;
   const metaCalc = rec?.meta_calculada != null ? n(rec.meta_calculada) : null;
-  // Próximo degrau: 15% da meta atual na direção da meta calculada (nunca passa dela).
-  const metaSugerida = metaAtual != null && metaCalc != null && Math.abs(metaCalc - metaAtual) > 0.15 * metaCalc
-    ? Math.round((metaAtual + Math.sign(metaCalc - metaAtual) * Math.min(Math.abs(metaCalc - metaAtual), 0.15 * metaAtual)) * 10) / 10
-    : null;
+  // Meta sugerida vem do motor (v3.2): degrau pra cima (pronto/desalinhada), pra baixo
+  // (meta não entregue: −15% até o piso de empate) ou a meta anterior (retomar_meta).
+  const metaSugerida = rec?.meta_sugerida != null ? n(rec.meta_sugerida) : null;
+  const ehRetomar = String(rec?.classificacao) === "retomar_meta";
   const campaignId = n(rec?.campaign_id || cfg?.campaign_id);
   const janela = rec ? String(rec.estado_janela || "livre") : null;
-  // "usar degrau" só quando o motor recomenda mexer na meta (campeão = manter meta).
-  const sugerirDegrau = !!rec && ["pronto_proximo_degrau", "meta_desalinhada"].includes(String(rec.classificacao));
   const degrau = (rec?.degrau_avaliacao as Row | null) || null;
   const { data: refRaw } = campaignId > 0
     ? await supabase.from("ads_reforcos").select("*").eq("loja_id", lojaId).eq("campaign_id", campaignId).order("dia", { ascending: false }).limit(5)
@@ -240,8 +238,8 @@ export default async function AdsItemPage({ searchParams }: Props) {
             orcamentoAtual={orcAtual}
             metaAtual={metaAtual}
             orcamentoSugerido={rec?.orcamento_ideal != null && n(rec.orcamento_ideal) > 0 ? n(rec.orcamento_ideal) : null}
-            metaSugerida={sugerirDegrau ? metaSugerida : null}
-            metaAnterior={degrau && String(rec?.classificacao) === "retomar_meta" ? n(degrau.meta_antes) : null}
+            metaSugerida={ehRetomar ? null : metaSugerida}
+            metaAnterior={ehRetomar ? metaSugerida : null}
             reforcoBase={reforcoHoje ? n(reforcoHoje.orcamento_base) : null}
             janela={janela}
             diasRestantes={rec ? n(rec.dias_restantes_janela) : null}

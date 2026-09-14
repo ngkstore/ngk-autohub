@@ -88,6 +88,9 @@ alter table ads_recomendacoes add column if not exists motivo_supressao text;
 -- v3.1 (14/set): gasto normal dos últimos 7 dias (item escalando) e avaliação pós-degrau.
 alter table ads_recomendacoes add column if not exists gasto_medio_normal_7d numeric(12,2);
 alter table ads_recomendacoes add column if not exists degrau_avaliacao jsonb;
+-- v3.2: meta sugerida nas DUAS direções (subir em degrau, baixar quando não entregue,
+-- voltar quando o degrau regrediu). As telas usam este valor nos botões.
+alter table ads_recomendacoes add column if not exists meta_sugerida numeric(8,2);
 
 -- ---------------------------------------------------------------------------
 -- Motor v3 = v2 + orçamento ideal + relógio das janelas.
@@ -307,13 +310,18 @@ begin
       (meta_roas is not null and roas_shopee < 0.7*meta_roas) as f_meta_nao_entregue,
       (meta_roas is not null and meta_calc is not null and abs(meta_roas - meta_calc) > 0.15*meta_calc) as f_meta_desalinhada,
       (roas_real >= roas_min and roas_shopee >= 0.9*roas_shopee28) as perf_mantida,
-      -- Pós-degrau: lucro/dia estimado = GMV × fator × margem − gasto. "Regrediu" quando a
-      -- meta SUBIU, o GMV/dia caiu >30% e o lucro/dia ficou menor que antes.
+      -- Pós-degrau: lucro/dia estimado = GMV × fator × margem − gasto. "Regrediu" quando:
+      --   meta SUBIU  → GMV/dia caiu >30% e o lucro/dia ficou menor (público esfriou);
+      --   meta DESCEU → lucro/dia caiu >20% (o ROAS caiu mais do que o volume subiu).
       gmv_dia_antes*fator*margem - gasto_dia_antes   as lucro_dia_antes,
       gmv_dia_depois*fator*margem - gasto_dia_depois as lucro_dia_depois,
-      coalesce(meta_depois > meta_antes and gasto_dia_antes >= 10 and gmv_dia_antes > 0
-        and gmv_dia_depois < 0.7*gmv_dia_antes
-        and (gmv_dia_depois*fator*margem - gasto_dia_depois) < (gmv_dia_antes*fator*margem - gasto_dia_antes), false) as f_degrau_regrediu
+      coalesce(gasto_dia_antes >= 10 and gmv_dia_antes > 0 and (
+        (meta_depois > meta_antes and gmv_dia_depois < 0.7*gmv_dia_antes
+          and (gmv_dia_depois*fator*margem - gasto_dia_depois) < (gmv_dia_antes*fator*margem - gasto_dia_antes))
+        or
+        (meta_depois < meta_antes
+          and (gmv_dia_depois*fator*margem - gasto_dia_depois) < 0.8*(gmv_dia_antes*fator*margem - gasto_dia_antes))
+      ), false) as f_degrau_regrediu
     from calc2
   ),
   classif as (
@@ -347,8 +355,23 @@ begin
         else 1.25 end as mult,
       -- próximo degrau: 15% da meta atual na direção da meta calculada (nunca passa dela)
       case when meta_roas is not null and meta_calc is not null
-        then round((meta_roas + sign(meta_calc-meta_roas)*least(abs(meta_calc-meta_roas), 0.15*meta_roas))::numeric, 1) end as proximo_degrau
+        then round((meta_roas + sign(meta_calc-meta_roas)*least(abs(meta_calc-meta_roas), 0.15*meta_roas))::numeric, 1) end as proximo_degrau,
+      -- degrau pra BAIXO (meta não entregue): −15% da meta, nunca abaixo do ROAS mínimo em
+      -- termos de Shopee (mín ÷ fator = empate). A Shopee entrega o que consegue; meta alta
+      -- demais só estrangula a entrega.
+      case when meta_roas is not null and roas_min is not null
+        then round(greatest(0.85*meta_roas, roas_min/nullif(fator,0))::numeric, 1) end as degrau_baixo
     from classif
+  ),
+  fin2 as (
+    select *,
+      case classificacao
+        when 'pronto_proximo_degrau' then proximo_degrau
+        when 'meta_desalinhada'      then proximo_degrau
+        when 'meta_nao_entregue'     then case when degrau_baixo < meta_roas then degrau_baixo end
+        when 'retomar_meta'          then meta_antes
+      end as meta_sugerida
+    from fin
   )
   insert into ads_recomendacoes
     (loja_id, dia, item_id, campaign_id, gasto_7d, roas_shopee, fator, roas_real, roas_minimo,
@@ -356,19 +379,24 @@ begin
      promo, alerta_roas, ctr_7d, ctr_28d, cr_7d, cr_28d,
      roas_28d, gasto_medio_normal_28d, dias_normais_28d, dias_esgotados_7d, censurado_teto,
      orcamento_configurado, orcamento_ideal, estado_janela, dias_restantes_janela, motivo_supressao,
-     gasto_medio_normal_7d, degrau_avaliacao)
+     gasto_medio_normal_7d, degrau_avaliacao, meta_sugerida)
   select loja_id, v_hoje, item_id, campaign_id, round(gasto7,2), round(roas_shopee,2), round(fator,4),
     round(roas_real,2), round(roas_min,2), meta_roas, round(meta_calc,2), dias_campanha, classificacao,
     case classificacao
       when 'aprendizado'           then format('Aguardar (aprendizado, faltam %s dia(s)); não editar meta', dias_restantes)
       when 'sem_margem'            then 'Cadastrar custo/checar margem (sem base pra ROAS mínimo)'
       when 'abaixo_do_minimo'      then 'Pausar OU revisar página/preço antes de reinvestir'
-      when 'retomar_meta'          then format('Voltar a meta para %s: desde a troca %s → %s (%s dias) o GMV/dia caiu de R$%s para R$%s e o lucro/dia de R$%s para R$%s — público esfriou',
-                                          meta_antes, meta_antes, meta_depois, dias_depois, round(gmv_dia_antes), round(gmv_dia_depois), round(lucro_dia_antes), round(lucro_dia_depois))
+      when 'retomar_meta'          then format('Voltar a meta para %s: desde a troca %s → %s (%s dias) o GMV/dia foi de R$%s para R$%s e o lucro/dia de R$%s para R$%s — %s',
+                                          meta_antes, meta_antes, meta_depois, dias_depois, round(gmv_dia_antes), round(gmv_dia_depois), round(lucro_dia_antes), round(lucro_dia_depois),
+                                          case when meta_depois > meta_antes then 'público esfriou' else 'o ROAS caiu mais do que o volume subiu' end)
       when 'problema_anuncio'      then 'Trocar capa / revisar título e preço exibido (CTR caiu, CR estável)'
       when 'problema_pagina'       then 'Auditar preço vs concorrência, avaliações, estoque de variações (CR caiu)'
       when 'estabilizacao'         then format('Aguardar %s dia(s) — janela de estabilização (meta alterada há %s dias)', dias_restantes, dias_desde_meta)
-      when 'meta_nao_entregue'     then 'Checar Impulsão Rápida/Aumento Automático; reduzir meta em degraus'
+      when 'meta_nao_entregue'     then case when degrau_baixo < meta_roas
+                                          then format('Meta não entregue (ROAS Shopee %s vs meta %s): baixar a meta em degrau %s → %s (piso %s = empate) e checar Impulsão Rápida/Aumento Automático',
+                                                      round(roas_shopee,1), meta_roas, meta_roas, degrau_baixo, round(roas_min/nullif(fator,0),1))
+                                          else format('Meta não entregue (ROAS Shopee %s vs meta %s), mas a meta já está no piso (%s = empate): checar Impulsão Rápida/Aumento Automático, página e preço',
+                                                      round(roas_shopee,1), meta_roas, round(roas_min/nullif(fator,0),1)) end
       when 'campeao'               then 'Aumentar orçamento 20-30%; manter meta'
       when 'orcamento_esgotando'   then format('Orçamento esgotando com ROAS saudável (%s de 7 dias no teto): aumentar 20-30%%', dias_esgotados)
       when 'pronto_proximo_degrau' then format('Aplicar próximo degrau da meta: %s → %s (alvo %s)', meta_roas, proximo_degrau, round(meta_calc,1))
@@ -418,8 +446,9 @@ begin
       'roas_antes', round(gmv_dia_antes/nullif(gasto_dia_antes,0),1), 'roas_depois', round(gmv_dia_depois/nullif(gasto_dia_depois,0),1),
       'lucro_dia_antes', round(lucro_dia_antes,2), 'lucro_dia_depois', round(lucro_dia_depois,2),
       'veredito', case when f_degrau_regrediu then 'regrediu'
-                       when gmv_dia_depois < 0.7*gmv_dia_antes then 'volume_caiu_lucro_ok' else 'ok' end) end
-  from fin;
+                       when gmv_dia_depois < 0.7*gmv_dia_antes then 'volume_caiu_lucro_ok' else 'ok' end) end,
+    meta_sugerida
+  from fin2;
 
   get diagnostics v_n = row_count;
   return v_n;

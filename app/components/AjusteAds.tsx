@@ -103,8 +103,8 @@ export default function AjusteAds({
           <div className="mt-1 flex items-center gap-2">
             <input value={meta} onChange={(e) => setMeta(e.target.value)} inputMode="decimal" className={cls} placeholder="—" />
             {metaSugerida != null && (
-              <button type="button" onClick={() => setMeta(fmt(metaSugerida))} className="rounded-lg border border-emerald-700/60 px-2 py-1 text-xs text-emerald-300 hover:bg-emerald-900/30">
-                usar degrau {fmt(metaSugerida)}×
+              <button type="button" onClick={() => setMeta(fmt(metaSugerida))} className={`rounded-lg border px-2 py-1 text-xs ${metaAtual != null && metaSugerida < metaAtual ? "border-orange-700/60 text-orange-300 hover:bg-orange-900/30" : "border-emerald-700/60 text-emerald-300 hover:bg-emerald-900/30"}`}>
+                {metaAtual != null && metaSugerida < metaAtual ? "baixar p/" : "subir p/"} {fmt(metaSugerida)}×
               </button>
             )}
             {metaAnterior != null && (

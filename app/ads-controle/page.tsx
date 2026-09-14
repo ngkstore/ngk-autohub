@@ -14,16 +14,8 @@ type Rec = {
   orcamento_configurado: number | null; orcamento_ideal: number | null; censurado_teto: boolean;
   estado_janela: string | null; dias_restantes_janela: number | null; motivo_supressao: string | null;
   meta_calculada: number | null; degrau_avaliacao: Record<string, unknown> | null;
+  meta_sugerida: number | null; // do motor: degrau pra cima, pra baixo (não entregue) ou meta anterior (retomar)
 };
-// Próximo degrau da meta: 15% da meta atual na direção da meta calculada (nunca passa dela).
-// Só é oferecido quando o motor recomenda mexer na meta (campeão = manter meta).
-function proximoDegrau(x: Rec): number | null {
-  if (!["pronto_proximo_degrau", "meta_desalinhada"].includes(x.classificacao)) return null;
-  const meta = x.meta_roas != null ? Number(x.meta_roas) : null;
-  const calc = x.meta_calculada != null ? Number(x.meta_calculada) : null;
-  if (meta == null || calc == null || Math.abs(calc - meta) <= 0.15 * calc) return null;
-  return Math.round((meta + Math.sign(calc - meta) * Math.min(Math.abs(calc - meta), 0.15 * meta)) * 10) / 10;
-}
 
 const brl = (v: number) => (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const n = (v: unknown) => Number(v || 0);
@@ -201,8 +193,8 @@ export default async function AdsControlePage({ searchParams }: Props) {
                   metaAtual={x.meta_roas != null ? n(x.meta_roas) : null}
                   orcamentoAtual={x.orcamento_configurado != null ? n(x.orcamento_configurado) : null}
                   orcamentoIdeal={x.orcamento_ideal != null ? n(x.orcamento_ideal) : null}
-                  metaSugerida={proximoDegrau(x)}
-                  metaAnterior={x.classificacao === "retomar_meta" && x.degrau_avaliacao?.meta_antes != null ? n(x.degrau_avaliacao.meta_antes) : null}
+                  metaSugerida={x.classificacao !== "retomar_meta" && x.meta_sugerida != null ? n(x.meta_sugerida) : null}
+                  metaAnterior={x.classificacao === "retomar_meta" && x.meta_sugerida != null ? n(x.meta_sugerida) : null}
                   janela={x.estado_janela}
                   diasRestantes={x.dias_restantes_janela}
                   censurado={!!x.censurado_teto}
@@ -223,6 +215,7 @@ export default async function AdsControlePage({ searchParams }: Props) {
       <p className="mt-4 text-xs text-slate-500">
         <b>ROAS real</b> = ROAS Shopee × fator de efetivação. <b>ROAS mínimo</b> = 1 ÷ margem efetiva (taxa real do escrow + custo + 6%).
         <b> Meta desalinhada</b> = sua meta ROAS na Shopee difere mais de 15% da meta calculada (máx. entre 30× e o ROAS mínimo, ÷ fator) — ajuste em degraus de ~15%.
+        <b> Meta não entregue</b> = a Shopee entrega ROAS abaixo de 70% da meta: meta alta demais estrangula a entrega; o sistema sugere baixar −15% por vez (↓), nunca abaixo do ponto de empate.
         <b> Orçamento ideal</b> = 2,5× o gasto médio &quot;normal&quot; (28 dias, sem promoção e sem dia de campanha Shopee) para campeão/saudável; 1,25× em aprendizado/estabilização/problemas; 0 abaixo do mínimo.
         Ideal &lt; configurado = folga (orçamento não é o limitador); item batendo no teto (≥95% em ≥5 de 7 dias) com ROAS saudável sobe em degrau de +25%.
         <b> Janela</b>: aprendizado = 14 dias após o início; estabilização = 12 dias após alterar a meta — nesses períodos a recomendação de mexer na meta é suprimida.
