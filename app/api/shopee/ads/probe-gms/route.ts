@@ -76,6 +76,21 @@ export async function GET(request: NextRequest) {
   const end = request.nextUrl.searchParams.get("end") || fmt(hoje);
 
   const balance = await chamar("/api/v2/ads/get_total_balance", t.at, t.shop);
+
+  // ?hourly=<campaign_ids> → performance POR HORA de HOJE (o endpoint aceita o
+  // dia corrente, diferente do diário). Só leitura; base pro "reforço intradia".
+  const hourly = request.nextUrl.searchParams.get("hourly");
+  if (hourly) {
+    const dia = request.nextUrl.searchParams.get("dia") || fmt(hoje);
+    const perfHora = await chamar(
+      "/api/v2/ads/get_product_campaign_hourly_performance",
+      t.at,
+      t.shop,
+      `&campaign_id_list=${hourly}&performance_date=${dia}`
+    );
+    return NextResponse.json({ sucesso: true, loja, dia, get_total_balance: balance, get_product_campaign_hourly_performance: perfHora });
+  }
+
   const campanhas = await chamar(
     "/api/v2/ads/get_product_level_campaign_id_list",
     t.at,
