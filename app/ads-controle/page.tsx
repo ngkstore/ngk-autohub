@@ -8,19 +8,26 @@ type Rec = {
   item_id: number; campaign_id: number | null; gasto_7d: number; roas_shopee: number;
   fator: number; roas_real: number; roas_minimo: number | null; meta_roas: number | null;
   classificacao: string; acao: string; loja_id: string;
+  orcamento_configurado: number | null; orcamento_ideal: number | null; censurado_teto: boolean;
+  estado_janela: string | null; dias_restantes_janela: number | null; motivo_supressao: string | null;
 };
 
-const brl = (v: number) => (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const brl = (v: number) => (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const n = (v: unknown) => Number(v || 0);
 
 const COR: Record<string, string> = {
   campeao: "text-emerald-300", abaixo_do_minimo: "text-red-300", meta_desalinhada: "text-orange-300",
   aprendizado: "text-blue-300", sem_margem: "text-slate-400", saudavel: "text-slate-300",
+  problema_anuncio: "text-orange-300", problema_pagina: "text-orange-300", meta_nao_entregue: "text-orange-300",
+  orcamento_esgotando: "text-amber-300", estabilizacao: "text-blue-300", pronto_proximo_degrau: "text-emerald-300",
 };
 const ROTULO: Record<string, string> = {
   campeao: "Campeão", abaixo_do_minimo: "Abaixo do mínimo", meta_desalinhada: "Meta desalinhada",
   aprendizado: "Aprendizado", sem_margem: "Sem custo", saudavel: "Saudável",
+  problema_anuncio: "Problema no anúncio", problema_pagina: "Problema na página", meta_nao_entregue: "Meta não entregue",
+  orcamento_esgotando: "Orçamento esgotando", estabilizacao: "Estabilização", pronto_proximo_degrau: "Pronto p/ próximo degrau",
 };
+const JANELA: Record<string, string> = { aprendizado: "🎓 aprendizado", estabilizacao: "⏳ estabilização", livre: "✓ livre" };
 
 export default async function AdsControlePage({ searchParams }: Props) {
   const params = await searchParams;
@@ -54,10 +61,19 @@ export default async function AdsControlePage({ searchParams }: Props) {
   const tend = roasAnterior > 0 ? ((roasSemana - roasAnterior) / roasAnterior) * 100 : null;
   const porClasse = (r.por_classificacao as { classificacao: string; qtd: number; gasto: number }[]) || [];
 
+  // Orçamento diário: configurado vs ideal (itens com ideal calculado).
+  const comOrc = recs.filter((x) => x.orcamento_ideal != null && x.orcamento_configurado != null);
+  const orcCfg = comOrc.reduce((s, x) => s + n(x.orcamento_configurado), 0);
+  const orcIdeal = comOrc.reduce((s, x) => s + n(x.orcamento_ideal), 0);
+  const noTeto = recs.filter((x) => x.censurado_teto).length;
+  const emJanela = recs.filter((x) => x.estado_janela && x.estado_janela !== "livre").length;
+
   const alertas: string[] = [];
-  if (saldoDias > 0 && saldoDias < 7) alertas.push(`Saldo de créditos baixo: cobre só ~${saldoDias} dia(s) de gasto (${brl(n(r.saldo))}).`);
+  if (saldoDias > 0 && saldoDias < 7) alertas.push(`Saldo de créditos baixo: cobre só ~${saldoDias.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} dia(s) de gasto (${brl(n(r.saldo))}).`);
   const nRisco = porClasse.find((c) => c.classificacao === "abaixo_do_minimo");
   if (nRisco) alertas.push(`${nRisco.qtd} item(ns) abaixo do ROAS mínimo — ${brl(nRisco.gasto)} em gasto no prejuízo.`);
+  const nEsg = porClasse.find((c) => c.classificacao === "orcamento_esgotando");
+  if (nEsg) alertas.push(`${nEsg.qtd} item(ns) com ROAS saudável batendo no teto do orçamento — vale subir 20-30%.`);
 
   const Kpi = ({ label, val, hint, cor, trend }: { label: string; val: string; hint?: string; cor?: string; trend?: number | null }) => (
     <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
@@ -77,7 +93,7 @@ export default async function AdsControlePage({ searchParams }: Props) {
       <h1 className="text-4xl font-bold">🎯 Controle de Ads (GMV Max)</h1>
       <p className="mt-2 max-w-2xl text-slate-400">
         ROAS <b>real</b> por item (corrigido pelo fator de efetivação) contra o ROAS <b>mínimo</b> (margem da conciliação) e a sua meta.
-        Atualiza todo dia de madrugada. Ações prioritárias por gasto em risco.
+        Orçamento ideal por item e o relógio das janelas (aprendizado / estabilização). Atualiza todo dia de madrugada.
       </p>
 
       {alertas.length > 0 && (
@@ -88,11 +104,12 @@ export default async function AdsControlePage({ searchParams }: Props) {
         </div>
       )}
 
-      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
         <Kpi label="ROAS real (semana)" val={`${roasSemana.toFixed(1)}×`} trend={tend} hint={`média 4 semanas: ${n(r.roas_media4s).toFixed(1)}×`} cor="text-emerald-300" />
         <Kpi label="Gasto (semana)" val={brl(n(r.gasto_semana))} hint={`~${brl(n(r.gasto_medio_dia))}/dia`} cor="text-orange-300" />
         <Kpi label="Gasto em risco" val={brl(n(r.gasto_risco))} hint="itens abaixo do mínimo" cor="text-red-300" />
-        <Kpi label="Saldo de créditos" val={brl(n(r.saldo))} hint={`~${saldoDias} dia(s) de gasto`} cor={saldoDias < 7 ? "text-red-300" : "text-emerald-300"} />
+        <Kpi label="Orçamento/dia ideal" val={comOrc.length ? brl(orcIdeal) : "—"} hint={comOrc.length ? `configurado ${brl(orcCfg)}${noTeto ? ` · ${noTeto} no teto` : ""}` : "sem base ainda"} cor="text-amber-300" />
+        <Kpi label="Saldo de créditos" val={brl(n(r.saldo))} hint={`~${saldoDias.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} dia(s) de gasto`} cor={saldoDias < 7 ? "text-red-300" : "text-emerald-300"} />
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
@@ -101,6 +118,9 @@ export default async function AdsControlePage({ searchParams }: Props) {
             {ROTULO[c.classificacao] || c.classificacao}: <b>{c.qtd}</b> · {brl(c.gasto)}
           </span>
         ))}
+        {emJanela > 0 && (
+          <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs text-blue-300">🕐 em janela: <b>{emJanela}</b></span>
+        )}
       </div>
 
       <div className="mt-6 overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900">
@@ -112,13 +132,15 @@ export default async function AdsControlePage({ searchParams }: Props) {
               <th className="p-3 text-right">ROAS real</th>
               <th className="p-3 text-right">ROAS mín.</th>
               <th className="p-3 text-right">Meta</th>
+              <th className="p-3 text-right">Orç. config → ideal</th>
+              <th className="p-3">Janela</th>
               <th className="p-3">Situação</th>
               <th className="p-3">Ação</th>
             </tr>
           </thead>
           <tbody>
             {recs.length === 0 ? (
-              <tr><td className="p-4 text-slate-400" colSpan={7}>Sem recomendações ainda — o coletor roda de madrugada. Rode o backfill se acabou de configurar.</td></tr>
+              <tr><td className="p-4 text-slate-400" colSpan={9}>Sem recomendações ainda — o coletor roda de madrugada. Rode o backfill se acabou de configurar.</td></tr>
             ) : recs.map((x) => (
               <tr key={`${x.loja_id}-${x.item_id}`} className="border-t border-slate-800">
                 <td className="p-3 max-w-xs truncate" title={nomes[String(x.item_id)] || String(x.item_id)}>
@@ -128,6 +150,24 @@ export default async function AdsControlePage({ searchParams }: Props) {
                 <td className="p-3 text-right tabular-nums">{n(x.roas_real).toFixed(1)}×</td>
                 <td className="p-3 text-right tabular-nums text-slate-400">{x.roas_minimo != null ? `${n(x.roas_minimo).toFixed(1)}×` : "—"}</td>
                 <td className="p-3 text-right tabular-nums text-slate-400">{x.meta_roas != null ? `${n(x.meta_roas).toFixed(1)}×` : "—"}</td>
+                <td className="p-3 text-right tabular-nums" title={x.censurado_teto ? "consumo no teto do orçamento (média censurada): degrau de +25%" : undefined}>
+                  {x.orcamento_ideal == null ? (
+                    <span className="text-slate-500">{x.orcamento_configurado != null ? brl(n(x.orcamento_configurado)) : "—"}</span>
+                  ) : (
+                    <>
+                      <span className="text-slate-400">{x.orcamento_configurado != null ? brl(n(x.orcamento_configurado)) : "—"}</span>
+                      <span className="text-slate-500"> → </span>
+                      <span className={n(x.orcamento_ideal) > n(x.orcamento_configurado) ? "text-emerald-300" : n(x.orcamento_ideal) < n(x.orcamento_configurado) ? "text-orange-300" : "text-slate-300"}>
+                        {brl(n(x.orcamento_ideal))}
+                      </span>
+                      {x.censurado_teto && <span className="ml-1 text-xs text-amber-300">teto</span>}
+                    </>
+                  )}
+                </td>
+                <td className="p-3 text-xs" title={x.motivo_supressao || undefined}>
+                  <span className={x.estado_janela === "livre" ? "text-slate-500" : "text-blue-300"}>{JANELA[x.estado_janela || "livre"] || x.estado_janela}</span>
+                  {x.estado_janela && x.estado_janela !== "livre" && <span className="text-slate-400"> · faltam {x.dias_restantes_janela ?? 0}d</span>}
+                </td>
                 <td className={`p-3 font-semibold ${COR[x.classificacao] || "text-slate-300"}`}>{ROTULO[x.classificacao] || x.classificacao}</td>
                 <td className="p-3 text-xs text-slate-400">{x.acao}</td>
               </tr>
@@ -137,8 +177,10 @@ export default async function AdsControlePage({ searchParams }: Props) {
       </div>
 
       <p className="mt-4 text-xs text-slate-500">
-        <b>ROAS real</b> = ROAS Shopee × fator de efetivação (corrige cancelamentos/devoluções). <b>ROAS mínimo</b> = 1 ÷ margem efetiva
-        (taxa real do escrow + custo + 6%): abaixo disso o anúncio dá prejuízo. Itens <b>sem custo</b> cadastrado não têm mínimo confiável.
+        <b>ROAS real</b> = ROAS Shopee × fator de efetivação. <b>ROAS mínimo</b> = 1 ÷ margem efetiva (taxa real do escrow + custo + 6%).
+        <b> Orçamento ideal</b> = multiplicador × gasto médio &quot;normal&quot; (28 dias, sem promoção e sem dia de campanha Shopee):
+        2,5× para campeão/saudável, 1,25× para aprendizado/estabilização/problemas, 0 abaixo do mínimo; item batendo no teto (≥95% do orçamento em ≥5 de 7 dias) com ROAS saudável sobe em degrau de +25%.
+        <b> Janela</b>: aprendizado = 14 dias após o início; estabilização = 12 dias após alterar a meta — nesses períodos a recomendação de mexer na meta é suprimida.
       </p>
     </div>
   );

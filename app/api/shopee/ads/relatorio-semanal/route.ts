@@ -8,10 +8,14 @@ export const maxDuration = 120;
 // Relatório semanal do controle de Ads GMV Max (spec §8), enviado por Telegram
 // toda segunda (cron). Uma mensagem por loja que tem recomendações. ?dry=1 devolve
 // os textos sem enviar; ?loja=<id> restringe. Mesma base da página /ads-controle.
+// Inclui: orçamento ideal vs configurado por item e o "relógio dos anúncios"
+// (estado de cada item nas janelas de aprendizado/estabilização).
 
 type Rec = {
   item_id: number; gasto_7d: number; roas_real: number; roas_minimo: number | null;
   meta_roas: number | null; classificacao: string; acao: string; promo: boolean; alerta_roas: boolean;
+  orcamento_configurado: number | null; orcamento_ideal: number | null; censurado_teto: boolean;
+  estado_janela: string | null; dias_restantes_janela: number | null; motivo_supressao: string | null;
 };
 const brl = (v: unknown) => (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const n = (v: unknown) => Number(v || 0);
@@ -21,8 +25,17 @@ const ROTULO: Record<string, string> = {
   campeao: "campeões", abaixo_do_minimo: "abaixo do mínimo", meta_desalinhada: "meta desalinhada",
   aprendizado: "em aprendizado", sem_margem: "sem custo", saudavel: "saudáveis",
   problema_anuncio: "problema no anúncio", problema_pagina: "problema na página", meta_nao_entregue: "meta não entregue",
+  orcamento_esgotando: "orçamento esgotando", estabilizacao: "em estabilização", pronto_proximo_degrau: "prontos p/ próximo degrau",
 };
-const PRIORIDADE = ["abaixo_do_minimo", "problema_anuncio", "problema_pagina", "meta_nao_entregue", "meta_desalinhada"];
+// Ordem de prioridade das ações (gasto em risco primeiro).
+const PRIORIDADE = ["abaixo_do_minimo", "problema_anuncio", "problema_pagina", "meta_nao_entregue", "orcamento_esgotando", "pronto_proximo_degrau", "meta_desalinhada"];
+
+// " · orç. R$100 → R$250" quando há orçamento ideal calculado.
+function orc(x: Rec): string {
+  if (x.orcamento_ideal == null) return "";
+  const cfg = x.orcamento_configurado != null ? brl(x.orcamento_configurado) : "—";
+  return ` · orç. ${cfg} → ${brl(x.orcamento_ideal)}${x.censurado_teto ? " (no teto)" : ""}`;
+}
 
 async function montarTexto(lojaId: string, nomeLoja: string): Promise<string | null> {
   const hoje = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
@@ -52,6 +65,16 @@ async function montarTexto(lojaId: string, nomeLoja: string): Promise<string | n
   L.push(`Gasto ${brl(r.gasto_semana)} · em risco ${brl(r.gasto_risco)} · saldo ${brl(r.saldo)} (~${d1(saldoDias)} dia${saldoDias === 1 ? "" : "s"})`);
   L.push(`Situação: ` + porClasse.map((c) => `${c.qtd} ${ROTULO[c.classificacao] || c.classificacao}`).join(" · "));
 
+  // Orçamento diário: configurado vs ideal (soma dos itens com ideal calculado).
+  const comOrc = recs.filter((x) => x.orcamento_ideal != null && x.orcamento_configurado != null);
+  if (comOrc.length) {
+    const cfg = comOrc.reduce((s, x) => s + n(x.orcamento_configurado), 0);
+    const ideal = comOrc.reduce((s, x) => s + n(x.orcamento_ideal), 0);
+    const teto = recs.filter((x) => x.censurado_teto).length;
+    const delta = ideal - cfg;
+    L.push(`💰 Orçamento/dia: configurado ${brl(cfg)} → ideal ${brl(ideal)} (${delta >= 0 ? "+" : "−"}${brl(Math.abs(delta))})${teto ? ` · ${teto} item(ns) batendo no teto` : ""}`);
+  }
+
   const alertas: string[] = [];
   if (saldoDias > 0 && saldoDias < 7) alertas.push(`saldo cobre só ~${d1(saldoDias)} dia(s) de gasto`);
   const despencando = recs.filter((x) => x.alerta_roas);
@@ -61,18 +84,31 @@ async function montarTexto(lojaId: string, nomeLoja: string): Promise<string | n
   if (fat && n(fat.divergencia_pct) > 10) alertas.push(`fator D+30 divergiu ${n(fat.divergencia_pct).toFixed(0)}% (estimado ${d3(fat.fator_estimado)} vs consolidado ${d3(fat.fator_consolidado)}) — recalibrar`);
   if (alertas.length) { L.push(""); L.push("🚨 Alertas:"); alertas.forEach((a) => L.push(`• ${a}`)); }
 
-  const acoes = recs.filter((x) => PRIORIDADE.includes(x.classificacao)).slice(0, 6);
+  const acoes = recs.filter((x) => PRIORIDADE.includes(x.classificacao))
+    .sort((a, b) => PRIORIDADE.indexOf(a.classificacao) - PRIORIDADE.indexOf(b.classificacao) || n(b.gasto_7d) - n(a.gasto_7d))
+    .slice(0, 6);
   if (acoes.length) {
     L.push(""); L.push("⚠️ Ações prioritárias (por gasto em risco):");
-    acoes.forEach((x, i) => L.push(`${i + 1}. ${nome(x.item_id)} — ${brl(x.gasto_7d)} · ROAS ${x1(x.roas_real)} vs mín ${x.roas_minimo != null ? x1(x.roas_minimo) : "—"} → ${x.acao}${x.promo ? " (promo)" : ""}`));
+    acoes.forEach((x, i) => L.push(`${i + 1}. ${nome(x.item_id)} — ${brl(x.gasto_7d)} · ROAS ${x1(x.roas_real)} vs mín ${x.roas_minimo != null ? x1(x.roas_minimo) : "—"} → ${x.acao}${x.promo ? " (promo)" : ""}${orc(x)}`));
   }
   const camp = recs.filter((x) => x.classificacao === "campeao").slice(0, 4);
   if (camp.length) {
     L.push(""); L.push("📈 Campeões pra escalar:");
-    camp.forEach((x) => L.push(`• ${nome(x.item_id)} — ROAS ${x1(x.roas_real)} (mín ${x.roas_minimo != null ? x1(x.roas_minimo) : "—"}, meta ${x.meta_roas != null ? x1(x.meta_roas) : "—"})`));
+    camp.forEach((x) => L.push(`• ${nome(x.item_id)} — ROAS ${x1(x.roas_real)} (mín ${x.roas_minimo != null ? x1(x.roas_minimo) : "—"}, meta ${x.meta_roas != null ? x1(x.meta_roas) : "—"})${orc(x)}`));
   }
-  const aprend = porClasse.find((c) => c.classificacao === "aprendizado");
-  if (aprend) L.push(`\n⏳ ${aprend.qtd} item(ns) em aprendizado (aguardar 14 dias).`);
+
+  // 🕐 Relógio dos anúncios: estado de cada item nas janelas + dias restantes.
+  const emJanela = recs.filter((x) => x.estado_janela && x.estado_janela !== "livre")
+    .sort((a, b) => n(a.dias_restantes_janela) - n(b.dias_restantes_janela));
+  const livres = recs.filter((x) => x.estado_janela === "livre").length;
+  L.push(""); L.push(`🕐 Relógio dos anúncios: ${livres} livre(s) · ${emJanela.filter((x) => x.estado_janela === "aprendizado").length} em aprendizado · ${emJanela.filter((x) => x.estado_janela === "estabilizacao").length} em estabilização`);
+  emJanela.slice(0, 8).forEach((x) => {
+    const est = x.estado_janela === "aprendizado" ? "aprendizado" : "estabilização";
+    const sup = x.motivo_supressao && x.motivo_supressao.includes("suprimida") ? " · rec. de meta suprimida" : "";
+    L.push(`• ${nome(x.item_id)} — ${est}, faltam ${x.dias_restantes_janela ?? 0} dia(s)${sup}`);
+  });
+  if (emJanela.length > 8) L.push(`• … +${emJanela.length - 8} item(ns) em janela`);
+
   const promos = recs.filter((x) => x.promo).length;
   if (promos) L.push(`🏷️ ${promos} item(ns) em promoção (regra de escalar suprimida).`);
   L.push(""); L.push("Detalhe completo: /ads-controle");
