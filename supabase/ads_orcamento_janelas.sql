@@ -69,6 +69,11 @@ end $$;
 grant execute on function ads_detectar_alteracoes() to anon, authenticated;
 
 -- ---------------------------------------------------------------------------
+-- Índices pro cálculo (lookup de orçamento por campanha/dia e janela de 60d de pedido_itens).
+create index if not exists ads_campaign_config_camp_dia_idx on ads_campaign_config_daily (loja_id, campaign_id, dia);
+create index if not exists pedido_itens_dia_idx on pedido_itens (dia);
+
+-- ---------------------------------------------------------------------------
 -- Novas colunas em ads_recomendacoes
 alter table ads_recomendacoes add column if not exists roas_28d numeric(8,2);
 alter table ads_recomendacoes add column if not exists gasto_medio_normal_28d numeric(12,2);
@@ -128,15 +133,21 @@ begin
     where p_base is not null and p_dia < 0.95*p_base
   ),
   -- Gasto médio "normal": últimos 28 dias com gasto, sem dias de promo e sem dias de
-  -- campanha Shopee. (Dias sem gasto ficam de fora: a média é do dia ativo típico.)
+  -- campanha Shopee. Agrega por DIA antes (item com 2+ campanhas soma as duas);
+  -- dias sem gasto ficam de fora: a média é do dia ativo típico.
   normal as (
-    select d.loja_id, d.item_id, avg(d.gasto) as gasto_medio, (count(*))::int as dias_normais
-    from ads_item_performance_daily d
-    left join promo_dia pd on pd.loja_id=d.loja_id and pd.item_id=d.item_id and pd.dia=d.dia
-    left join ads_dias_campanha_shopee cs on cs.dia=d.dia
-    where d.escopo='direto' and d.dia between v_hoje-28 and v_hoje-1 and d.gasto>0
-      and pd.dia is null and cs.dia is null
-      and (p_loja_ids is null or d.loja_id = any(p_loja_ids))
+    select loja_id, item_id, avg(gasto_dia) as gasto_medio, (count(*))::int as dias_normais
+    from (
+      select d.loja_id, d.item_id, d.dia, sum(d.gasto) as gasto_dia
+      from ads_item_performance_daily d
+      left join promo_dia pd on pd.loja_id=d.loja_id and pd.item_id=d.item_id and pd.dia=d.dia
+      left join ads_dias_campanha_shopee cs on cs.dia=d.dia
+      where d.escopo='direto' and d.dia between v_hoje-28 and v_hoje-1
+        and pd.dia is null and cs.dia is null
+        and (p_loja_ids is null or d.loja_id = any(p_loja_ids))
+      group by d.loja_id, d.item_id, d.dia
+      having sum(d.gasto) > 0
+    ) x
     group by 1,2
   ),
   -- Esgotamento: gasto do dia >= 95% do orçamento (snapshot do dia; senão o último conhecido).
@@ -244,7 +255,7 @@ begin
     select *,
       1/nullif(margem,0) as roas_min,
       greatest(p_meta_global, 1/nullif(margem,0)) / nullif(fator,0) as meta_calc,
-      (select count(*) from ads_item_performance_daily d
+      (select count(distinct d.dia) from ads_item_performance_daily d
         where d.loja_id=c.loja_id and d.item_id=c.item_id and d.escopo='direto'
           and d.dia between v_hoje-3 and v_hoje-1 and d.gasto>0
           and (d.gmv/d.gasto)*c.fator < 0.7 * (1/nullif(c.margem,0))) = 3 as alerta_roas,
