@@ -192,13 +192,27 @@ begin
     select distinct on (loja_id) loja_id, fator_estimado as f
     from ads_fator_historico order by loja_id, competencia desc
   ),
-  custo_item as (
+  custo_var as (  -- custo pelas variações vendidas (90d)
     select pi.loja_id, pi.item_id::bigint as item_id, avg(cv.custo) as custo
     from pedido_itens pi
     join custos_variacao cv on cv.loja_id=pi.loja_id and norm_sku(cv.model_sku)=norm_sku(pi.model_sku)
     where pi.dia >= v_hoje-90 and (p_loja_ids is null or pi.loja_id = any(p_loja_ids))
       and (pi.loja_id, pi.item_id::bigint) in (select loja_id, item_id from perf)  -- só itens com Ads
     group by 1,2
+  ),
+  -- v3.3: fallback do custo = custos_variacao pelo SKU do ITEM (produto sem variação) ->
+  -- produtos.custo (linha "produto inteiro" do /financas). Também traz o preço do catálogo
+  -- pra estimar o ticket de item sem venda recente.
+  custo_item as (
+    select p.loja_id, p.item_id,
+      coalesce(cv.custo,
+        (select max(c.custo) from custos_variacao c
+          where c.loja_id=p.loja_id and coalesce(pr.sku,'')<>'' and norm_sku(c.model_sku)=norm_sku(pr.sku)),
+        pr.custo) as custo,
+      pr.preco as preco_catalogo
+    from perf p
+    left join custo_var cv on cv.loja_id=p.loja_id and cv.item_id=p.item_id
+    left join produtos pr on pr.loja_id=p.loja_id and pr.item_id=p.item_id::text
   ),
   preco_item as (  -- promo do ITEM (7d vs 28d anteriores) — regra campeão
     select loja_id, item_id::bigint as item_id,
@@ -253,7 +267,10 @@ begin
       coalesce((select round(100.0*ti.taxa/nullif(ti.vt,0),1) from taxa_item_cache ti
                 where ti.loja_id=p.loja_id and ti.item_id=p.item_id::text and ti.vt>0), 14) as taxa_pct,
       ci.custo,
-      case when p.ped7>0 then p.gmv7/p.ped7 end as ticket,
+      -- ticket: 7d -> 28d -> preço do catálogo (item sem venda recente não vira 'sem_margem')
+      case when p.ped7>0 then p.gmv7/p.ped7
+           when p.ped28>0 then p.gmv28/p.ped28
+           else ci.preco_catalogo end as ticket,
       case when p.imp7>0 then p.cli7::numeric/p.imp7 end as ctr7,
       case when p.imp28>0 then p.cli28::numeric/p.imp28 end as ctr28,
       case when p.cli7>0 then p.ped7::numeric/p.cli7 end as cr7,
@@ -384,7 +401,9 @@ begin
     round(roas_real,2), round(roas_min,2), meta_roas, round(meta_calc,2), dias_campanha, classificacao,
     case classificacao
       when 'aprendizado'           then format('Aguardar (aprendizado, faltam %s dia(s)); não editar meta', dias_restantes)
-      when 'sem_margem'            then 'Cadastrar custo/checar margem (sem base pra ROAS mínimo)'
+      when 'sem_margem'            then case when custo is null
+                                          then 'Cadastrar custo em Finanças → Produtos & Margem (filtro "só sem custo") — sem base pra ROAS mínimo'
+                                          else 'Sem preço de venda conhecido (sem venda e sem preço no catálogo) — checar o produto' end
       when 'abaixo_do_minimo'      then 'Pausar OU revisar página/preço antes de reinvestir'
       when 'retomar_meta'          then format('Voltar a meta para %s: desde a troca %s → %s (%s dias) o GMV/dia foi de R$%s para R$%s e o lucro/dia de R$%s para R$%s — %s',
                                           meta_antes, meta_antes, meta_depois, dias_depois, round(gmv_dia_antes), round(gmv_dia_depois), round(lucro_dia_antes), round(lucro_dia_depois),

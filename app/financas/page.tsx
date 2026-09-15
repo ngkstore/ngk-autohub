@@ -11,7 +11,7 @@ import SeletorEstado from "../components/SeletorEstado";
 export const dynamic = "force-dynamic";
 
 type Props = {
-  searchParams: Promise<{ aba?: string; periodo?: string; loja?: string; ufTend?: string; pMargem?: string }>;
+  searchParams: Promise<{ aba?: string; periodo?: string; loja?: string; ufTend?: string; pMargem?: string; q?: string; semCusto?: string; semVenda?: string }>;
 };
 
 // ---------- período (Brasília, fim exclusivo) ----------
@@ -140,7 +140,16 @@ export default async function FinancasPage({ searchParams }: Props) {
         {aba === "previsao" && <Previsao lojas={lojas} ufTend={params.ufTend} sufixo={sufixo} />}
         {aba === "carteira" && <Carteira lojas={lojas} />}
         {(aba === "produtos" || aba === "variacoes") && (
-          <Produtos lojas={lojas} pagina={Math.max(0, Number(params.pMargem) || 0)} sufixo={sufixo} />
+          <Produtos
+            lojas={lojas}
+            pagina={Math.max(0, Number(params.pMargem) || 0)}
+            sufixo={sufixo}
+            busca={(params.q || "").trim()}
+            semCusto={params.semCusto === "1"}
+            semVenda={params.semVenda !== "0"}
+            loja={params.loja}
+            periodo={params.periodo}
+          />
         )}
         {aba === "impostos" && <Impostos conta={escopo.contaId} />}
       </div>
@@ -891,16 +900,23 @@ type CatRow = {
   loja_id: string; item_id: string; produto: string; model_sku: string; variacao: string | null;
   unidades: number; preco: number; custo: number | null; taxa_pct: number;
   margem_valor: number; margem_pct: number; sem_custo: boolean; total_linhas: number;
+  produto_id: string | null; fonte: string; // 'variacao' (vendeu) | 'item' (produto inteiro: sem variação ou sem venda)
 };
 
-async function Produtos({ lojas, pagina, sufixo }: { lojas: string[] | null; pagina: number; sufixo: string }) {
+async function Produtos({ lojas, pagina, sufixo, busca, semCusto, semVenda, loja, periodo }: {
+  lojas: string[] | null; pagina: number; sufixo: string; busca: string; semCusto: boolean; semVenda: boolean; loja?: string; periodo?: string;
+}) {
   const LIM = 100;
-  const { data } = await supabase.rpc("margem_catalogo", { p_loja_ids: lojas, p_offset: pagina * LIM, p_limite: LIM });
+  const { data } = await supabase.rpc("margem_catalogo", {
+    p_loja_ids: lojas, p_offset: pagina * LIM, p_limite: LIM,
+    p_busca: busca || null, p_sem_custo: semCusto, p_incluir_sem_venda: semVenda,
+  });
   const rows = (data as CatRow[]) || [];
   const total = rows[0] ? n(rows[0].total_linhas) : 0;
   const totalPaginas = Math.max(1, Math.ceil(total / LIM));
   const semCustoPag = rows.filter((r) => r.custo == null).length;
-  const linkPag = (p: number) => `/financas?aba=produtos&pMargem=${p}${sufixo}`;
+  const filtros = `${busca ? `&q=${encodeURIComponent(busca)}` : ""}${semCusto ? "&semCusto=1" : ""}${semVenda ? "" : "&semVenda=0"}`;
+  const linkPag = (p: number) => `/financas?aba=produtos&pMargem=${p}${sufixo}${filtros}`;
 
   let ultimoItem = "";
   let idx = 0;
@@ -913,12 +929,36 @@ async function Produtos({ lojas, pagina, sufixo }: { lojas: string[] | null; pag
           custo e aperte <b>Enter</b> pra salvar e pular pra próxima linha.
         </p>
         <span className="text-sm text-slate-300">
-          {int(total)} variações · pág. {pagina + 1}/{totalPaginas}
+          {int(total)} linha(s) · pág. {pagina + 1}/{totalPaginas}
         </span>
       </div>
+      {/* Busca + filtros (GET; preserva loja/período da Topbar) */}
+      <form method="get" action="/financas" className="mb-3 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-3 text-sm">
+        <input type="hidden" name="aba" value="produtos" />
+        {loja && <input type="hidden" name="loja" value={loja} />}
+        {periodo && <input type="hidden" name="periodo" value={periodo} />}
+        <input
+          name="q"
+          defaultValue={busca}
+          placeholder="buscar por nome, SKU ou item_id"
+          className="w-64 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-white placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none"
+        />
+        <label className="flex items-center gap-2 text-slate-300">
+          <input type="checkbox" name="semCusto" value="1" defaultChecked={semCusto} className="accent-emerald-500" /> só sem custo
+        </label>
+        <label className="flex items-center gap-2 text-slate-300">
+          <input type="checkbox" name="semVenda" value="1" defaultChecked={semVenda} className="accent-emerald-500" /> incluir produtos sem venda (novos)
+        </label>
+        {!semVenda && <input type="hidden" name="semVenda" value="0" />}
+        <button type="submit" className="rounded-lg bg-slate-700 px-3 py-1.5 font-semibold text-white hover:bg-slate-600">Filtrar</button>
+        {(busca || semCusto) && (
+          <a href={`/financas?aba=produtos${sufixo}`} className="text-xs text-slate-400 hover:text-white">limpar</a>
+        )}
+      </form>
       {semCustoPag > 0 && (
         <p className="mb-3 text-xs text-orange-300">
-          ⚠ {semCustoPag} variação(ões) desta página sem custo — a margem delas ainda não conta o custo.
+          ⚠ {semCustoPag} linha(s) desta página sem custo — a margem delas ainda não conta o custo. Linhas &quot;(produto inteiro)&quot; são
+          produtos sem variação ou sem venda ainda: o custo vale pro item todo (variações herdam até terem custo próprio).
         </p>
       )}
       <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900">
@@ -952,14 +992,19 @@ async function Produtos({ lojas, pagina, sufixo }: { lojas: string[] | null; pag
                   )}
                   <tr className="border-t border-slate-800">
                     <td className="p-3">
-                      <span className="text-slate-300">{r.variacao || "—"}</span>
-                      <span className="ml-2 font-mono text-xs text-slate-500">{r.model_sku}</span>
+                      <span className={r.fonte === "item" ? "text-amber-200" : "text-slate-300"}>{r.variacao || "—"}</span>
+                      <span className="ml-2 font-mono text-xs text-slate-500">{r.model_sku || r.item_id}</span>
+                      {r.fonte === "item" && n(r.unidades) === 0 && <span className="ml-2 rounded-full border border-slate-700 px-2 py-0.5 text-[10px] text-slate-400">sem venda em 90d</span>}
                     </td>
                     <td className="p-3 text-right text-slate-400">{int(r.unidades)}</td>
                     <td className="p-3 text-right">{brl(n(r.preco))}</td>
                     <td className="p-3 text-right text-slate-400">{n(r.taxa_pct)}%</td>
                     <td className="p-3 text-right">
-                      <CustoVariacaoInput lojaId={r.loja_id} modelSku={r.model_sku} inicial={r.custo != null ? n(r.custo) : null} idx={idx} />
+                      {r.fonte === "item" && r.produto_id ? (
+                        <CustoInput produtoId={r.produto_id} inicial={r.custo != null ? n(r.custo) : null} idx={idx} />
+                      ) : (
+                        <CustoVariacaoInput lojaId={r.loja_id} modelSku={r.model_sku} inicial={r.custo != null ? n(r.custo) : null} idx={idx} />
+                      )}
                     </td>
                     <td className={`p-3 text-right ${cor}`}>{r.custo == null ? "—" : brl(n(r.margem_valor))}</td>
                     <td className={`p-3 text-right font-semibold ${cor}`}>{r.custo == null ? "—" : `${m.toFixed(0)}%`}</td>
