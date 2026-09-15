@@ -946,10 +946,10 @@ async function Produtos({ lojas, pagina, sufixo, busca, semCusto, semVenda, loja
         <label className="flex items-center gap-2 text-slate-300">
           <input type="checkbox" name="semCusto" value="1" defaultChecked={semCusto} className="accent-emerald-500" /> só sem custo
         </label>
-        <label className="flex items-center gap-2 text-slate-300">
-          <input type="checkbox" name="semVenda" value="1" defaultChecked={semVenda} className="accent-emerald-500" /> incluir produtos sem venda (novos)
-        </label>
-        {!semVenda && <input type="hidden" name="semVenda" value="0" />}
+        <select name="semVenda" defaultValue={semVenda ? "1" : "0"} className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-white focus:border-emerald-500 focus:outline-none">
+          <option value="1">com e sem venda (inclui produtos novos)</option>
+          <option value="0">só com venda nos últimos 90 dias</option>
+        </select>
         <button type="submit" className="rounded-lg bg-slate-700 px-3 py-1.5 font-semibold text-white hover:bg-slate-600">Filtrar</button>
         {(busca || semCusto) && (
           <a href={`/financas?aba=produtos${sufixo}`} className="text-xs text-slate-400 hover:text-white">limpar</a>

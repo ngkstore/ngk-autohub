@@ -7,6 +7,8 @@
 --   3) busca (p_busca) e filtro "só sem custo" (p_sem_custo) no servidor.
 -- Custo da linha "produto inteiro" = custos_variacao pelo SKU do item, senão produtos.custo
 -- (o input dessa linha grava em produtos.custo; a DRE e o motor de Ads já usam esse fallback).
+-- A taxa Shopee por item vem do taxa_item_cache (refresh_taxa_item, pg_cron de hora em hora):
+-- recalcular ao vivo varre 250k+ pedido_itens e estoura os 8s do role anon.
 drop function if exists margem_catalogo(uuid[], int, int, text);
 drop function if exists margem_catalogo(uuid[], int, int, text, boolean, boolean);
 create or replace function margem_catalogo(
@@ -23,24 +25,10 @@ returns table(
   margem_valor numeric, margem_pct numeric, sem_custo boolean, total_linhas bigint,
   produto_id uuid, fonte text
 )
-language sql stable
-set plan_cache_mode = 'force_custom_plan'
-as $$
-  with single as (
-    select pedido_id, min(item_id) as item_id
-    from pedido_itens
+language sql stable as $$
+  with taxa_item as (
+    select loja_id, item_id, taxa, vt from taxa_item_cache
     where (p_loja_ids is null or loja_id = any(p_loja_ids))
-    group by pedido_id having count(*) = 1
-  ),
-  taxa_item as (
-    select s.item_id,
-      sum(coalesce(p.taxa_comissao,0) + coalesce(p.taxa_servico,0)) as taxa,
-      sum(p.valor_total) as vt
-    from single s
-    join pedidos p on p.id = s.pedido_id
-    where p.escrow_atualizado_em is not null and p.valor_total > 0
-      and (p_loja_ids is null or p.loja_id = any(p_loja_ids))
-    group by 1
   ),
   media as (select round(100.0 * sum(taxa) / nullif(sum(vt), 0), 1) as pct from taxa_item),
   -- (a) variações que venderam nos últimos 90 dias (como antes)
@@ -64,7 +52,7 @@ as $$
       coalesce((select sum(pi.qtd) from pedido_itens pi join pedidos p on p.id = pi.pedido_id
                 where pi.loja_id = pr.loja_id and pi.item_id = pr.item_id and p.pedido_efetivado
                   and pi.dia >= (now() at time zone 'America/Sao_Paulo')::date - 90), 0) as unidades,
-      pr.preco as preco,
+      nullif(pr.preco, 0) as preco,
       coalesce((select max(cv.custo) from custos_variacao cv
                 where cv.loja_id = pr.loja_id and coalesce(pr.sku,'') <> '' and norm_sku(cv.model_sku) = norm_sku(pr.sku)),
                pr.custo) as custo,
@@ -78,7 +66,8 @@ as $$
   base as (
     select b.*,
       coalesce(
-        (select round(100.0 * ti.taxa / nullif(ti.vt, 0), 1) from taxa_item ti where ti.item_id = b.item_id and ti.vt > 0),
+        (select round(100.0 * ti.taxa / nullif(ti.vt, 0), 1) from taxa_item ti
+          where ti.loja_id = b.loja_id and ti.item_id = b.item_id and ti.vt > 0),
         (select pct from media)
       ) as taxa_pct
     from base0 b
@@ -87,7 +76,7 @@ as $$
   ),
   calc as (
     select *,
-      (preco - preco*taxa_pct/100 - preco*0.06 - coalesce(custo,0)) as margem_valor
+      (coalesce(preco,0) - coalesce(preco,0)*taxa_pct/100 - coalesce(preco,0)*0.06 - coalesce(custo,0)) as margem_valor
     from base
   )
   select loja_id, item_id, coalesce(produto,'(produto sem nome)') as produto, model_sku, variacao,
