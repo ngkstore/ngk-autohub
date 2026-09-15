@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
 import { escopoDoUsuario, podeVerLoja } from "@/lib/conta";
-import { editarCampanhaProduto, type AcaoEdicao } from "@/lib/shopee/adsEditar";
+import { aplicarAjuste } from "@/lib/shopee/adsAjuste";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 // Ajuste ASSISTIDO de orçamento diário / meta ROAS de uma campanha (Fase 4).
 // - Só usuário logado E dono da loja (podeVerLoja) — não é rota de cron.
-// - A confirmação manual é feita na tela (AjusteAds); aqui cada chamada = 1 item.
-// - Grava auditoria em ads_ajustes, reflete no snapshot de hoje, registra a
-//   alteração em ads_alteracoes (inicia a janela de estabilização) e marca a
-//   recomendação do dia como 'aplicada'. ?simular via body {simular:true} só monta.
+// - A confirmação manual é feita na tela (AjusteAds / AjusteInline); cada chamada = 1 item.
+// - Toda a contabilidade (auditoria, snapshot, relógio, reforço, 'aplicada') está em
+//   lib/shopee/adsAjuste.ts. Body {simular:true} só monta.
 const num = (v: unknown): number | null => {
   if (v === null || v === undefined || v === "") return null;
   const n = Number(String(v).replace(",", "."));
@@ -43,82 +41,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ sucesso: false, erro: "Loja fora da sua conta." }, { status: 403 });
     }
 
-    // Valores atuais (último snapshot da campanha).
-    const { data: cfg } = await supabase
-      .from("ads_campaign_config_daily")
-      .select("orcamento, meta_roas, item_id, dia")
-      .eq("loja_id", lojaId)
-      .eq("campaign_id", campaignId)
-      .order("dia", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const acoes: AcaoEdicao[] = [];
-    if (orcamento !== null && Number(cfg?.orcamento) !== orcamento) acoes.push({ campo: "orcamento", valor: orcamento });
-    if (metaRoas !== null && Number(cfg?.meta_roas) !== metaRoas) acoes.push({ campo: "meta_roas", valor: metaRoas });
-    if (acoes.length === 0) {
+    const { resultados, nadaAAlterar } = await aplicarAjuste({
+      lojaId, campaignId, itemId, orcamento, metaRoas, simular, usuario: escopo.email || "usuário",
+    });
+    if (nadaAAlterar) {
       return NextResponse.json({ sucesso: false, erro: "Nada a alterar (valores iguais aos atuais)." }, { status: 400 });
     }
-
-    const resultados = await editarCampanhaProduto({ lojaId, campaignId, acoes, simular });
-    const hoje = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
-    const item = itemId ?? (cfg?.item_id != null ? Number(cfg.item_id) : null);
-
-    for (const r of resultados) {
-      const antigo = r.campo === "orcamento" ? cfg?.orcamento : cfg?.meta_roas;
-      await supabase.from("ads_ajustes").insert({
-        loja_id: lojaId,
-        campaign_id: campaignId,
-        item_id: item,
-        campo: r.campo,
-        valor_antigo: antigo ?? null,
-        valor_novo: r.valor,
-        reference_id: r.reference_id,
-        simulado: r.simulado,
-        sucesso: r.sucesso,
-        resposta: r.resposta ?? r.body,
-        usuario: escopo.email,
-      });
-      if (r.sucesso && !r.simulado) {
-        // Snapshot de hoje passa a refletir o novo valor (a página mostra na hora).
-        await supabase
-          .from("ads_campaign_config_daily")
-          .update(r.campo === "orcamento" ? { orcamento: r.valor } : { meta_roas: r.valor })
-          .eq("loja_id", lojaId)
-          .eq("campaign_id", campaignId)
-          .eq("dia", hoje);
-        // Relógio: registra a alteração hoje (inicia a janela de estabilização se for meta).
-        await supabase.from("ads_alteracoes").upsert(
-          {
-            loja_id: lojaId,
-            item_id: item,
-            campaign_id: campaignId,
-            data_deteccao: hoje,
-            campo: r.campo,
-            valor_antigo: antigo != null ? String(antigo) : null,
-            valor_novo: String(r.valor),
-          },
-          { onConflict: "loja_id,campaign_id,data_deteccao,campo" }
-        );
-        // Reforço automático ativo hoje? O valor salvo manualmente vira a nova base
-        // (a reversão da meia-noite volta pra ele, não pro valor de antes do reforço).
-        if (r.campo === "orcamento") {
-          await supabase
-            .from("ads_reforcos")
-            .update({ orcamento_base: r.valor, orcamento_atual: r.valor })
-            .eq("loja_id", lojaId).eq("campaign_id", campaignId).eq("dia", hoje).is("revertido_em", null);
-        }
-      }
-    }
-    if (!simular && item != null && resultados.some((r) => r.sucesso)) {
-      await supabase.from("ads_recomendacoes").update({ status: "aplicada" }).eq("loja_id", lojaId).eq("item_id", item).eq("dia", hoje);
-    }
-
-    return NextResponse.json({
-      sucesso: resultados.every((r) => r.sucesso),
-      simular,
-      resultados: resultados.map((r) => ({ campo: r.campo, valor: r.valor, sucesso: r.sucesso, erro: r.erro })),
-    });
+    return NextResponse.json({ sucesso: resultados.every((r) => r.sucesso), simular, resultados });
   } catch (error) {
     return NextResponse.json(
       { sucesso: false, erro: error instanceof Error ? error.message : "Erro ao ajustar campanha." },
