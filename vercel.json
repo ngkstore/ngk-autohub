@@ -77,6 +77,10 @@
       "schedule": "*/30 * * * *"
     },
     {
+      "path": "/api/shopee/produtos/variacoes?limite=150",
+      "schedule": "20 * * * *"
+    },
+    {
       "path": "/api/shopee/ads/reforco?reverter=1",
       "schedule": "5 3 * * *"
     },

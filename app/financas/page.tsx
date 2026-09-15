@@ -994,7 +994,7 @@ async function Produtos({ lojas, pagina, sufixo, busca, semCusto, semVenda, loja
                     <td className="p-3">
                       <span className={r.fonte === "item" ? "text-amber-200" : "text-slate-300"}>{r.variacao || "—"}</span>
                       <span className="ml-2 font-mono text-xs text-slate-500">{r.model_sku || r.item_id}</span>
-                      {r.fonte === "item" && n(r.unidades) === 0 && <span className="ml-2 rounded-full border border-slate-700 px-2 py-0.5 text-[10px] text-slate-400">sem venda em 90d</span>}
+                      {(r.fonte === "item" || r.fonte === "modelo") && n(r.unidades) === 0 && <span className="ml-2 rounded-full border border-slate-700 px-2 py-0.5 text-[10px] text-slate-400">sem venda em 90d</span>}
                     </td>
                     <td className="p-3 text-right text-slate-400">{int(r.unidades)}</td>
                     <td className="p-3 text-right">{brl(n(r.preco))}</td>

@@ -45,7 +45,38 @@ language sql stable as $$
     where (p_loja_ids is null or vr.loja_id = any(p_loja_ids))
     group by vr.loja_id, vr.item_id, pr.nome, pr.id, norm_sku(vr.model_sku)
   ),
-  -- (b) produtos ativos sem nenhuma variação vendida: sem variação (SKU único) ou novos
+  -- Quantas variações (com SKU) a API conhece de cada produto (produto_variacoes).
+  -- 0 ou 1 = produto "de SKU único" (custo no item); 2+ = produto com variações.
+  n_modelos as (
+    select loja_id, item_id,
+      count(*) filter (where status = 'MODEL_NORMAL' and coalesce(model_sku,'') <> '') as n
+    from produto_variacoes
+    where (p_loja_ids is null or loja_id = any(p_loja_ids))
+    group by 1,2
+  ),
+  -- (c) variações conhecidas pela API que ainda NÃO venderam (90d): entram com preço
+  -- atual e custo por variação (custos_variacao pelo model_sku), pra cadastrar antes
+  -- da primeira venda.
+  modelos as (
+    select distinct on (pv.loja_id, pv.item_id, norm_sku(pv.model_sku))
+      pv.loja_id, pv.item_id, pr.nome as produto,
+      norm_sku(pv.model_sku) as model_sku, coalesce(nullif(pv.nome,''), '(variação)') as variacao,
+      0::numeric as unidades, nullif(pv.preco, 0) as preco,
+      (select max(cv.custo) from custos_variacao cv
+        where cv.loja_id = pv.loja_id and norm_sku(cv.model_sku) = norm_sku(pv.model_sku)) as custo,
+      pr.id as produto_id, 'modelo'::text as fonte
+    from produto_variacoes pv
+    join produtos pr on pr.loja_id = pv.loja_id and pr.item_id = pv.item_id
+    join n_modelos nm on nm.loja_id = pv.loja_id and nm.item_id = pv.item_id and nm.n >= 2
+    where p_incluir_sem_venda and pr.marketplace = 'shopee' and pr.status = 'NORMAL'
+      and pv.status = 'MODEL_NORMAL' and coalesce(pv.model_sku,'') <> ''
+      and (p_loja_ids is null or pv.loja_id = any(p_loja_ids))
+      and not exists (select 1 from variacoes_resumo vr
+                      where vr.loja_id = pv.loja_id and vr.item_id = pv.item_id and norm_sku(vr.model_sku) = norm_sku(pv.model_sku))
+    order by pv.loja_id, pv.item_id, norm_sku(pv.model_sku), pv.model_id
+  ),
+  -- (b) produtos ativos sem nenhuma variação vendida E sem variações conhecidas (SKU
+  -- único ou novo): linha do produto inteiro
   itens as (
     select pr.loja_id, pr.item_id, pr.nome as produto,
       norm_sku(pr.sku) as model_sku, '(produto inteiro)'::text as variacao,
@@ -61,8 +92,9 @@ language sql stable as $$
     where p_incluir_sem_venda and pr.marketplace = 'shopee' and pr.status = 'NORMAL'
       and (p_loja_ids is null or pr.loja_id = any(p_loja_ids))
       and not exists (select 1 from variacoes_resumo vr where vr.loja_id = pr.loja_id and vr.item_id = pr.item_id)
+      and not exists (select 1 from n_modelos nm where nm.loja_id = pr.loja_id and nm.item_id = pr.item_id and nm.n >= 2)
   ),
-  base0 as (select * from vars union all select * from itens),
+  base0 as (select * from vars union all select * from modelos union all select * from itens),
   base as (
     select b.*,
       coalesce(
