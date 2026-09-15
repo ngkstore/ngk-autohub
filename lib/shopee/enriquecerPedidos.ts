@@ -265,10 +265,11 @@ export type ResultadoEnriquecimento = {
 export async function enriquecerPedidosPendentes({
   limite = 300,
   lojaIds = null,
+  offset = 0,
   resync = false,
   backfill = false,
   revisar = false,
-}: { limite?: number; lojaIds?: string[] | null; resync?: boolean; backfill?: boolean; revisar?: boolean } = {}): Promise<ResultadoEnriquecimento> {
+}: { limite?: number; lojaIds?: string[] | null; offset?: number; resync?: boolean; backfill?: boolean; revisar?: boolean } = {}): Promise<ResultadoEnriquecimento> {
   const partnerId = process.env.SHOPEE_PARTNER_ID;
   const partnerKey = process.env.SHOPEE_PARTNER_KEY;
   const baseUrl = process.env.SHOPEE_API_BASE_URL || BASE_URL_PADRAO;
@@ -320,7 +321,8 @@ export async function enriquecerPedidosPendentes({
     query = query.is("data_pedido", null).is("origem", null);
   }
   if (lojaIds) query = query.in("loja_id", lojaIds);
-  const { data: pedidos } = await query.limit(limite);
+  // offset: permite chamadas paralelas pegarem fatias diferentes da fila (backfill)
+  const { data: pedidos } = await query.range(offset, offset + limite - 1);
 
   if (!pedidos || pedidos.length === 0) {
     return { processados: 0, atualizados: 0, erros: 0, restantes: 0 };

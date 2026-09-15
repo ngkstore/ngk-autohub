@@ -9,10 +9,10 @@ export const maxDuration = 300;
 // data/valor/itens via get_order_detail. Separado do cron ao vivo pra não
 // atrasar o faturamento do dia. ?limite=N (padrão 300). Escrow (taxa real) fica
 // por conta do cron financeiro normal, que já é recente-primeiro.
-async function rodar(limite: number, loja: string | null) {
+async function rodar(limite: number, loja: string | null, offset: number) {
   try {
     // ?loja=<id> particiona a fila por loja (permite rodar uma chamada por loja em paralelo)
-    const r = await enriquecerPedidosPendentes({ limite, backfill: true, lojaIds: loja ? [loja] : null });
+    const r = await enriquecerPedidosPendentes({ limite, backfill: true, lojaIds: loja ? [loja] : null, offset });
     return NextResponse.json({
       sucesso: true,
       mensagem: `${r.atualizados} enriquecido(s). Faltam ${r.restantes}.`,
@@ -28,10 +28,10 @@ async function rodar(limite: number, loja: string | null) {
 
 export async function GET(request: NextRequest) {
   const limite = Math.min(1000, Math.max(1, Number(request.nextUrl.searchParams.get("limite")) || 300));
-  return rodar(limite, request.nextUrl.searchParams.get("loja"));
+  return rodar(limite, request.nextUrl.searchParams.get("loja"), Math.max(0, Number(request.nextUrl.searchParams.get("offset")) || 0));
 }
 
 export async function POST(request: NextRequest) {
   const limite = Math.min(1000, Math.max(1, Number(request.nextUrl.searchParams.get("limite")) || 300));
-  return rodar(limite, request.nextUrl.searchParams.get("loja"));
+  return rodar(limite, request.nextUrl.searchParams.get("loja"), Math.max(0, Number(request.nextUrl.searchParams.get("offset")) || 0));
 }
