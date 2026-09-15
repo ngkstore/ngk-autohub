@@ -99,7 +99,9 @@ export async function coletarAdsLoja({
   // 1) Saldo (registra pra HOJE).
   const bal = await chamar("/api/v2/ads/get_total_balance", tok);
   const saldo = num((bal.response as Record<string, unknown>)?.total_balance);
-  const hojeIso = new Date().toISOString().slice(0, 10);
+  // Data de HOJE em horário de Brasília (em UTC vira "amanhã" depois das 21h e o
+  // snapshot cai no dia errado — o motor e o relógio das janelas usam o dia BRT).
+  const hojeIso = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
   if (saldo != null) {
     await supabase.from("ads_saldo_diario").upsert(
       { loja_id: lojaId, dia: hojeIso, saldo, atualizado_em: new Date().toISOString() },
