@@ -213,7 +213,7 @@ begin
       coalesce(
         (select sum(pi.qtd*pi.preco)/nullif(sum(pi.qtd),0) from pedido_itens pi
           where pi.loja_id=p.loja_id and pi.item_id=p.item_id::text and pi.dia >= v_hoje-90),
-        pr.preco) as preco_catalogo
+        nullif(pr.preco, 0)) as preco_catalogo
     from perf p
     left join custo_var cv on cv.loja_id=p.loja_id and cv.item_id=p.item_id
     left join produtos pr on pr.loja_id=p.loja_id and pr.item_id=p.item_id::text
@@ -408,7 +408,7 @@ begin
       when 'aprendizado'           then format('Aguardar (aprendizado, faltam %s dia(s)); não editar meta', dias_restantes)
       when 'sem_margem'            then case
                                           when custo is null then 'Cadastrar custo em Finanças → Produtos & Margem (filtro "só sem custo") — sem base pra ROAS mínimo'
-                                          when ticket is null then 'Sem preço de venda conhecido (sem venda e sem preço no catálogo) — checar o produto'
+                                          when ticket is null or ticket <= 0 then 'Sem preço de venda conhecido (sem venda e sem preço no catálogo) — checar o produto'
                                           else format('Margem ≤ 0: custo R$%s vs preço R$%s (taxa %s%%) — custo cadastrado errado ou preço abaixo do custo', round(custo,2), round(ticket,2), taxa_pct) end
       when 'abaixo_do_minimo'      then 'Pausar OU revisar página/preço antes de reinvestir'
       when 'retomar_meta'          then format('Voltar a meta para %s: desde a troca %s → %s (%s dias) o GMV/dia foi de R$%s para R$%s e o lucro/dia de R$%s para R$%s — %s',
