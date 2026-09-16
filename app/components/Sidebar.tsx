@@ -15,6 +15,7 @@ const grupos: Grupo[] = [
       { name: "Produtos", href: "/produtos" },
       { name: "Avaliações", href: "/avaliacoes" },
       { name: "Atendimento", href: "/atendimento" },
+      { name: "🩺 Saúde da conta", href: "/saude" },
     ],
   },
   {

@@ -73,6 +73,10 @@
       "schedule": "30 11 * * 1"
     },
     {
+      "path": "/api/shopee/saude/coletar",
+      "schedule": "20 9 * * *"
+    },
+    {
       "path": "/api/shopee/ads/reforco",
       "schedule": "*/30 * * * *"
     },
