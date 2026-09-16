@@ -18,7 +18,7 @@ export const RATING: Record<number, string> = { 1: "Ruim", 2: "Precisa melhorar"
 export const TIPO_METRICA: Record<number, string> = { 1: "Envio", 2: "Anúncios", 3: "Atendimento" };
 export const METRICA_PT: Record<number, string> = {
   [-1]: "Chats não respondidos", 1: "Taxa de atraso no envio", 3: "Taxa de não cumprimento", 4: "Tempo de preparo",
-  11: "Taxa de resposta no chat", 12: "% de anúncios em pré-venda", 15: "Dias de violação de pré-venda",
+  11: "Taxa de resposta no chat", 12: "% de anúncios em pré-venda", 15: "Qtd. de anúncios em pré-venda",
   21: "Tempo de resposta", 22: "Avaliação da loja", 23: "Nº de chats não respondidos", 25: "Taxa de entrega rápida",
   27: "Falha de coleta no prazo", 28: "Valor de violação de coleta", 29: "Tempo médio de resposta",
   42: "Taxa de cancelamento", 43: "Taxa de devolução/reembolso", 52: "Violações graves de anúncio",
@@ -27,7 +27,7 @@ export const METRICA_PT: Record<number, string> = {
   92: "Devolução (NDD)", 95: "Satisfação do cliente", 96: "% anúncios SDD", 97: "% anúncios NDD",
   2001: "Entrega rápida - SLS", 2002: "Entrega rápida - FBS", 2003: "Entrega rápida - 3PF",
   2011: "Produtos de baixa qualidade", 2030: "% anúncios HD", 2031: "% HD com frete grátis",
-  2032: "Envio aos sábados", 2033: "Tempo de preparo (PS)", 2036: "OTDR logística", 2037: "OTDR DD",
+  2032: "Envio aos sábados", 2033: "Tempo médio de preparo", 2036: "Entrega no prazo - logística (OTDR)", 2037: "Entrega no prazo (OTDR)",
 };
 export const MOTIVO_ANUNCIO: Record<number, string> = {
   1: "Proibido", 2: "Falsificado", 3: "Spam", 4: "Imagem inadequada", 5: "Informação insuficiente",
