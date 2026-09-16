@@ -62,7 +62,15 @@ export default async function AdsControlePage({ searchParams }: Props) {
   let qLojas = supabase.from("lojas").select("id, nome, nome_publico, apelido").eq("marketplace", "shopee").order("nome");
   if (escopoLojas) qLojas = qLojas.in("id", escopoLojas);
 
-  let qRec = supabase.from("ads_recomendacoes").select("*").eq("dia", hoje).order("gasto_7d", { ascending: false }).limit(300);
+  // Dia das recomendações: hoje ou, se o job ads-recomendacoes (7h BRT) falhou/não rodou,
+  // o último dia disponível — com aviso na tela em vez de tabela vazia. O RPC do resumo usa a mesma regra.
+  let qDia = supabase.from("ads_recomendacoes").select("dia").lte("dia", hoje).order("dia", { ascending: false }).limit(1);
+  if (lojas) qDia = qDia.in("loja_id", lojas);
+  const { data: diaRaw } = await qDia;
+  const diaRecs: string = (diaRaw as { dia: string }[] | null)?.[0]?.dia || hoje;
+  const recsAtrasadas = diaRecs < hoje;
+
+  let qRec = supabase.from("ads_recomendacoes").select("*").eq("dia", diaRecs).order("gasto_7d", { ascending: false }).limit(300);
   if (lojas) qRec = qRec.in("loja_id", lojas);
 
   let qRef = supabase.from("ads_reforcos").select("loja_id, campaign_id, orcamento_base").eq("dia", hoje).is("revertido_em", null);
@@ -129,6 +137,13 @@ export default async function AdsControlePage({ searchParams }: Props) {
         <LojaSeletor lojas={lojasList} atual={params.loja || "todas"} base="/ads-controle" />
       </div>
 
+      {recsAtrasadas && (
+        <div className="mt-6 rounded-xl border border-amber-900 bg-amber-950/40 px-4 py-3 text-sm text-amber-200">
+          ⚠️ Mostrando as recomendações de <b>{new Date(diaRecs + "T12:00:00").toLocaleDateString("pt-BR")}</b> — o cálculo de hoje (job ads-recomendacoes, 7h) ainda não rodou ou falhou.
+          Os cards de gasto em risco e orçamento ideal seguem esse mesmo dia.
+        </div>
+      )}
+
       {alertas.length > 0 && (
         <div className="mt-6 space-y-2">
           {alertas.map((a, i) => (
@@ -174,7 +189,7 @@ export default async function AdsControlePage({ searchParams }: Props) {
           </thead>
           <tbody>
             {recs.length === 0 ? (
-              <tr><td className="p-4 text-slate-400" colSpan={mostrarLoja ? 10 : 9}>Sem recomendações ainda — o coletor roda de madrugada. Rode o backfill se acabou de configurar.</td></tr>
+              <tr><td className="p-4 text-slate-400" colSpan={mostrarLoja ? 10 : 9}>Sem recomendações — o coletor roda de madrugada e o cálculo às 7h. Se a loja acabou de ser configurada, rode o backfill.</td></tr>
             ) : recs.map((x) => (
               <tr key={`${x.loja_id}-${x.item_id}`} className="border-t border-slate-800 hover:bg-slate-800/40">
                 <td className="p-3 max-w-xs truncate" title={nomes[String(x.item_id)] || String(x.item_id)}>
