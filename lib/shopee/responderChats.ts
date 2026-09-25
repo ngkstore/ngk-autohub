@@ -7,6 +7,27 @@ import { nomeLojaPublico } from "@/lib/shopee/lojas";
 
 const BASE_URL_PADRAO = "https://partner.shopeemobile.com";
 
+// Contato fora da Shopee (WhatsApp, telefone, e-mail, redes sociais, links).
+// A Shopee BLOQUEIA a mensagem no envio e pode penalizar a loja — então isso
+// nunca pode sair do robô: nem como exemplo pra IA, nem na resposta final.
+// Cobre: apps/redes (whats, zap, insta…), e-mail, links (http/www/.com/.br),
+// telefone BR — (11) 91234-5678, 11912345678, 11 1234 5678 — e frases do tipo
+// "me passa seu número" / "fora da Shopee" / "me liga".
+const RE_CONTATO_EXTERNO =
+  /whats|wpp|\bzap\b|zapzap|telegram|instagram|\binsta\b|facebook|messenger|e-?mail|https?:\/\/|www\.|\.com\b|\.br\b|\(?\d{2}\)?\s?9?\s?\d{4}[-.\s]?\d{4}|fora da (shopee|plataforma)|por fora|(meu|seu|teu) n[uú]mero|n[uú]mero (de|do) (telefone|celular|contato|whats)|me liga|te ligo|ligar pra/i;
+
+export function contemContatoExterno(texto: string | null | undefined) {
+  return RE_CONTATO_EXTERNO.test(texto || "");
+}
+
+// Anexado ao contexto na 2ª tentativa, quando a 1ª resposta citou contato externo.
+const AVISO_CONTATO =
+  "\n\nATENÇÃO: sua resposta anterior citava contato fora da Shopee (WhatsApp, telefone, e-mail, rede social ou link). Isso é PROIBIDO — a Shopee bloqueia a mensagem e pune a loja. Reescreva resolvendo tudo por aqui, pelo chat da Shopee, sem pedir nem oferecer NENHUM contato externo e sem citar número, e-mail ou link.";
+
+// Erro de envio em que a Shopee recusou o CONTEÚDO (contato externo/palavra sensível).
+const RE_ERRO_CONTEUDO =
+  /sensitive|prohibit|violat|censor|blocked|not allowed|restricted|banned|illegal|contact info/i;
+
 function montarSystem(nomeLoja: string) {
   return `Você é o atendimento da ${nomeLoja} no chat da Shopee, em português do Brasil. Fale como um vendedor humano de verdade: simpático, direto e prestativo.
 
@@ -28,6 +49,11 @@ DISPONIBILIDADE / CORES / VARIAÇÕES — regra crítica:
 - Você NÃO tem o estoque por cor/variação. Então NUNCA diga que uma cor, tamanho ou variação específica está indisponível — isso costuma ser informação ERRADA.
 - Se perguntarem sobre uma cor/variação, responda de forma positiva: as opções disponíveis aparecem nas variações do anúncio, é só selecionar na hora de comprar. (Só diga que está esgotado se o estoque geral do produto for 0.)
 - Nunca invente preço, cor, medida ou prazo que não esteja nos dados.
+
+CONTATO FORA DA SHOPEE — regra crítica (a Shopee BLOQUEIA a mensagem e pode punir a loja):
+- NUNCA peça nem ofereça WhatsApp, telefone, celular, e-mail, Instagram, Telegram, link ou qualquer contato fora da Shopee. Nada de "me chama no whats", "passa seu número", "manda seu e-mail".
+- Todo o atendimento acontece AQUI, pelo chat da Shopee. Se o cliente pedir contato externo ou mandar um número, responda com gentileza que a loja atende só por aqui mesmo, pelo chat, e resolva a dúvida dele por aqui.
+- Mesmo que os exemplos antigos da loja ou a conversa tenham pedido contato externo, NÃO repita isso.
 
 QUANDO precisa_humano=true: só quando o caso exige uma decisão manual que as orientações não cobrem (loja pagar frete da devolução, desconto/negociação, exceção fora do padrão) ou quando faltam dados pra responder com segurança. MESMO ASSIM, o campo "resposta" deve ser uma mensagem CURTA e tranquila pro cliente, ex.: "Deixa eu confirmar isso certinho pra te passar a resposta correta e já te retorno, tá? 🙏" — sem NUNCA mencionar escalação, prioridade ou processos internos. Na dúvida entre responder e escalar, prefira RESPONDER com a orientação padrão (confianca="alta").
 
@@ -208,7 +234,10 @@ export async function responderChatsLote({
     const t = (m.texto || "").trim();
     // pula saudações curtas/repetidas E os textões dramáticos antigos (>320)
     // pra eles não virarem "modelo" e realimentarem o tom exagerado.
+    // …e os que pediam contato fora da Shopee (WhatsApp etc.): viravam
+    // "modelo" e o robô repetia — a Shopee bloqueia a resposta.
     if (t.length < 20 || t.length > 320 || vistos.has(t)) continue;
+    if (contemContatoExterno(t)) continue;
     vistos.add(t);
     exemplosLoja.push(t);
     if (exemplosLoja.length >= 30) break;
@@ -282,7 +311,7 @@ export async function responderChatsLote({
       if (msgs && msgs.length > 0) {
         historicoTxt = msgs
           .reverse()
-          .filter((m) => m.texto)
+          .filter((m) => m.texto && !(m.de_loja && contemContatoExterno(m.texto)))
           .map((m) => `${m.de_loja ? "Loja" : "Cliente"}: ${m.texto}`)
           .join("\n");
       }
@@ -313,8 +342,9 @@ export async function responderChatsLote({
       .find((m) => !m.de_loja);
     const pergunta = ultimaDoCliente?.texto || c.ultima_mensagem || "";
 
-    let decisao = null;
+    let decisao: Decisao | null = null;
     let escalar: boolean;
+    let bloqueadaPorContato = false;
     let categoria = "outro";
     let confianca = "baixa";
     let resposta = "";
@@ -334,6 +364,16 @@ export async function responderChatsLote({
 
       try {
         decisao = await decidir(client, contexto, lojaId, system);
+        // Guarda: resposta com contato fora da Shopee (WhatsApp, telefone,
+        // e-mail, link) é bloqueada no envio e pode punir a loja. Pede UMA
+        // reescrita; se insistir, não envia — vai pra você no Telegram.
+        if (decisao?.resposta && contemContatoExterno(decisao.resposta)) {
+          decisao = await decidir(client, contexto + AVISO_CONTATO, lojaId, system);
+          if (decisao?.resposta && contemContatoExterno(decisao.resposta)) {
+            bloqueadaPorContato = true;
+            decisao = { ...decisao, precisa_humano: true, resposta: "" };
+          }
+        }
       } catch {
         // Falha transitória da IA (sobrecarga/rate limit/rede): NÃO derruba o
         // lote inteiro nem marca a conversa. Pula esta e tenta de novo na
@@ -352,7 +392,7 @@ export async function responderChatsLote({
     // Modo 100% autônomo: responde TUDO (nunca escala). Se a IA não gerou
     // texto (ex.: cliente só mandou imagem), envia uma mensagem gentil
     // pedindo mais detalhes, em vez de deixar pra você.
-    if (autonomo && !resposta.trim()) {
+    if (autonomo && !bloqueadaPorContato && !resposta.trim()) {
       resposta =
         "Oi! 😊 Recebi sua mensagem. Pode me contar com mais detalhes como posso te ajudar?";
     }
@@ -378,7 +418,9 @@ export async function responderChatsLote({
           .update({
             ultimo_tratado_msg_id: c.latest_message_id,
             escalada: true,
-            motivo_escala: `${categoria} / confiança ${confianca}`,
+            motivo_escala: bloqueadaPorContato
+              ? "contato_externo (IA insistiu em contato fora da Shopee)"
+              : `${categoria} / confiança ${confianca}`,
             categoria,
             confianca,
             resposta_ia: resposta,
@@ -405,6 +447,9 @@ export async function responderChatsLote({
 
         await enviarTelegram(
           `🔔 Chat para você responder\n\n` +
+            (bloqueadaPorContato
+              ? `⚠️ A IA insistiu em pedir contato fora da Shopee (bloqueado). Responda por aqui, pelo chat.\n\n`
+              : "") +
             `Cliente: ${c.to_name || "-"}\n` +
             `Produto: ${nomeProduto}\n` +
             `Assunto: ${categoria} (confiança ${confianca})\n\n` +
@@ -435,6 +480,32 @@ export async function responderChatsLote({
       // falha no envio: registra o motivo (antes era engolido).
       const msg = e instanceof Error ? e.message : String(e);
       erroEnvio = msg;
+      // Shopee recusou o CONTEÚDO (contato externo/palavra sensível): reenviar
+      // o mesmo texto não resolve. Marca como tratada, escala e avisa — antes
+      // ficava em loop regenerando (e pagando IA) a cada rodada de 2 min.
+      if (RE_ERRO_CONTEUDO.test(msg)) {
+        await supabase
+          .from("chat_conversas")
+          .update({
+            ultimo_tratado_msg_id: c.latest_message_id,
+            escalada: true,
+            motivo_escala: `bloqueado_shopee: ${msg.slice(0, 160)}`,
+            categoria,
+            confianca,
+            resposta_ia: resposta,
+          })
+          .eq("conversation_id", c.conversation_id);
+        await enviarTelegram(
+          `🚫 Shopee bloqueou a resposta do robô\n\n` +
+            `Cliente: ${c.to_name || "-"}\n` +
+            `Produto: ${nomeProduto}\n` +
+            `Motivo: ${msg.slice(0, 200)}\n\n` +
+            `Cliente disse:\n"${pergunta}"\n\n` +
+            `Responda por aqui, pelo chat da Shopee, sem contato externo.`
+        );
+        escalados++;
+        continue;
+      }
       // Fora da janela de mensagem da Shopee (só dá pra responder se o cliente
       // falou nos últimos 7 dias / comprou em 30 dias / tem devolução aberta):
       // não adianta re-tentar — nem manualmente dá. Marca como tratada pra não
