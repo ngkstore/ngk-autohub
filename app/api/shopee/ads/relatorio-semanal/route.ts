@@ -119,7 +119,20 @@ async function montarTexto(lojaId: string, nomeLoja: string): Promise<string | n
   const promos = recs.filter((x) => x.promo).length;
   if (promos) L.push(`🏷️ ${promos} item(ns) em promoção (regra de escalar suprimida).`);
   L.push(""); L.push("Detalhe completo: /ads-controle");
-  return L.join("\n").slice(0, 4000);
+  return L.join("\n");
+}
+
+// Telegram aceita 4096 caracteres por mensagem: quebra o texto em partes, cortando
+// em quebra de linha (o diagnóstico fez o relatório passar do limite e cortava o fim).
+function partes(texto: string, max = 3900): string[] {
+  const out: string[] = [];
+  let atual = "";
+  for (const linha of texto.split("\n")) {
+    if (atual.length + linha.length + 1 > max && atual) { out.push(atual); atual = ""; }
+    atual += (atual ? "\n" : "") + linha.slice(0, max);
+  }
+  if (atual) out.push(atual);
+  return out;
 }
 
 export async function GET(request: NextRequest) {
@@ -135,7 +148,12 @@ export async function GET(request: NextRequest) {
       const texto = await montarTexto(l.id, nomeLoja);
       if (!texto) { saida.push({ loja: nomeLoja, vazio: true }); continue; }
       if (dry) { saida.push({ loja: nomeLoja, texto }); continue; }
-      const ok = await enviarTelegram(texto);
+      let ok = true;
+      const pedacos = partes(texto);
+      for (let i = 0; i < pedacos.length; i++) {
+        const cab = pedacos.length > 1 ? `(${i + 1}/${pedacos.length}) ` : "";
+        ok = (await enviarTelegram(cab + pedacos[i])) && ok;
+      }
       saida.push({ loja: nomeLoja, enviado: ok });
     }
     return NextResponse.json({ sucesso: true, dry, lojas: saida });

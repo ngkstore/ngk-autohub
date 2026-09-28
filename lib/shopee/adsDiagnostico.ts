@@ -76,7 +76,7 @@ function explicar(x: ItemDiag, roasMedioAnterior: number | null): ItemExplicado 
   const alts = descreverAlteracoes(x.alteracoes);
   const causas: string[] = [];
   let tipo: ItemExplicado["tipo"] = eficDomina ? "eficiencia" : "mix";
-  const flags = { crCaiu: false, ctrCaiu: false, cpcSubiu: false };
+  const flags = { crCaiu: false, ctrCaiu: false, cpcSubiu: false, perdeuVolumeBom: false };
 
   if (novo) {
     tipo = "novo";
@@ -107,9 +107,9 @@ function explicar(x: ItemDiag, roasMedioAnterior: number | null): ItemExplicado 
         ? `gasto subiu ${dGasto.toFixed(0)}% (${gastoTxt}) num item com ROAS abaixo da média (${x1(x.roas_atual)} vs ${x1(roasMedioAnterior)})`
         : `item com ROAS abaixo da média (${x1(x.roas_atual)} vs ${x1(roasMedioAnterior)}) ganhou peso no gasto total (${gastoTxt})`);
     } else {
-      causas.push(dGasto != null && dGasto > 10
-        ? `gasto subiu ${dGasto.toFixed(0)}% (${gastoTxt}) num item com ROAS acima da média (${x1(x.roas_atual)} vs ${x1(roasMedioAnterior)})`
-        : `item com ROAS acima da média (${x1(x.roas_atual)} vs ${x1(roasMedioAnterior)}) segue com bom peso no gasto (${gastoTxt})`);
+      if (dGasto != null && dGasto > 10) causas.push(`gasto subiu ${dGasto.toFixed(0)}% (${gastoTxt}) num item com ROAS acima da média (${x1(x.roas_atual)} vs ${x1(roasMedioAnterior)})`);
+      else if (dGasto != null && dGasto < -10) { flags.perdeuVolumeBom = true; causas.push(`gasto caiu ${Math.abs(dGasto).toFixed(0)}% (${gastoTxt}) num item com ROAS acima da média (${x1(x.roas_atual)} vs ${x1(roasMedioAnterior)}) — ajuda o ROAS geral, mas perdeu volume rentável`); }
+      else causas.push(`item com ROAS acima da média (${x1(x.roas_atual)} vs ${x1(roasMedioAnterior)}) mantém peso no gasto (${gastoTxt})`);
     }
   }
   if (alts.length) causas.push(`alterações: ${alts.join("; ")}`);
@@ -134,6 +134,8 @@ function explicar(x: ItemDiag, roasMedioAnterior: number | null): ItemExplicado 
     else if (x.promo) rec = "efeito da promoção: reavaliar quando o preço voltar ao normal";
     else if (tipo === "mix") rec = `reduzir o orçamento desse item${ideal} e realocar pros campeões`;
     else rec = "manter e observar mais uma semana; se cair de novo, baixar o orçamento";
+  } else if (flags.perdeuVolumeBom) {
+    rec = `item rentável gastando menos: conferir orçamento/teto e estoque e devolver o combustível${ideal}`;
   } else {
     rec = x.classificacao === "campeao" || x.classificacao === "saudavel"
       ? `está puxando o ROAS pra cima: escalar o orçamento${ideal}`
