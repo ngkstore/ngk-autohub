@@ -93,7 +93,7 @@ export default function AjusteAds({
               </button>
             )}
           </div>
-          <p className="mt-1 text-[11px] text-slate-500">atual: {orcamentoAtual != null ? `R$ ${fmt(orcamentoAtual)}` : "—"} (0 = sem limite na Shopee)</p>
+          <p className="mt-1 text-[11px] text-slate-500">atual: {orcamentoAtual != null ? `R$ ${fmt(orcamentoAtual)}` : "—"} (mín. R$ 10 · 0 = sem limite na Shopee)</p>
           {reforcoBase != null && (
             <p className="mt-1 text-[11px] text-amber-300">⚡ reforço automático ativo hoje: base R$ {fmt(reforcoBase)}. O valor atual inclui o reforço; à meia-noite volta pra base. Se você salvar outro valor, ele vira a nova base.</p>
           )}

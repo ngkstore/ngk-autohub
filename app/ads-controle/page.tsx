@@ -3,6 +3,8 @@ import { supabase } from "@/lib/supabase";
 import { escopoDoUsuario, filtroLojas } from "@/lib/conta";
 import LojaSeletor from "../components/LojaSeletor";
 import AjusteInline from "../components/AjusteInline";
+import DiagnosticoRoas from "../components/DiagnosticoRoas";
+import { obterDiagnosticoRoas } from "@/lib/shopee/adsDiagnostico";
 
 export const dynamic = "force-dynamic";
 
@@ -76,11 +78,12 @@ export default async function AdsControlePage({ searchParams }: Props) {
   let qRef = supabase.from("ads_reforcos").select("loja_id, campaign_id, orcamento_base").eq("dia", hoje).is("revertido_em", null);
   if (lojas) qRef = qRef.in("loja_id", lojas);
 
-  const [{ data: resumoRaw }, { data: recsRaw }, { data: lojasRaw }, { data: refRaw }] = await Promise.all([
+  const [{ data: resumoRaw }, { data: recsRaw }, { data: lojasRaw }, { data: refRaw }, diagnostico] = await Promise.all([
     supabase.rpc("ads_resumo_controle", { p_loja_ids: lojas }),
     qRec,
     qLojas,
     qRef,
+    obterDiagnosticoRoas(lojas), // por que o ROAS da semana subiu/caiu
   ]);
   // Reforço automático ativo hoje, por campanha (mostra ⚡ e a base na edição inline).
   const reforcoBase: Record<string, number> = Object.fromEntries(
@@ -159,6 +162,8 @@ export default async function AdsControlePage({ searchParams }: Props) {
         <Kpi label="Orçamento/dia ideal" val={comOrc.length ? brl(orcIdeal) : "—"} hint={comOrc.length ? `configurado ${brl(orcCfg)}${noTeto ? ` · ${noTeto} no teto` : ""}` : "sem base ainda"} cor="text-amber-300" />
         <Kpi label="Saldo de créditos" val={brl(n(r.saldo))} hint={`~${saldoDias.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} dia(s) de gasto`} cor={saldoDias < 7 ? "text-red-300" : "text-emerald-300"} />
       </div>
+
+      {diagnostico && <DiagnosticoRoas dg={diagnostico} />}
 
       <div className="mt-4 flex flex-wrap gap-2">
         {porClasse.map((c) => (

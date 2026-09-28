@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { enviarTelegram } from "@/lib/telegram";
+import { obterDiagnosticoRoas, textoDiagnostico } from "@/lib/shopee/adsDiagnostico";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -65,6 +66,10 @@ async function montarTexto(lojaId: string, nomeLoja: string): Promise<string | n
   L.push(`Semana: ROAS real ${x1(sem)} ${seta} (anterior ${x1(ant)} · média 4 sem ${x1(r.roas_media4s)})`);
   L.push(`Gasto ${brl(r.gasto_semana)} · em risco ${brl(r.gasto_risco)} · saldo ${brl(r.saldo)} (~${d1(saldoDias)} dia${saldoDias === 1 ? "" : "s"})`);
   L.push(`Situação: ` + porClasse.map((c) => `${c.qtd} ${ROTULO[c.classificacao] || c.classificacao}`).join(" · "));
+
+  // 🔍 Diagnóstico: por que o ROAS geral subiu/caiu (decomposição por item, causa e o que fazer).
+  const dg = await obterDiagnosticoRoas([lojaId]);
+  if (dg) { L.push(""); L.push(...textoDiagnostico(dg)); }
 
   // Orçamento diário: configurado vs ideal (soma dos itens com ideal calculado).
   const comOrc = recs.filter((x) => x.orcamento_ideal != null && x.orcamento_configurado != null);

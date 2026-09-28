@@ -101,6 +101,7 @@ alter table ads_recomendacoes add column if not exists meta_sugerida numeric(8,2
 -- Multiplicador do orçamento ideal: campeao/saudavel/pronto_proximo_degrau 2,5× ·
 -- aprendizado/estabilizacao/problema_*/meta_* 1,25× · abaixo_do_minimo 0 ·
 -- sem_margem sem recomendação. Censurado pelo teto -> orçamento configurado × 1,25.
+-- Todo ideal > 0 tem piso de R$10 (mínimo aceito pela Shopee).
 create or replace function ads_recomendacoes_calc(p_loja_ids uuid[] default null, p_meta_global numeric default 30)
 returns int language plpgsql security definer as $$
 declare v_hoje date := (now() at time zone 'America/Sao_Paulo')::date; v_n int;
@@ -451,10 +452,11 @@ begin
     case
       when classificacao = 'sem_margem' then null
       when classificacao = 'abaixo_do_minimo' then 0
-      when censurado and orc_config is not null then round(orc_config*1.25, 2)
+      -- piso R$10: é o mínimo que a Shopee aceita de orçamento diário (28/set/2026)
+      when censurado and orc_config is not null then greatest(10, round(orc_config*1.25, 2))
       when mult is null or gasto_medio_normal is null then null
       -- item escalando: usa o maior entre o normal de 28d e o normal dos últimos 7d
-      else round(mult*greatest(gasto_medio_normal, coalesce(gasto_medio_normal_7d, 0)), 2)
+      else greatest(10, round(mult*greatest(gasto_medio_normal, coalesce(gasto_medio_normal_7d, 0)), 2))
     end,
     estado_janela, dias_restantes,
     case

@@ -32,6 +32,10 @@ export async function POST(request: NextRequest) {
     if (orcamento !== null && (Number.isNaN(orcamento) || orcamento < 0)) {
       return NextResponse.json({ sucesso: false, erro: "Orçamento inválido." }, { status: 400 });
     }
+    // A Shopee não aceita orçamento diário abaixo de R$10 (0 = sem limite).
+    if (orcamento !== null && orcamento > 0 && orcamento < 10) {
+      return NextResponse.json({ sucesso: false, erro: "Orçamento mínimo na Shopee é R$ 10/dia (ou 0 = sem limite)." }, { status: 400 });
+    }
     if (metaRoas !== null && (Number.isNaN(metaRoas) || metaRoas <= 0)) {
       return NextResponse.json({ sucesso: false, erro: "Meta ROAS inválida (tem que ser > 0)." }, { status: 400 });
     }

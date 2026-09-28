@@ -129,7 +129,7 @@ export default function AjusteInline(p: Props) {
       <td className="p-2 text-right whitespace-nowrap">
         <div className="flex items-center justify-end gap-1">
           <span className="text-xs text-slate-500">R$</span>
-          <input value={orc} onChange={(e) => setOrc(e.target.value)} inputMode="decimal" className={cls} placeholder="orç." />
+          <input value={orc} onChange={(e) => setOrc(e.target.value)} inputMode="decimal" className={cls} placeholder="orç." title="orçamento diário (mínimo R$ 10; 0 = sem limite)" />
           {p.orcamentoIdeal != null && p.orcamentoIdeal > 0 && (
             <button type="button" onClick={() => setOrc(fmt(Math.round(p.orcamentoIdeal!)))} className={`${mini} border-amber-700/60 text-amber-300 hover:bg-amber-900/30`} title="usar orçamento ideal">ideal {Math.round(p.orcamentoIdeal)}</button>
           )}
