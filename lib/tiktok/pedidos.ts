@@ -60,7 +60,8 @@ async function buscarPagina(
   loja: LojaTikTok,
   pageToken: string,
   desdeUnix?: number,
-  pageSize = 50
+  pageSize = 50,
+  ateUnix?: number
 ) {
   const query: Record<string, string> = {
     page_size: String(pageSize),
@@ -71,6 +72,8 @@ async function buscarPagina(
 
   const body: Record<string, unknown> = {};
   if (desdeUnix) body.create_time_ge = desdeUnix;
+  // Janela fechada (backfill por fatias): create_time < ate.
+  if (ateUnix) body.create_time_lt = ateUnix;
 
   return chamarTikTok("/order/202309/orders/search", {
     method: "POST",
@@ -94,7 +97,9 @@ export type ResultadoTikTokPedidos = {
 export async function sincronizarPedidosTikTokLoja(
   loja: LojaTikTok,
   maxPaginas = 20,
-  desdeUnix?: number
+  desdeUnix?: number,
+  ateUnix?: number,
+  pageSize = 50
 ): Promise<ResultadoTikTokPedidos> {
   let pageToken = "";
   let novos = 0;
@@ -103,7 +108,7 @@ export async function sincronizarPedidosTikTokLoja(
   let amostra: unknown = undefined;
 
   for (let p = 0; p < maxPaginas; p++) {
-    const resp = await buscarPagina(loja, pageToken, desdeUnix);
+    const resp = await buscarPagina(loja, pageToken, desdeUnix, pageSize, ateUnix);
     if (resp?.code !== 0) {
       return {
         loja: loja.lojaId,
@@ -159,11 +164,16 @@ export async function sincronizarPedidosTikTokLoja(
 }
 
 // maxPaginas menor no cron (só os recentes, rápido); maior no manual/backfill.
-export async function sincronizarPedidosTikTok(maxPaginas = 20, desdeUnix?: number) {
+export async function sincronizarPedidosTikTok(
+  maxPaginas = 20,
+  desdeUnix?: number,
+  ateUnix?: number,
+  pageSize = 50
+) {
   const lojas = await lojasTikTokAtivas();
   const resultados: ResultadoTikTokPedidos[] = [];
   for (const loja of lojas) {
-    resultados.push(await sincronizarPedidosTikTokLoja(loja, maxPaginas, desdeUnix));
+    resultados.push(await sincronizarPedidosTikTokLoja(loja, maxPaginas, desdeUnix, ateUnix, pageSize));
   }
   return resultados;
 }
