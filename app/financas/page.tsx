@@ -189,7 +189,9 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
   const ads = n(r.ads);
   const reemb = n(r.reembolsos);
   const imposto = n(r.imposto);
-  const resultado = liquida - ads - reemb - imposto;
+  const freteCusto = n(r.frete_custo); // TikTok: frete real − subsídio Frete Grátis − pago pelo cliente (já dentro do líquido)
+  const reembTiktok = n(r.reembolsos_tiktok); // TikTok: reembolsos de logística/plataforma (fora do pedido)
+  const resultado = liquida + reembTiktok - ads - reemb - imposto;
   const margem = receita > 0 ? (resultado / receita) * 100 : 0;
 
   // CMV: custo da mercadoria vendida no período. Cobertura = % de itens com custo.
@@ -202,7 +204,7 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
 
   // Comparação com o período anterior (mesma duração).
   const receitaPrev = n(rp.receita_bruta);
-  const resultadoPrev = n(rp.receita_liquida) - n(rp.ads) - n(rp.reembolsos) - n(rp.imposto);
+  const resultadoPrev = n(rp.receita_liquida) + n(rp.reembolsos_tiktok) - n(rp.ads) - n(rp.reembolsos) - n(rp.imposto);
   const deltaReceita = receitaPrev > 0 ? ((receita - receitaPrev) / receitaPrev) * 100 : null;
   const deltaResultado = Math.abs(resultadoPrev) > 0 ? ((resultado - resultadoPrev) / Math.abs(resultadoPrev)) * 100 : null;
   const maxEvoR = Math.max(1, ...evo.map((e) => n(e.receita)));
@@ -213,7 +215,9 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
     { l: "(−) Comissão de afiliado (liquida ~30 dias depois)", v: -afiliado, tot: false },
     { l: "(−) Taxa de serviço de afiliado", v: -taxaServAfiliado, tot: false },
     { l: "(−) Cupom próprio (o do marketplace não entra)", v: -cupom, tot: false },
+    ...(freteCusto !== 0 ? [{ l: "(−) Frete cobrado pelo TikTok (líquido do subsídio e do frete do cliente; detalhe em Conciliação)", v: -freteCusto, tot: false }] : []),
     { l: "= Receita líquida (escrow / extrato)", v: liquida, tot: true },
+    ...(reembTiktok !== 0 ? [{ l: "(+) Reembolsos do TikTok (logística / plataforma)", v: reembTiktok, tot: false }] : []),
     { l: "(−) Ads (saída da carteira)", v: -ads, tot: false },
     { l: "(−) Reembolsos / devoluções", v: -reemb, tot: false },
     { l: "(−) Imposto lançado", v: -imposto, tot: false },
@@ -328,7 +332,7 @@ async function Conciliacao({ lojas, periodo }: { lojas: string[] | null; periodo
   if (periodo) qAud = qAud.gte("data_pedido", periodo.inicio).lt("data_pedido", periodo.fim);
 
   const argsPer = { p_loja_ids: lojas, p_inicio: periodo?.inicio ?? null, p_fim: periodo?.fim ?? null };
-  const [{ data: pedRaw }, { data: conRaw }, { data: divRaw }, { data: audResRaw }, { data: audListRaw }, { data: agingRaw }] =
+  const [{ data: pedRaw }, { data: conRaw }, { data: divRaw }, { data: audResRaw }, { data: audListRaw }, { data: agingRaw }, { data: freteResRaw }, { data: freteListRaw }] =
     await Promise.all([
       qPed,
       supabase.rpc("resumo_conciliacao", argsPer),
@@ -336,7 +340,13 @@ async function Conciliacao({ lojas, periodo }: { lojas: string[] | null; periodo
       supabase.rpc("auditoria_resumo", argsPer),
       qAud,
       supabase.rpc("recebimento_aging", { p_loja_ids: lojas }),
+      supabase.rpc("tiktok_frete_resumo", argsPer),
+      supabase.rpc("tiktok_frete_lista", { ...argsPer, p_limite: 100 }),
     ]);
+  const fr = (freteResRaw as Record<string, unknown>) || {};
+  const frMotivos = (fr.por_motivo as { motivo: string; pedidos: number; valor: number }[]) || [];
+  const freteLista = (freteListRaw as { order_id: string; cliente_nome: string | null; data_pedido: string; status: string; revenue: number; frete_real: number; subsidio: number; pago_cliente: number; devolucao: number; estorno_cliente: number; liquido: number; motivo: string }[]) || [];
+  const MOTIVO: Record<string, string> = { devolucao: "Devolução (frete de volta)", reembolso: "Reembolso / cancelamento", acima_subsidio: "Acima do subsídio", credito: "Crédito a seu favor" };
 
   const pedidos = (pedRaw as Record<string, unknown>[]) || [];
   const con = (conRaw as Record<string, unknown>) || {};
@@ -376,6 +386,71 @@ async function Conciliacao({ lojas, periodo }: { lojas: string[] | null; periodo
           <Kpi label="Vencido (+60d)" val={brl(n(ag.b60_val))} hint={n(ag.b60_qtd) > 0 ? `${int(n(ag.b60_qtd))} pedidos · cobrar Shopee` : "tudo em dia"} cor={n(ag.b60_qtd) > 0 ? "text-red-300" : "text-emerald-300"} />
         </div>
       </section>
+
+      {/* Frete do TikTok: o que foi cobrado além do Programa de Frete Grátis (6%) */}
+      {n(fr.pedidos) > 0 && (
+        <section>
+          <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-xl font-bold">🚚 Frete cobrado pelo TikTok</h2>
+            <span className={`text-xs font-semibold ${n(fr.liquido) > 0 ? "text-orange-300" : "text-emerald-300"}`}>
+              líquido no período: {brl(n(fr.liquido))}
+            </span>
+          </div>
+          <p className="mb-3 text-xs text-slate-500">
+            Você paga 6% do Programa de Frete Grátis (já nas taxas). O TikTok cobra o frete real de cada pedido e devolve o subsídio
+            mais o que o cliente pagou; em pedido normal fecha em zero. O que sobra é custo seu e aparece aqui por motivo,
+            com a lista pra contestar.
+          </p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <Kpi label="Frete real cobrado" val={brl(n(fr.frete_real))} hint={`${int(n(fr.pedidos))} pedidos`} cor="text-slate-200" />
+            <Kpi label="Subsídio Frete Grátis" val={brl(n(fr.subsidio))} hint="devolvido pelo TikTok" cor="text-emerald-300" />
+            <Kpi label="Pago pelo cliente" val={brl(n(fr.pago_cliente))} hint="creditado a você" cor="text-emerald-300" />
+            <Kpi label="Custo líquido" val={brl(n(fr.custo))} hint={n(fr.credito) > 0 ? `crédito a seu favor ${brl(n(fr.credito))}` : "o que sobrou pra você"} cor="text-orange-300" />
+          </div>
+          {frMotivos.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {frMotivos.map((m) => (
+                <span key={m.motivo} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs text-slate-300">
+                  {MOTIVO[m.motivo] || m.motivo}: <b>{brl(n(m.valor))}</b> · {int(n(m.pedidos))} pedidos
+                </span>
+              ))}
+            </div>
+          )}
+          {freteLista.length > 0 && (
+            <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-800 text-xs uppercase text-slate-400">
+                  <tr>
+                    <th className="p-3">Pedido</th><th className="p-3">Cliente</th><th className="p-3">Data</th><th className="p-3">Motivo</th>
+                    <th className="p-3 text-right">Receita</th><th className="p-3 text-right">Frete real</th><th className="p-3 text-right">Subsídio</th>
+                    <th className="p-3 text-right">Cliente pagou</th><th className="p-3 text-right">Devolução</th><th className="p-3 text-right">Custo líquido</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {freteLista.map((f) => (
+                    <tr key={f.order_id} className="border-t border-slate-800">
+                      <td className="p-3 font-mono text-xs">{f.order_id}</td>
+                      <td className="p-3 text-slate-300">{f.cliente_nome || "—"}</td>
+                      <td className="p-3 text-slate-400">{f.data_pedido ? new Date(f.data_pedido).toLocaleDateString("pt-BR") : "—"}</td>
+                      <td className="p-3"><Chip cor={f.motivo === "devolucao" || f.motivo === "reembolso" ? "neg" : "info"}>{MOTIVO[f.motivo] || f.motivo}</Chip></td>
+                      <td className="p-3 text-right">{brl(n(f.revenue))}</td>
+                      <td className="p-3 text-right">{brl(n(f.frete_real))}</td>
+                      <td className="p-3 text-right text-emerald-300">{brl(n(f.subsidio))}</td>
+                      <td className="p-3 text-right text-emerald-300">{brl(n(f.pago_cliente))}</td>
+                      <td className="p-3 text-right">{n(f.devolucao) > 0 ? brl(n(f.devolucao)) : "—"}</td>
+                      <td className="p-3 text-right font-semibold text-orange-300">{brl(n(f.liquido))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p className="mt-2 text-xs text-slate-500">
+            Os {freteLista.length} maiores custos do período. Devolução e reembolso são os casos a contestar quando a culpa não foi sua
+            (pedido do cliente entregue e devolvido, ou cancelamento depois do envio).
+          </p>
+        </section>
+      )}
 
       {/* 1 — Recebimento */}
       <section>
