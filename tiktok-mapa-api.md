@@ -103,6 +103,17 @@ Isso permite no TikTok o mesmo Hub Finanças da Shopee: conciliação pedido × 
 6. **Sincronização de estoque/preço** Shopee ↔ TikTok (escrita de inventory/price).
 7. **Chat e remarketing**: depende do escopo; pedir no Partner Center (Manage API) os escopos Customer Service e Customer Engagement.
 
+## Linha do tempo das taxas (medida nos extratos, por data do pedido)
+
+| Período | Comissão da plataforma | Taxa fixa por item | Frete Grátis (sfp) |
+| --- | --- | --- | --- |
+| lançamento → 23/09/2025 | 0% | R$ 0 | 6% |
+| 24/09/2025 → 04/02/2026 | 6% | R$ 2 (abaixo de R$ 50; acima variou R$ 0/2/4) | 6% |
+| 05/02/2026 → 14/07/2026 | 6% | R$ 4 | 6% |
+| 15/07/2026 → hoje | 10% abaixo de R$ 50 · 6% a partir de R$ 50 | R$ 4 abaixo de R$ 50 · R$ 6 a partir de R$ 50 | 6% |
+
+Base de cálculo: preço do item após o desconto do vendedor. Afiliado (7–8% típico) e Shop Ads de afiliado vêm por pedido no extrato. Função SQL: `tiktok_taxa_esperada_item(preco, dia)` em `supabase/tiktok_taxas.sql`. Exemplo real de 23/09/2026: item de R$ 18,90 paga R$ 1,89 + R$ 4 + R$ 1,13 = R$ 7,02 (37%) antes do afiliado.
+
 ## Regras e limites
 
 - Autenticação: HMAC do app_secret; `shop_cipher` na query só nos endpoints de loja (os de seller/authorization recusam).
