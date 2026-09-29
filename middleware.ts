@@ -34,6 +34,8 @@ const ROTAS_CRON = [
   "/api/shopee/rastreio/debug",
   "/api/shopee/produtos/sincronizar-todos",
   "/api/tiktok/pedidos/sincronizar",
+  "/api/tiktok/token/refresh",
+  "/api/tiktok/sondar",
 ];
 
 export async function middleware(request: NextRequest) {
