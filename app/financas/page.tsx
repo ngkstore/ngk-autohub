@@ -209,11 +209,11 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
 
   const linhas = [
     { l: "Receita (pedidos pagos)", v: receita, tot: false },
-    { l: "(−) Taxas Shopee (comissão + serviço)", v: -taxas, tot: false },
+    { l: "(−) Taxas do marketplace (comissão + serviço; TikTok inclui taxa fixa e Frete Grátis)", v: -taxas, tot: false },
     { l: "(−) Comissão de afiliado (liquida ~30 dias depois)", v: -afiliado, tot: false },
     { l: "(−) Taxa de serviço de afiliado", v: -taxaServAfiliado, tot: false },
-    { l: "(−) Cupom próprio (Shopee não entra)", v: -cupom, tot: false },
-    { l: "= Receita líquida (escrow)", v: liquida, tot: true },
+    { l: "(−) Cupom próprio (o do marketplace não entra)", v: -cupom, tot: false },
+    { l: "= Receita líquida (escrow / extrato)", v: liquida, tot: true },
     { l: "(−) Ads (saída da carteira)", v: -ads, tot: false },
     { l: "(−) Reembolsos / devoluções", v: -reemb, tot: false },
     { l: "(−) Imposto lançado", v: -imposto, tot: false },
@@ -312,7 +312,7 @@ async function Conciliacao({ lojas, periodo }: { lojas: string[] | null; periodo
   let qPed = supabase
     .from("pedidos")
     .select("pedido_externo_id, cliente_nome, valor_total, valor_liquido, valor_recebido, recebido_em, status, uf")
-    .eq("marketplace", "shopee")
+    .in("marketplace", ["shopee", "tiktok_shop"])
     .eq("pedido_efetivado", true)
     .order("data_pedido", { ascending: false })
     .limit(400);
