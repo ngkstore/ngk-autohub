@@ -66,6 +66,8 @@ Números reais da semana 21–27/09: GMV atribuído a vídeo de criador R$ 41 mi
 
 Isso permite no TikTok o mesmo Hub Finanças da Shopee: conciliação pedido × liquidação, DRE por canal, margem real por SKU, aging de recebíveis.
 
+**Feito em 29/09/2026 (v1):** `supabase/tiktok_financeiro.sql` + `lib/tiktok/financeiro.ts` + cron `/api/tiktok/financeiro/sincronizar` (de hora em hora). Extratos e transações preenchem as colunas financeiras do pedido (líquido, comissão + taxa fixa, Frete Grátis, afiliado, frete, recebido) e o `/financas` passa a incluir o TikTok no DRE, recebido/a receber, conciliação de recebimento, aging e previsão. Falta: CMV/margem (precisa sincronizar produtos do TikTok e casar `seller_sku` com os custos), linha de frete no DRE, Ads do TikTok.
+
 ## 5. Afiliados (o módulo mais rico)
 
 | Capacidade | Endpoint | Status | O que traz |
