@@ -36,6 +36,7 @@ const ROTAS_CRON = [
   "/api/tiktok/pedidos/sincronizar",
   "/api/tiktok/token/refresh",
   "/api/tiktok/sondar",
+  "/api/tiktok/financeiro/sincronizar",
 ];
 
 export async function middleware(request: NextRequest) {

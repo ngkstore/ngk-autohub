@@ -28,8 +28,15 @@ function mapear(o: Pedido, lojaId: string) {
   const status = String(o.status || "");
   const pay = (o.payment as Record<string, unknown>) || {};
   const recipient = (o.recipient_address as Record<string, unknown>) || {};
-  // "Vendas" = subtotal dos itens (sem frete), p/ alinhar com a Shopee.
-  const valorItens = num(pay.sub_total) || num(pay.total_amount);
+  // "Vendas" = receita do vendedor pelos itens (sem frete): preço original −
+  // desconto do VENDEDOR. NÃO usar sub_total: ele já vem com o desconto da
+  // PLATAFORMA descontado, que a TikTok paga ao vendedor (em set/2026 isso
+  // escondia R$26k: R$298k vs R$324k). Fallback: sub_total / total.
+  const original = num(pay.original_total_product_price);
+  const valorItens =
+    (original > 0 ? Math.round((original - num(pay.seller_discount)) * 100) / 100 : 0) ||
+    num(pay.sub_total) ||
+    num(pay.total_amount);
   // O nome real vem no cpf_name (recipient.name costuma vir mascarado/vazio).
   const nome =
     (o.cpf_name as string) ||
