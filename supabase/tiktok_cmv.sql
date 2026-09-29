@@ -136,6 +136,51 @@ begin
 end $$;
 grant execute on function sync_pedido_itens(boolean) to anon, authenticated;
 
+-- ------------------------------------------------ CMV de UMA loja (rápido; cabe na Management API)
+-- Recalcula financas_cmv_diario e variacoes_resumo só da loja informada, com a
+-- mesma regra de custo (própria loja → outras lojas da mesma conta).
+create or replace function rebuild_financas_cmv_loja(p_loja uuid)
+returns void language plpgsql security definer as $$
+begin
+  drop table if exists _itens_custo_loja;
+  create temp table _itens_custo_loja as
+    select pi.loja_id, pi.dia, pi.uf, pi.item_id, pi.model_sku, pi.variacao, pi.qtd, pi.preco,
+           coalesce(cv.custo, pr.custo, cvc.custo, prc.custo) as custo
+    from pedido_itens pi
+    left join lojas l on l.id = pi.loja_id
+    left join custos_variacao cv on cv.loja_id = pi.loja_id and cv.model_sku = pi.model_sku
+    left join produtos pr        on pr.loja_id = pi.loja_id and pr.item_id  = pi.item_id
+    left join lateral (
+      select c2.custo from custos_variacao c2 join lojas l2 on l2.id = c2.loja_id
+      where l2.conta_id = l.conta_id and c2.loja_id <> pi.loja_id and c2.model_sku = pi.model_sku and c2.custo is not null
+      order by c2.atualizado_em desc nulls last limit 1
+    ) cvc on coalesce(pi.model_sku,'') <> ''
+    left join lateral (
+      select p2.custo from produtos p2 join lojas l2 on l2.id = p2.loja_id
+      where l2.conta_id = l.conta_id and p2.loja_id <> pi.loja_id and upper(trim(p2.sku)) = pi.model_sku and p2.custo is not null
+      order by p2.atualizado_em desc nulls last limit 1
+    ) prc on coalesce(pi.model_sku,'') <> ''
+    where pi.loja_id = p_loja;
+
+  delete from financas_cmv_diario where loja_id = p_loja;
+  insert into financas_cmv_diario (loja_id, dia, uf, cmv, unidades, itens_total, itens_com_custo)
+  select loja_id, dia, uf,
+    coalesce(sum(qtd*custo) filter (where custo is not null),0),
+    coalesce(sum(qtd),0), count(*)::int,
+    count(*) filter (where custo is not null)::int
+  from _itens_custo_loja group by 1,2,3;
+
+  delete from variacoes_resumo where loja_id = p_loja;
+  insert into variacoes_resumo
+  select loja_id, item_id, model_sku, max(variacao), sum(qtd), sum(qtd*preco)
+  from _itens_custo_loja
+  where dia >= ((now() at time zone 'America/Sao_Paulo')::date - 90) and coalesce(model_sku,'') <> ''
+  group by 1,2,3;
+
+  drop table if exists _itens_custo_loja;
+end $$;
+grant execute on function rebuild_financas_cmv_loja(uuid) to anon, authenticated;
+
 -- ------------------------------------------------ CMV: custo também de outras lojas da conta
 create or replace function rebuild_financas_cmv()
 returns void language plpgsql security definer as $$
