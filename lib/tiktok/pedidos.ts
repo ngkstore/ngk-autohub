@@ -82,13 +82,22 @@ async function buscarPagina(
   // Janela fechada (backfill por fatias): create_time < ate.
   if (ateUnix) body.create_time_lt = ateUnix;
 
-  return chamarTikTok("/order/202309/orders/search", {
-    method: "POST",
-    accessToken: loja.accessToken,
-    shopCipher: loja.shopCipher,
-    query,
-    body,
-  });
+  // Rate limit do TikTok (36009002) é compartilhado com o financeiro/cron:
+  // espera e tenta de novo em vez de abortar a janela (deixaria buraco).
+  for (let tent = 0; ; tent++) {
+    const resp = await chamarTikTok("/order/202309/orders/search", {
+      method: "POST",
+      accessToken: loja.accessToken,
+      shopCipher: loja.shopCipher,
+      query,
+      body,
+    });
+    if (resp?.code === 36009002 && tent < 4) {
+      await new Promise((r) => setTimeout(r, 2000 * (tent + 1)));
+      continue;
+    }
+    return resp;
+  }
 }
 
 export type ResultadoTikTokPedidos = {
