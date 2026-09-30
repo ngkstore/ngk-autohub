@@ -77,7 +77,7 @@ async function listarConversas(t: TokenInfo, pageSize = 50) {
     method: "GET",
     accessToken: t.accessToken,
     shopCipher: t.shopCipher,
-    query: { page_size: String(pageSize) },
+    query: { page_size: String(Math.min(pageSize, 20)) },
   });
 }
 
@@ -103,7 +103,7 @@ async function enviarMensagem(t: TokenInfo, conversationId: string, texto: strin
 
 export async function sincronizarChatsTikTok(lojaId: string) {
   const t = await obterTokenTikTok(lojaId);
-  const resp = await listarConversas(t, 50);
+  const resp = await listarConversas(t, 20);
   if (resp.code !== 0) throw new Error(`TikTok conversations: ${resp.message}`);
 
   const convs: Array<{
