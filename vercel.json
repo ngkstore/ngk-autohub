@@ -107,6 +107,14 @@
     {
       "path": "/api/tiktok/financeiro/sincronizar",
       "schedule": "25 * * * *"
+    },
+    {
+      "path": "/api/tiktok/chat/sincronizar",
+      "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/tiktok/chat/responder",
+      "schedule": "*/2 * * * *"
     }
   ]
 }

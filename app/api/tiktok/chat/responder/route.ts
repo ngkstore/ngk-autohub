@@ -1,0 +1,103 @@
+import { NextRequest, NextResponse } from "next/server";
+import { supabase } from "@/lib/supabase";
+import { responderChatsTikTokLote, type ResultadoChatTikTok } from "@/lib/tiktok/responderChats";
+import { flagsPorConta } from "@/lib/flags";
+
+export const dynamic = "force-dynamic";
+export const maxDuration = 300;
+
+const CHAVE_ATIVO = "tiktok_responder_chat_ativo";
+const CHAVE_AUTONOMO = "tiktok_responder_chat_autonomo";
+
+function agregar(resultados: ResultadoChatTikTok[]) {
+  return resultados.reduce(
+    (acc, r) => ({
+      processados: acc.processados + r.processados,
+      enviados: acc.enviados + r.enviados,
+      escalados: acc.escalados + r.escalados,
+      propostas: [...acc.propostas, ...r.propostas],
+      erro: r.erro || acc.erro,
+    }),
+    {
+      processados: 0,
+      enviados: 0,
+      escalados: 0,
+      propostas: [] as ResultadoChatTikTok["propostas"],
+      erro: undefined as string | undefined,
+    }
+  );
+}
+
+// GET: cron — processa lojas TikTok com robô ativo (flag por conta)
+export async function GET() {
+  try {
+    const { data: tokens } = await supabase
+      .from("marketplace_tokens")
+      .select("loja_id, lojas(conta_id)")
+      .eq("marketplace", "tiktok_shop")
+      .eq("status", "ativo");
+
+    const lojas = (tokens || []).map((t) => ({
+      lojaId: t.loja_id as string,
+      contaId: (t.lojas as unknown as { conta_id: string } | null)?.conta_id,
+    }));
+
+    const [ativos, autonomos] = await Promise.all([
+      flagsPorConta(CHAVE_ATIVO),
+      flagsPorConta(CHAVE_AUTONOMO),
+    ]);
+
+    const resultados: ResultadoChatTikTok[] = [];
+    for (const l of lojas) {
+      if (!l.contaId || !ativos[l.contaId]) continue;
+      resultados.push(
+        await responderChatsTikTokLote({
+          lojaId: l.lojaId,
+          limite: 15,
+          enviar: true,
+          autonomo: !!autonomos[l.contaId],
+        })
+      );
+    }
+
+    return NextResponse.json({ sucesso: true, ...agregar(resultados) });
+  } catch (error) {
+    return NextResponse.json(
+      { sucesso: false, erro: error instanceof Error ? error.message : "Erro robô TikTok" },
+      { status: 500 }
+    );
+  }
+}
+
+// POST: manual (painel/botão) — usa conta do usuário logado, não exige flag ativa
+export async function POST(request: NextRequest) {
+  let limite = 5;
+  let enviar = false;
+  let autonomo = false;
+  try {
+    const body = await request.json();
+    if (body?.limite) limite = Number(body.limite);
+    if (typeof body?.enviar === "boolean") enviar = body.enviar;
+    if (typeof body?.autonomo === "boolean") autonomo = body.autonomo;
+  } catch { /* padrão */ }
+
+  try {
+    const { data: tokens } = await supabase
+      .from("marketplace_tokens")
+      .select("loja_id")
+      .eq("marketplace", "tiktok_shop")
+      .eq("status", "ativo");
+
+    const ids = [...new Set((tokens || []).map((t) => t.loja_id as string))];
+    const resultados: ResultadoChatTikTok[] = [];
+    for (const lojaId of ids) {
+      resultados.push(await responderChatsTikTokLote({ lojaId, limite, enviar, autonomo }));
+    }
+    return NextResponse.json({ sucesso: true, enviar, autonomo, ...agregar(resultados) });
+  } catch (error) {
+    return NextResponse.json(
+      { sucesso: false, erro: error instanceof Error ? error.message : "Erro robô TikTok" },
+      { status: 500 }
+    );
+  }
+}
