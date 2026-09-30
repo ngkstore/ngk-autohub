@@ -1,5 +1,17 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+
+// Fecha conversas escaladas sem cliente esperando há mais de 7 dias.
+// Acumulavam como "abertas" porque o robô marca escalada=true mas não zera precisa_resposta.
+async function fecharEscaladasAntiquas() {
+  await supabase
+    .from("chat_conversas")
+    .update({ precisa_resposta: false })
+    .eq("marketplace", "shopee")
+    .eq("escalada", true)
+    .eq("unread_count", 0)
+    .lt("atualizado_em", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+}
 import { sincronizarChatsPagina } from "@/lib/shopee/sincronizarChats";
 import {
   listarLojasShopeeAtivas,
@@ -91,6 +103,7 @@ export async function POST() {
 // se o histórico ainda não terminou, avança uma página antiga (cursor por loja).
 export async function GET() {
   try {
+    await fecharEscaladasAntiquas();
     const lojas = await listarLojasShopeeAtivas();
     const resultados = [];
 
