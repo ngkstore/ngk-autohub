@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
   const { data: conversa } = await supabase
     .from("chat_conversas")
     .select("to_id, resposta_ia, latest_message_id")
-    .eq("conversation_id", conversationId)
+    .eq("marketplace", "shopee").eq("conversation_id", conversationId)
     .maybeSingle();
 
   if (!conversa) {
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
           ultimo_remetente: "loja",
           respondida_em: new Date().toISOString(),
         })
-        .eq("conversation_id", conversationId);
+        .eq("marketplace", "shopee").eq("conversation_id", conversationId);
 
       await responderCallback(cq.id, "Resposta enviada! ✅");
       if (chatId && messageId) {

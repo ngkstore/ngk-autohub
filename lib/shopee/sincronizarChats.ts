@@ -145,15 +145,28 @@ export async function sincronizarChatsPagina({
           };
         });
 
-      await supabase
+      const { error: erroMsgs } = await supabase
         .from("chat_mensagens")
         .upsert(registros, { onConflict: "message_id" });
+      if (erroMsgs) {
+        return {
+          conversas: 0,
+          mensagens: totalMensagens,
+          nextTimestamp,
+          done: false,
+          erro: `upsert chat_mensagens: ${erroMsgs.message}`,
+        };
+      }
 
       totalMensagens += registros.length;
     }
 
-    await supabase.from("chat_conversas").upsert(
+    // PK de chat_conversas é (marketplace, conversation_id) desde a chegada do
+    // chat TikTok — o onConflict TEM de casar com esse índice único, senão o
+    // upsert inteiro falha e o robô fica cego (foi um incidente real em 30/09).
+    const { error: erroUpsert } = await supabase.from("chat_conversas").upsert(
       {
+        marketplace: "shopee",
         conversation_id: conversationId,
         loja_id: loja.lojaId,
         to_id: toId,
@@ -169,8 +182,17 @@ export async function sincronizarChatsPagina({
         ultima_mensagem_ts: c.last_message_timestamp ?? null,
         atualizado_em: new Date().toISOString(),
       },
-      { onConflict: "conversation_id" }
+      { onConflict: "marketplace,conversation_id" }
     );
+    if (erroUpsert) {
+      return {
+        conversas: 0,
+        mensagens: totalMensagens,
+        nextTimestamp,
+        done: false,
+        erro: `upsert chat_conversas: ${erroUpsert.message}`,
+      };
+    }
   }
 
   const cursor = lista?.response?.page_result?.next_cursor;

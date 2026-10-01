@@ -215,7 +215,6 @@ export async function responderChatsTikTokLote({
     .eq("marketplace", "tiktok_shop")
     .eq("loja_id", lojaId)
     .eq("precisa_resposta", true)
-    .or("escalada.is.null,escalada.eq.false")
     .order("ultima_mensagem_ts", { ascending: true })
     .limit(limite);
 

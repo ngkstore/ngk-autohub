@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     const { data: conversa } = await supabase
       .from("chat_conversas")
       .select("to_id, resposta_ia")
-      .eq("conversation_id", conversationId)
+      .eq("marketplace", "shopee").eq("conversation_id", conversationId)
       .maybeSingle();
 
     if (!conversa) {
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
           resposta_ia: texto,
           respondida_em: new Date().toISOString(),
         })
-        .eq("conversation_id", conversationId);
+        .eq("marketplace", "shopee").eq("conversation_id", conversationId);
 
       return NextResponse.json({ sucesso: true, acao: "enviar" });
     }
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
       await supabase
         .from("chat_conversas")
         .update({ escalada: false, precisa_resposta: false })
-        .eq("conversation_id", conversationId);
+        .eq("marketplace", "shopee").eq("conversation_id", conversationId);
 
       return NextResponse.json({ sucesso: true, acao: "resolver" });
     }

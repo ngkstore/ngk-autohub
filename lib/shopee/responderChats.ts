@@ -322,7 +322,7 @@ export async function responderChatsLote({
     const { data: thread } = await supabase
       .from("chat_mensagens")
       .select("de_loja, texto, created_timestamp")
-      .eq("conversation_id", c.conversation_id)
+      .eq("marketplace", "shopee").eq("conversation_id", c.conversation_id)
       .not("texto", "is", null)
       .neq("texto", "")
       .order("created_timestamp", { ascending: false })
@@ -425,7 +425,7 @@ export async function responderChatsLote({
             confianca,
             resposta_ia: resposta,
           })
-          .eq("conversation_id", c.conversation_id);
+          .eq("marketplace", "shopee").eq("conversation_id", c.conversation_id);
 
         // Notifica você no Telegram. Se houver sugestão, oferece aprovar com 1 toque.
         const botoes = resposta
@@ -473,7 +473,7 @@ export async function responderChatsLote({
             resposta_ia: resposta,
             respondida_em: new Date().toISOString(),
           })
-          .eq("conversation_id", c.conversation_id);
+          .eq("marketplace", "shopee").eq("conversation_id", c.conversation_id);
         enviados++;
       }
     } catch (e) {
@@ -494,7 +494,7 @@ export async function responderChatsLote({
             confianca,
             resposta_ia: resposta,
           })
-          .eq("conversation_id", c.conversation_id);
+          .eq("marketplace", "shopee").eq("conversation_id", c.conversation_id);
         await enviarTelegram(
           `🚫 Shopee bloqueou a resposta do robô\n\n` +
             `Cliente: ${c.to_name || "-"}\n` +
@@ -522,7 +522,7 @@ export async function responderChatsLote({
             confianca,
             resposta_ia: resposta,
           })
-          .eq("conversation_id", c.conversation_id);
+          .eq("marketplace", "shopee").eq("conversation_id", c.conversation_id);
         foraJanela++;
       }
       // outros erros (token/rede/transitório): deixa pendente pra próxima rodada.
