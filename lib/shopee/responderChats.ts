@@ -322,7 +322,7 @@ export async function responderChatsLote({
     const { data: thread } = await supabase
       .from("chat_mensagens")
       .select("de_loja, texto, created_timestamp")
-      .eq("marketplace", "shopee").eq("conversation_id", c.conversation_id)
+      .eq("conversation_id", c.conversation_id)
       .not("texto", "is", null)
       .neq("texto", "")
       .order("created_timestamp", { ascending: false })
@@ -349,7 +349,15 @@ export async function responderChatsLote({
     let confianca = "baixa";
     let resposta = "";
 
-    const temTextoCliente = mensagensOrdenadas.some((m) => !m.de_loja);
+    let temTextoCliente = mensagensOrdenadas.some((m) => !m.de_loja);
+    // O texto do cliente às vezes só vem no resumo da conversa (ultima_mensagem)
+    // e não nas mensagens sincronizadas (ex.: foto com legenda). Usa o resumo
+    // antes de tratar como anexo mudo.
+    let conversaComFallback = conversaTxt;
+    if (!temTextoCliente && (c.ultima_mensagem || "").trim()) {
+      conversaComFallback = `${conversaTxt}\nCliente: ${c.ultima_mensagem}`;
+      temTextoCliente = true;
+    }
 
     if (!temTextoCliente) {
       // Cliente mandou só imagem/anexo (sem texto) -> escala para humano.
@@ -359,7 +367,7 @@ export async function responderChatsLote({
       const contexto =
         `=== PRODUTO ===\n${produtoTxt}\n\n` +
         `=== RESPOSTAS ANTERIORES DA LOJA NESTE PRODUTO ===\n${historicoTxt}\n\n` +
-        `=== CONVERSA ATUAL COM ESTE CLIENTE (do início ao fim) ===\n${conversaTxt}\n\n` +
+        `=== CONVERSA ATUAL COM ESTE CLIENTE (do início ao fim) ===\n${conversaComFallback}\n\n` +
         `Responda à(s) última(s) mensagem(ns) do cliente, considerando TODA a conversa acima.`;
 
       try {
