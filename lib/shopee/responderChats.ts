@@ -404,8 +404,24 @@ export async function responderChatsLote({
       resposta =
         "Oi! 😊 Recebi sua mensagem. Pode me contar com mais detalhes como posso te ajudar?";
     }
+    // Anti-papagaio: se a loja JÁ mandou exatamente esse texto como última
+    // mensagem, não repete (aconteceu com o fallback genérico em série).
+    const ultimaDaLoja = [...mensagensOrdenadas].reverse().find((m) => m.de_loja);
+    const repetida =
+      !!resposta.trim() && (ultimaDaLoja?.texto || "").trim() === resposta.trim();
+
     const deveResponder =
-      resposta.trim().length > 0 && (autonomo || !escalar);
+      resposta.trim().length > 0 && (autonomo || !escalar) && !repetida;
+
+    if (repetida) {
+      // Marca tratada sem reenviar — o cliente já recebeu esse texto.
+      await supabase
+        .from("chat_conversas")
+        .update({ ultimo_tratado_msg_id: c.latest_message_id })
+        .eq("marketplace", "shopee")
+        .eq("conversation_id", c.conversation_id);
+      continue;
+    }
 
     propostas.push({
       conversation_id: c.conversation_id,
