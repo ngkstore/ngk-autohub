@@ -99,6 +99,17 @@ async function enviarMensagem(t: TokenInfo, conversationId: string, texto: strin
   });
 }
 
+// Envio avulso (botão "Aprovar" do Telegram): resolve o token da loja e envia.
+export async function enviarMensagemTikTokPorLoja(
+  lojaId: string,
+  conversationId: string,
+  texto: string
+) {
+  const t = await obterTokenTikTok(lojaId);
+  const resp = await enviarMensagem(t, conversationId, texto);
+  if (resp.code !== 0) throw new Error(`TikTok send: ${resp.message}`);
+}
+
 // ── Sincronizar conversas → chat_conversas ───────────────────────────────────
 
 export async function sincronizarChatsTikTok(lojaId: string) {

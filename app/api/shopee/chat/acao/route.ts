@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
 
     const { data: conversa } = await supabase
       .from("chat_conversas")
-      .select("to_id, resposta_ia")
+      .select("to_id, loja_id, resposta_ia")
       .eq("marketplace", "shopee").eq("conversation_id", conversationId)
       .maybeSingle();
 
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      await enviarMensagemChat(String(conversa.to_id), texto);
+      await enviarMensagemChat(String(conversa.to_id), texto, String(conversa.loja_id));
       await supabase
         .from("chat_conversas")
         .update({

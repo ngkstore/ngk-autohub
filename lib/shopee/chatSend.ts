@@ -4,9 +4,12 @@ import { supabase } from "@/lib/supabase";
 const BASE_URL_PADRAO = "https://partner.shopeemobile.com";
 
 // Envia uma mensagem de texto para um comprador no chat da Shopee.
+// lojaId define de QUAL loja a mensagem sai — sem ele, caía no primeiro token
+// ativo e podia responder pelo shop errado em conta multi-loja.
 export async function enviarMensagemChat(
   toId: string,
-  texto: string
+  texto: string,
+  lojaId?: string
 ): Promise<boolean> {
   const partnerId = process.env.SHOPEE_PARTNER_ID;
   const partnerKey = process.env.SHOPEE_PARTNER_KEY;
@@ -14,13 +17,13 @@ export async function enviarMensagemChat(
 
   if (!partnerId || !partnerKey) throw new Error("Credenciais Shopee ausentes.");
 
-  const { data: token } = await supabase
+  let consulta = supabase
     .from("marketplace_tokens")
     .select("access_token, shop_id")
     .eq("marketplace", "shopee")
-    .eq("status", "ativo")
-    .limit(1)
-    .single();
+    .eq("status", "ativo");
+  if (lojaId) consulta = consulta.eq("loja_id", lojaId);
+  const { data: token } = await consulta.limit(1).single();
 
   if (!token?.access_token || !token?.shop_id) {
     throw new Error("Token Shopee ativo não encontrado.");

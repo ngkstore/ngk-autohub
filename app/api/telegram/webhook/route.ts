@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { enviarMensagemChat } from "@/lib/shopee/chatSend";
+import { enviarMensagemTikTokPorLoja } from "@/lib/tiktok/responderChats";
 import {
   segredoWebhook,
   responderCallback,
@@ -32,7 +33,12 @@ export async function POST(request: NextRequest) {
   const cq = update.callback_query;
   if (!cq?.data) return NextResponse.json({ ok: true });
 
-  const [acao, conversationId] = cq.data.split(":");
+  // Formatos: "ap:<id>" / "rj:<id>" (Shopee) e "tkt:ap:<id>" / "tkt:rj:<id>" (TikTok).
+  const partes = cq.data.split(":");
+  const ehTikTok = partes[0] === "tkt";
+  const marketplace = ehTikTok ? "tiktok_shop" : "shopee";
+  const acao = ehTikTok ? partes[1] : partes[0];
+  const conversationId = ehTikTok ? partes.slice(2).join(":") : partes.slice(1).join(":");
   const chatId = cq.message?.chat?.id;
   const messageId = cq.message?.message_id;
   const textoOriginal = cq.message?.text || "";
@@ -40,8 +46,8 @@ export async function POST(request: NextRequest) {
   // Busca a conversa e a resposta sugerida pela IA.
   const { data: conversa } = await supabase
     .from("chat_conversas")
-    .select("to_id, resposta_ia, latest_message_id")
-    .eq("marketplace", "shopee").eq("conversation_id", conversationId)
+    .select("to_id, loja_id, resposta_ia, latest_message_id")
+    .eq("marketplace", marketplace).eq("conversation_id", conversationId)
     .maybeSingle();
 
   if (!conversa) {
@@ -56,7 +62,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
     try {
-      await enviarMensagemChat(String(conversa.to_id), conversa.resposta_ia);
+      if (ehTikTok) {
+        await enviarMensagemTikTokPorLoja(
+          String(conversa.loja_id),
+          conversationId,
+          conversa.resposta_ia
+        );
+      } else {
+        await enviarMensagemChat(
+          String(conversa.to_id),
+          conversa.resposta_ia,
+          String(conversa.loja_id)
+        );
+      }
       await supabase
         .from("chat_conversas")
         .update({
@@ -65,7 +83,7 @@ export async function POST(request: NextRequest) {
           ultimo_remetente: "loja",
           respondida_em: new Date().toISOString(),
         })
-        .eq("marketplace", "shopee").eq("conversation_id", conversationId);
+        .eq("marketplace", marketplace).eq("conversation_id", conversationId);
 
       await responderCallback(cq.id, "Resposta enviada! ✅");
       if (chatId && messageId) {
@@ -83,12 +101,12 @@ export async function POST(request: NextRequest) {
     }
   } else if (acao === "rj") {
     // Você vai responder manualmente: só registra.
-    await responderCallback(cq.id, "Ok! Responda pela Shopee.");
+    await responderCallback(cq.id, ehTikTok ? "Ok! Responda pelo TikTok Shop." : "Ok! Responda pela Shopee.");
     if (chatId && messageId) {
       await editarMensagem(
         chatId,
         messageId,
-        `${textoOriginal}\n\n✏️ Você vai responder pela Shopee.`
+        `${textoOriginal}\n\n✏️ Você vai responder pela plataforma.`
       );
     }
   } else {
