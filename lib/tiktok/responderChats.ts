@@ -81,12 +81,13 @@ async function listarConversas(t: TokenInfo, pageSize = 50) {
   });
 }
 
-async function listarMensagens(t: TokenInfo, conversationId: string, pageSize = 20) {
+async function listarMensagens(t: TokenInfo, conversationId: string, pageSize = 10) {
+  // Atenção: o endpoint de MENSAGENS aceita page_size <= 10 (o de conversas, <= 20).
   return chamarTikTok(`${BASE_PATH}/conversations/${conversationId}/messages`, {
     method: "GET",
     accessToken: t.accessToken,
     shopCipher: t.shopCipher,
-    query: { page_size: String(pageSize) },
+    query: { page_size: String(Math.min(pageSize, 10)) },
   });
 }
 
@@ -246,7 +247,7 @@ export async function responderChatsTikTokLote({
     if (c.ultimo_tratado_msg_id && c.ultimo_tratado_msg_id === c.latest_message_id) continue;
 
     // Buscar mensagens
-    const msgResp = await listarMensagens(t, c.conversation_id, 20);
+    const msgResp = await listarMensagens(t, c.conversation_id, 10);
     if (msgResp.code !== 0) {
       erroEnvio = `messages[${c.conversation_id}]: ${msgResp.code} ${msgResp.message}`;
       continue;
