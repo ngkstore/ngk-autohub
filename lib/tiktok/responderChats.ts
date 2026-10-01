@@ -139,7 +139,9 @@ export async function sincronizarChatsTikTok(lojaId: string) {
         to_id: buyer?.im_user_id || "",
         to_name: buyer?.nickname || "",
         ultimo_remetente: ultimoRemetente,
-        precisa_resposta: ultimoRemetente === "cliente" && c.unread_count > 0 && c.can_send_message,
+        // Decide por QUEM falou por último (não por unread: abrir a conversa no
+        // Seller Center zera o unread e deixava o cliente sem resposta).
+        precisa_resposta: ultimoRemetente === "cliente" && c.can_send_message,
         unread_count: c.unread_count,
         ultima_mensagem_ts: lm?.create_time ? lm.create_time * 1000 * 1_000_000 : null,
         latest_message_id: lm?.id || null,
