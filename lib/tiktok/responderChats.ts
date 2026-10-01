@@ -247,7 +247,10 @@ export async function responderChatsTikTokLote({
 
     // Buscar mensagens
     const msgResp = await listarMensagens(t, c.conversation_id, 20);
-    if (msgResp.code !== 0) continue;
+    if (msgResp.code !== 0) {
+      erroEnvio = `messages[${c.conversation_id}]: ${msgResp.code} ${msgResp.message}`;
+      continue;
+    }
 
     const msgs: Array<{
       id: string;
@@ -308,8 +311,11 @@ export async function responderChatsTikTokLote({
             decisao = { ...decisao, precisa_humano: true, resposta: "" };
           }
         }
-      } catch {
-        continue; // falha transitória — tenta na próxima rodada
+      } catch (e) {
+        // Falha transitória — tenta na próxima rodada, mas REGISTRA o motivo
+        // (erro engolido esconde robô morto; lição do incidente de 30/09).
+        erroEnvio = `decidir: ${e instanceof Error ? e.message : String(e)}`;
+        continue;
       }
 
       escalar = !decisao || decisao.precisa_humano === true || decisao.confianca === "baixa";
