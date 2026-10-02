@@ -153,8 +153,12 @@ async function sincronizarLoja(
         nextTimestamp: estado[chaveTs(loja.lojaId)] || "",
       });
       if (!historico.erro) {
+        // Cursor que não anda = fim do histórico alcançável (a Bild Store relia
+        // a mesma página a cada rodada sem nunca "terminar").
+        const parado =
+          historico.nextTimestamp === (estado[chaveTs(loja.lojaId)] || "");
         await setConfig(chaveTs(loja.lojaId), historico.nextTimestamp);
-        if (historico.done) await setConfig(chaveDone(loja.lojaId), "true");
+        if (historico.done || parado) await setConfig(chaveDone(loja.lojaId), "true");
       }
     }
 

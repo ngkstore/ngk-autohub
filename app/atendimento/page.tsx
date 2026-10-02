@@ -40,7 +40,7 @@ export default async function AtendimentoPage({
     )
     .eq("escalada", true)
     .order("ultima_mensagem_ts", { ascending: false })
-    .limit(50);
+    .limit(200);
 
   if (lojas) escaladosQuery = escaladosQuery.in("loja_id", lojas);
 
