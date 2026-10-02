@@ -88,11 +88,13 @@ async function listarConversas(t: TokenInfo, pageToken = "") {
 
 async function listarMensagens(t: TokenInfo, conversationId: string) {
   // Atenção: o endpoint de MENSAGENS aceita page_size <= 10.
+  // need_plaintext traz o conteúdo dos cartões (nome do produto, pedido,
+  // rastreio) em texto — sem isso o robô só via "cliente mandou um cartão".
   return chamarTikTok(`${BASE_PATH}/conversations/${conversationId}/messages`, {
     method: "GET",
     accessToken: t.accessToken,
     shopCipher: t.shopCipher,
-    query: { page_size: "10" },
+    query: { page_size: "10", need_plaintext: "true" },
   });
 }
 
@@ -139,6 +141,7 @@ export type MsgTikTok = {
   id: string;
   type: string;
   content: string;
+  plaintext?: string | null;
   sender?: { role?: string; nickname?: string };
   create_time: number;
   is_visible: boolean;
@@ -152,8 +155,7 @@ const ROTULO_TIPO: Record<string, string> = {
   LOGISTICS_CARD: "[cartão de rastreio do pedido]",
 };
 
-function textoDaMensagem(m: MsgTikTok) {
-  if (m.type !== "TEXT") return ROTULO_TIPO[m.type] || "";
+function textoCru(m: MsgTikTok) {
   try {
     const p = JSON.parse(m.content);
     return String(p?.content ?? m.content ?? "");
@@ -162,8 +164,24 @@ function textoDaMensagem(m: MsgTikTok) {
   }
 }
 
+function textoDaMensagem(m: MsgTikTok) {
+  if (m.type === "TEXT") return textoCru(m);
+  const rotulo = ROTULO_TIPO[m.type] || "";
+  // Cartões: o plaintext da API traz produto/pedido/rastreio por extenso.
+  const detalhe = (m.plaintext || "").replace(/\s+/g, " ").trim().slice(0, 500);
+  return rotulo && detalhe ? `${rotulo} ${detalhe}` : rotulo;
+}
+
 const ehDaLoja = (m: MsgTikTok) =>
   m.sender?.role === "CUSTOMER_SERVICE" || m.sender?.role === "SHOP";
+
+// O cliente pediu atendente (ou o TikTok transferiu a conversa pra loja). É o
+// que o Seller Center lista em "Atribuído", com prazo correndo: a partir daqui
+// o assistente do TikTok sai de cena e só uma resposta da LOJA atende.
+const ehTransferencia = (m: Pick<MsgTikTok, "type" | "content">) =>
+  m.type === "ALLOCATED_SERVICE" ||
+  (m.type === "NOTIFICATION" &&
+    /manual customer service|atendimento (manual|humano)/i.test(String(m.content || "")));
 
 // Avisos automáticos do TikTok que NÃO respondem dúvida nenhuma (menu de boas-
 // vindas, confirmação de endereço, "enviamos seu pedido"…).
@@ -175,6 +193,7 @@ const RE_AVISO_TIKTOK =
 // loja tinha respondido — e o cliente ficava sem resposta. Aqui olhamos o que
 // veio DEPOIS da última mensagem do cliente:
 //  - resposta da loja (humano ou nosso robô)                     -> atendido
+//  - cliente pediu atendente / conversa transferida pra loja     -> aguardando
 //  - resposta do assistente do TikTok em até 3 min (não é aviso) -> atendido
 //  - só avisos automáticos, ou nada                              -> aguardando
 export function analisarConversa(msgsBrutas: MsgTikTok[]) {
@@ -188,11 +207,19 @@ export function analisarConversa(msgsBrutas: MsgTikTok[]) {
       break;
     }
   }
-  if (idx === -1) return { msgs, aguardando: false, cliente: null as MsgTikTok | null };
+  const semCliente = { msgs, aguardando: false, pediuHumano: false, cliente: null as MsgTikTok | null };
+  if (idx === -1) return semCliente;
 
   const cliente = msgs[idx];
   const depois = msgs.slice(idx + 1);
   const lojaRespondeu = depois.some(ehDaLoja);
+  const pediuHumano = depois.some(ehTransferencia);
+  if (pediuHumano) {
+    // Fica aberta no Seller Center até a loja responder, então vale por mais
+    // tempo que uma dúvida comum.
+    const noPrazo = Date.now() / 1000 - cliente.create_time <= 7 * 24 * 3600;
+    return { msgs, aguardando: noPrazo && !lojaRespondeu, pediuHumano: true, cliente };
+  }
   // Cartão de produto/pedido sem pergunta: o assistente do TikTok já devolve
   // "em que posso ajudar?" — perguntar de novo só duplica.
   const soCartao = !["TEXT", "IMAGE", "VIDEO"].includes(cliente.type);
@@ -205,7 +232,12 @@ export function analisarConversa(msgsBrutas: MsgTikTok[]) {
   );
   // Só as recentes: responder dias depois não ajuda.
   const recente = Date.now() / 1000 - cliente.create_time <= 48 * 3600;
-  return { msgs, aguardando: recente && !lojaRespondeu && !assistenteRespondeu, cliente };
+  return {
+    msgs,
+    aguardando: recente && !lojaRespondeu && !assistenteRespondeu,
+    pediuHumano: false,
+    cliente,
+  };
 }
 
 const pausa = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -221,15 +253,20 @@ type ConversaTikTok = {
 };
 
 // Lê as conversas mais recentes (pagina até achar só conversa já sincronizada)
-// e marca quem está esperando resposta. `forcar` reanalisa tudo que vier nas
-// páginas pedidas (usado uma vez pra recuperar o que ficou pra trás).
+// e marca quem está esperando resposta. `forcar` reanalisa as páginas pedidas
+// mesmo sem mudança (recupera o que ficou pra trás); `token` continua de onde
+// uma chamada anterior parou (`proximoToken`).
 export async function sincronizarChatsTikTok(
   lojaId: string,
-  { paginas = 5, forcar = false }: { paginas?: number; forcar?: boolean } = {}
+  {
+    paginas = 5,
+    forcar = false,
+    token = "",
+  }: { paginas?: number; forcar?: boolean; token?: string } = {}
 ) {
   const t = await obterTokenTikTok(lojaId);
 
-  let pageToken = "";
+  let pageToken = token;
   let sincronizados = 0;
   let aguardando = 0;
   let analisadas = 0;
@@ -257,10 +294,19 @@ export async function sincronizarChatsTikTok(
     for (const c of convs) {
       const lm = c.latest_message;
       const ant = antes.get(c.id);
-      if (!forcar && ant && ant.latest_message_id === (lm?.id || null)) continue;
+      const papel = lm?.sender?.role || "";
+      const igual = !!ant && ant.latest_message_id === (lm?.id || null);
+      // Vale abrir as mensagens? Só quando há sinal de cliente esperando:
+      // não-lidas, pendência anterior, cliente por último ou transferência
+      // pra loja. O resto é aviso automático do TikTok.
+      const candidata =
+        papel === "BUYER" ||
+        c.unread_count > 0 ||
+        !!ant?.precisa_resposta ||
+        ehTransferencia({ type: lm?.type || "", content: lm?.content || "" });
+      if (igual && !(forcar && candidata)) continue;
       mudaram++;
 
-      const papel = lm?.sender?.role || "";
       const buyer = c.participants?.find((x) => x.role === "BUYER");
       let precisa = false;
       let clienteMsgId: string | null = null;
@@ -274,9 +320,9 @@ export async function sincronizarChatsTikTok(
         precisa = c.can_send_message;
         clienteMsgId = lm?.id || null;
         ultimaMensagem = lm ? textoDaMensagem(lm as MsgTikTok) : "";
-      } else if (forcar || c.unread_count > 0 || ant?.precisa_resposta) {
-        // Robô do TikTok falou por último: só as mensagens dizem se o cliente
-        // foi atendido. (Sem não-lidas e sem pendência = só aviso automático.)
+      } else if (candidata) {
+        // Robô/sistema do TikTok falou por último: só as mensagens dizem se o
+        // cliente foi atendido.
         const m = await listarMensagens(t, c.id);
         if (m.code !== 0) {
           // Rate limit/erro: não grava nada — a conversa é relida na próxima rodada.
@@ -322,15 +368,20 @@ export async function sincronizarChatsTikTok(
     await pausa(300);
   }
 
-  return { conversas: sincronizados, aguardando, analisadas, erro };
+  return { conversas: sincronizados, aguardando, analisadas, erro, proximoToken: pageToken };
 }
 
 // Reanalisa conversas do BANCO que têm não-lidas e não constam como pendentes:
 // são as que o sync antigo deu por respondidas porque o robô do TikTok falou
 // por último. `pular` pagina (mais recentes primeiro).
-export async function reavaliarNaoLidasTikTok(lojaId: string, limite = 40, pular = 0) {
+export async function reavaliarNaoLidasTikTok(
+  lojaId: string,
+  limite = 40,
+  pular = 0,
+  horas = 48
+) {
   const t = await obterTokenTikTok(lojaId);
-  const desde = (Date.now() - 48 * 3600_000) * 1_000_000; // ultima_mensagem_ts em ns
+  const desde = (Date.now() - horas * 3600_000) * 1_000_000; // ultima_mensagem_ts em ns
   const { data: linhas } = await supabase
     .from("chat_conversas")
     .select("conversation_id")
@@ -492,6 +543,9 @@ export async function responderChatsTikTokLote({
     if (temTextoCliente) {
       const contexto =
         `=== CONVERSA COM ESTE CLIENTE (do início ao fim) ===\n${conversaTxt}\n\n` +
+        (analise.pediuHumano
+          ? `ATENÇÃO: depois da resposta do Assistente TikTok, o cliente pediu para falar com um atendente da loja — a resposta automática não resolveu. Responda você, como atendente, sem repetir o que o assistente já disse.\n\n`
+          : "") +
         `Responda à(s) última(s) mensagem(ns) do cliente, considerando TODA a conversa acima.`;
       const pedir = (ctx: string) =>
         decidirResposta(client, { system, contexto: ctx, lojaId, marketplace: "tiktok_shop" });

@@ -7,9 +7,13 @@ import {
 import { registrarSyncOk } from "@/lib/chat/vigia";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
-async function processarLojas(opcoes: { paginas?: number; forcar?: boolean }) {
+async function processarLojas(opcoes: {
+  paginas?: number;
+  forcar?: boolean;
+  token?: string;
+}) {
   const { data: lojas } = await supabase
     .from("marketplace_tokens")
     .select("loja_id")
@@ -31,9 +35,10 @@ async function processarLojas(opcoes: { paginas?: number; forcar?: boolean }) {
   return resultados;
 }
 
-// GET: cron. `?forcar=1&paginas=N` reanalisa as N páginas mais recentes mesmo
-// sem mudança; `?reavaliar=N&pular=M` reanalisa as conversas do banco com
-// não-lidas (as duas formas recuperam clientes que ficaram sem resposta).
+// GET: cron. `?forcar=1&paginas=N[&token=T]` reanalisa N páginas mesmo sem
+// mudança (continua com o `proximoToken` devolvido); `?reavaliar=N&pular=M`
+// reanalisa as conversas do banco com não-lidas. As duas formas recuperam
+// clientes que ficaram sem resposta.
 export async function GET(request: NextRequest) {
   try {
     const sp = request.nextUrl.searchParams;
@@ -52,7 +57,8 @@ export async function GET(request: NextRequest) {
           ...(await reavaliarNaoLidasTikTok(
             lojaId,
             Math.min(reavaliar, 60),
-            Number(sp.get("pular")) || 0
+            Number(sp.get("pular")) || 0,
+            Math.min(Number(sp.get("horas")) || 48, 168)
           )),
         });
       }
@@ -60,8 +66,12 @@ export async function GET(request: NextRequest) {
     }
 
     const forcar = sp.get("forcar") === "1";
-    const paginas = Math.min(Number(sp.get("paginas")) || (forcar ? 3 : 5), 15);
-    const resultados = await processarLojas({ paginas, forcar });
+    const paginas = Math.min(Number(sp.get("paginas")) || (forcar ? 3 : 5), 60);
+    const resultados = await processarLojas({
+      paginas,
+      forcar,
+      token: sp.get("token") || "",
+    });
     return NextResponse.json({
       sucesso: resultados.every((r) => !("erro" in r && r.erro)),
       lojas: resultados,
