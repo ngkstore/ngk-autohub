@@ -51,7 +51,7 @@ CONTATO FORA DO TIKTOK SHOP — regra crítica:
 - NUNCA peça nem ofereça WhatsApp, telefone, celular, e-mail, Instagram, Telegram, link ou qualquer contato fora do TikTok Shop.
 - Todo o atendimento acontece aqui, pelo chat. Se o cliente pedir contato externo, responda com gentileza que a loja atende só por aqui e resolva a dúvida por aqui.
 
-QUANDO precisa_humano=true: só quando o caso exige decisão ou conferência que só uma pessoa da loja consegue fazer (negociação, cancelar/alterar pedido, pedido que chegou errado ou faltando item, exceção fora do padrão). Se a conversa mostra que a loja JÁ disse que ia verificar/retornar e o cliente está cobrando, marque precisa_humano=true — não invente uma resposta nova nem repita a promessa. Nesses casos o sistema avisa uma pessoa da equipe na hora, e o campo "resposta" deve ser UMA mensagem curta e tranquila dizendo que alguém da equipe vai olhar o caso e responder por aqui — sem prazo em minutos e sem mencionar processos internos.
+QUANDO precisa_humano=true: só quando o caso exige decisão ou conferência que só uma pessoa da loja consegue fazer (negociação, cancelar/alterar pedido, pedido que chegou errado ou faltando item, exceção fora do padrão). Se a conversa mostra que a loja JÁ disse que ia verificar/retornar e o cliente está cobrando, marque precisa_humano=true — não invente uma resposta nova nem repita a promessa. Nesses casos o sistema avisa uma pessoa da equipe na hora, e o campo "resposta" deve ser UMA mensagem curta e tranquila que (1) quando existir, diga o que o cliente JÁ pode fazer agora pelo app do TikTok Shop (ex.: abrir a devolução/reembolso do pedido) e (2) diga que alguém da equipe vai olhar o caso e responder por aqui — sem prazo em minutos e sem mencionar processos internos. O campo "resposta" NUNCA fica vazio: todo cliente recebe uma resposta.
 
 Categorias: "produto" | "envio_prazo" | "pagamento" | "devolucao_reembolso" | "defeito" | "outro".
 
@@ -666,17 +666,27 @@ export async function responderChatsTikTokLote({
 
         if (acao.tipo === "espera") {
           // Fica como NÃO-LIDA no Seller Center de propósito: é com você.
+          // Se ele já estava esperando e cobrou de novo, re-avisa — mas sem
+          // metralhar o Telegram a cada "?" dele.
+          const avisar = !aguardando || podeReavisar(c.escalada_em);
           await marcar(c.conversation_id, {
             ...base,
             escalada: true,
-            escalada_em: agora,
-            motivo_escala: `${PREFIXO_AGUARDANDO}: ${categoria}`,
+            motivo_escala: aguardando
+              ? c.motivo_escala
+              : `${PREFIXO_AGUARDANDO}: ${bloqueadaPorContato ? "contato_externo" : categoria}`,
+            ...(avisar ? { escalada_em: agora } : {}),
           });
-          await enviarTelegram(
-            `🟡 TikTok — cliente aguardando VOCÊ\n\n${cabecalho}\n\n` +
-              `O robô respondeu:\n"${acao.texto}"\n\n` +
-              `Ele não consegue resolver esse caso sozinho. Responda pelo TikTok Shop ou em Atendimento.`
-          );
+          if (avisar) {
+            await enviarTelegram(
+              (aguardando
+                ? `🔁 TikTok — cliente cobrando o retorno prometido`
+                : `🟡 TikTok — cliente aguardando VOCÊ`) +
+                `\n\n${cabecalho}\n\n` +
+                `O robô respondeu:\n"${acao.texto}"\n\n` +
+                `Ele não consegue resolver esse caso sozinho. Responda pelo TikTok Shop ou em Atendimento.`
+            );
+          }
           escalados++;
         } else {
           await marcar(c.conversation_id, {

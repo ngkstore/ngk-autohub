@@ -8,7 +8,9 @@ import {
   contemPromessaRetorno,
   decidirAcao,
   decidirResposta,
+  ehMensagemPronta,
   estaAguardandoHumano,
+  MSG_ESPERA_PADRAO,
   podeReavisar,
   PREFIXO_AGUARDANDO,
   REGRA_SEM_PROMESSA,
@@ -59,7 +61,7 @@ CONTATO FORA DA SHOPEE — regra crítica (a Shopee BLOQUEIA a mensagem e pode p
 - Todo o atendimento acontece AQUI, pelo chat da Shopee. Se o cliente pedir contato externo ou mandar um número, responda com gentileza que a loja atende só por aqui mesmo, pelo chat, e resolva a dúvida dele por aqui.
 - Mesmo que os exemplos antigos da loja ou a conversa tenham pedido contato externo, NÃO repita isso.
 
-QUANDO precisa_humano=true: só quando o caso exige uma decisão ou conferência que só uma pessoa da loja consegue fazer (loja pagar frete da devolução, desconto/negociação, pedido que chegou errado ou faltando item, exceção fora do padrão) ou quando faltam dados pra responder com segurança. Se a conversa mostra que a loja JÁ disse que ia verificar/retornar e o cliente está cobrando, marque precisa_humano=true — não invente uma resposta nova nem repita a promessa. Nesses casos o sistema avisa uma pessoa da equipe na hora, e o campo "resposta" deve ser UMA mensagem curta e tranquila dizendo que alguém da equipe vai olhar o caso e responder por aqui — sem prazo em minutos e sem NUNCA mencionar escalação, prioridade ou processos internos. Na dúvida entre responder e escalar, prefira RESPONDER com a orientação padrão (confianca="alta").
+QUANDO precisa_humano=true: só quando o caso exige uma decisão ou conferência que só uma pessoa da loja consegue fazer (loja pagar frete da devolução, desconto/negociação, pedido que chegou errado ou faltando item, exceção fora do padrão) ou quando faltam dados pra responder com segurança. Se a conversa mostra que a loja JÁ disse que ia verificar/retornar e o cliente está cobrando, marque precisa_humano=true — não invente uma resposta nova nem repita a promessa. Nesses casos o sistema avisa uma pessoa da equipe na hora, e o campo "resposta" deve ser UMA mensagem curta e tranquila que (1) quando existir, diga o que o cliente JÁ pode fazer agora pelo app (ex.: abrir a Devolução/Reembolso do pedido) e (2) diga que alguém da equipe vai olhar o caso e responder por aqui — sem prazo em minutos e sem NUNCA mencionar escalação, prioridade ou processos internos. O campo "resposta" NUNCA fica vazio: todo cliente recebe uma resposta. Na dúvida entre responder e escalar, prefira RESPONDER com a orientação padrão (confianca="alta").
 
 Categorias: "produto" | "envio_prazo" | "pagamento" | "devolucao_reembolso" | "defeito" | "outro".
 
@@ -281,7 +283,7 @@ export async function responderChatsLote({
     if (contemContatoExterno(t)) continue;
     // …e as promessas de retorno ("deixa eu confirmar com a equipe e já te
     // retorno"): eram o modelo mais repetido e ninguém retornava.
-    if (contemPromessaRetorno(t)) continue;
+    if (contemPromessaRetorno(t) || ehMensagemPronta(t)) continue;
     vistos.add(t);
     exemplosLoja.push(t);
     if (exemplosLoja.length >= 30) break;
@@ -358,7 +360,12 @@ export async function responderChatsLote({
           .filter(
             (m) =>
               m.texto &&
-              !(m.de_loja && (contemContatoExterno(m.texto) || contemPromessaRetorno(m.texto)))
+              !(
+                m.de_loja &&
+                (contemContatoExterno(m.texto) ||
+                  contemPromessaRetorno(m.texto) ||
+                  ehMensagemPronta(m.texto))
+              )
           )
           .map((m) => `${m.de_loja ? "Loja" : "Cliente"}: ${m.texto}`)
           .join("\n");
@@ -552,17 +559,27 @@ export async function responderChatsLote({
         if (acao.tipo === "espera") {
           // O cliente recebeu "alguém da equipe vai te responder": agora isso
           // TEM de chegar em você (antes a promessa saía e ninguém era avisado).
+          // Se ele já estava esperando e cobrou de novo, re-avisa — mas sem
+          // metralhar o Telegram a cada "?" dele.
+          const avisar = !aguardando || podeReavisar(c.escalada_em);
           await marcar(c.conversation_id, {
             ...base,
             escalada: true,
-            escalada_em: agora,
-            motivo_escala: `${PREFIXO_AGUARDANDO}: ${categoria}`,
+            motivo_escala: aguardando
+              ? c.motivo_escala
+              : `${PREFIXO_AGUARDANDO}: ${bloqueadaPorContato ? "contato_externo" : categoria}`,
+            ...(avisar ? { escalada_em: agora } : {}),
           });
-          await enviarTelegram(
-            `🟡 Cliente aguardando VOCÊ\n\n${cabecalho}\n\n` +
-              `O robô respondeu:\n"${acao.texto}"\n\n` +
-              `Ele não consegue resolver esse caso sozinho. Responda pelo chat da Shopee ou em Atendimento.`
-          );
+          if (avisar) {
+            await enviarTelegram(
+              (aguardando
+                ? `🔁 Cliente cobrando o retorno prometido`
+                : `🟡 Cliente aguardando VOCÊ`) +
+                `\n\n${cabecalho}\n\n` +
+                `O robô respondeu:\n"${acao.texto}"\n\n` +
+                `Ele não consegue resolver esse caso sozinho. Responda pelo chat da Shopee ou em Atendimento.`
+            );
+          }
           escalados++;
         } else {
           // Resposta normal. Se a conversa espera um humano, continua esperando.
@@ -580,14 +597,27 @@ export async function responderChatsLote({
       // o mesmo texto não resolve. Marca como tratada, escala e avisa — antes
       // ficava em loop regenerando (e pagando IA) a cada rodada de 2 min.
       if (RE_ERRO_CONTEUDO.test(msg)) {
+        // O cliente não pode ficar sem resposta por causa do bloqueio: manda
+        // o aviso padrão (texto neutro) no lugar do que a Shopee recusou.
+        let reserva: Record<string, unknown> | null = null;
+        try {
+          const id = await enviarMensagem(token, String(c.to_id), MSG_ESPERA_PADRAO);
+          reserva = { precisa_resposta: false, ultimo_remetente: "loja", respondida_em: agora, robo_msg_id: id };
+          enviados++;
+        } catch {
+          // nem o aviso passou: fica pendente pra você (o Telegram abaixo avisa)
+        }
         await marcar(c.conversation_id, {
           ultimo_tratado_msg_id: c.latest_message_id,
           escalada: true,
           escalada_em: agora,
-          motivo_escala: `bloqueado_shopee: ${msg.slice(0, 160)}`,
+          motivo_escala: reserva
+            ? `${PREFIXO_AGUARDANDO}: bloqueado_shopee`
+            : `bloqueado_shopee: ${msg.slice(0, 160)}`,
           categoria,
           confianca,
-          resposta_ia: resposta,
+          resposta_ia: reserva ? MSG_ESPERA_PADRAO : resposta,
+          ...(reserva || {}),
         });
         await enviarTelegram(
           `🚫 Shopee bloqueou a resposta do robô\n\n` +

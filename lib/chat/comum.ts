@@ -140,12 +140,49 @@ export async function decidirResposta(
   }
 }
 
+// Cliente cobrando um caso que já está com a equipe: ele recebe resposta toda
+// vez (nenhuma mensagem fica no vácuo), mas nunca o mesmo texto duas vezes.
+const MSGS_ACOMPANHANDO = [
+  "Seu caso já está com a nossa equipe, tá? Assim que a gente tiver a resposta, te chamamos por aqui mesmo 🙏",
+  "Estamos acompanhando seu caso por aqui. Assim que a equipe concluir a análise, a resposta chega neste chat 🙏",
+  "Não esquecemos de você! Seu caso segue com a equipe e a resposta vem por aqui mesmo 🙏",
+];
+
+// Cliente mandou anexo de novo depois de já termos pedido detalhes.
+const MSGS_ANEXO = [
+  "Recebi o que você enviou! Vou pedir pra alguém da nossa equipe olhar e te respondemos por aqui 🙏",
+  "Recebido! Alguém da nossa equipe vai olhar o que você mandou e te responde por aqui 🙏",
+];
+
+// A IA repetiu exatamente o que a loja acabou de dizer (cliente só disse "ok").
+const MSGS_ENCERRAMENTO = [
+  "Estou por aqui! Se precisar de mais alguma coisa, é só chamar 😊",
+  "Qualquer coisa é só falar por aqui, tá? 😊",
+];
+
+const diferenteDaUltima = (opcoes: string[], ultima: string) =>
+  opcoes.find((o) => o !== ultima.trim()) ?? opcoes[0];
+
+// Textos prontos do sistema não podem virar "exemplo de como a loja responde"
+// no prompt — senão a IA passa a usá-los em respostas normais.
+const PRONTAS = new Set([
+  MSG_ESPERA_PADRAO,
+  MSG_PEDIR_DETALHES,
+  ...MSGS_ACOMPANHANDO,
+  ...MSGS_ANEXO,
+  ...MSGS_ENCERRAMENTO,
+]);
+
+export function ehMensagemPronta(texto: string | null | undefined) {
+  return PRONTAS.has((texto || "").trim());
+}
+
 export type Acao =
   // resposta que resolve: envia e encerra
   | { tipo: "responder"; texto: string }
-  // caso precisa de gente: envia UM aviso de espera e chama você
+  // caso precisa de gente: envia um aviso ao cliente E chama você
   | { tipo: "espera"; texto: string }
-  // chama você sem enviar nada (não-autônomo, bloqueio, ou já avisou o cliente)
+  // chama você sem enviar nada — só existe no modo NÃO-autônomo (você aprova)
   | { tipo: "humano" };
 
 // Decide o que fazer com a resposta da IA.
@@ -164,16 +201,25 @@ export function decidirAcao({
   jaAguardandoHumano: boolean;
   ultimaMsgLoja: string;
 }): Acao {
-  if (bloqueadaPorContato) return { tipo: "humano" };
   const resposta = (decisao?.resposta || "").trim();
   const repetida = (txt: string) => !!txt && ultimaMsgLoja.trim() === txt;
+  // No autônomo TODA mensagem do cliente recebe resposta: quando o robô não
+  // tem o que dizer, manda um aviso (sempre diferente do anterior) e chama você.
+  const avisoEspera = (): Acao => ({
+    tipo: "espera",
+    texto: diferenteDaUltima(
+      jaAguardandoHumano ? MSGS_ACOMPANHANDO : [MSG_ESPERA_PADRAO, ...MSGS_ACOMPANHANDO],
+      ultimaMsgLoja
+    ),
+  });
+
+  if (bloqueadaPorContato) return autonomo ? avisoEspera() : { tipo: "humano" };
 
   if (!temTextoCliente) {
-    // Só anexo/imagem: no autônomo pergunta do que se trata (uma vez).
-    if (autonomo && !repetida(MSG_PEDIR_DETALHES)) {
-      return { tipo: "responder", texto: MSG_PEDIR_DETALHES };
-    }
-    return { tipo: "humano" };
+    if (!autonomo) return { tipo: "humano" };
+    // Só anexo/imagem: pergunta do que se trata; se já perguntou, chama você.
+    if (!repetida(MSG_PEDIR_DETALHES)) return { tipo: "responder", texto: MSG_PEDIR_DETALHES };
+    return { tipo: "espera", texto: diferenteDaUltima(MSGS_ANEXO, ultimaMsgLoja) };
   }
 
   // A IA marca precisa_humano também quando só falta um dado do cliente; se a
@@ -192,14 +238,18 @@ export function decidirAcao({
 
   if (!precisaHumano && resposta) {
     // Anti-papagaio: nunca manda de novo o texto que a loja acabou de enviar.
-    return repetida(resposta) ? { tipo: "humano" } : { tipo: "responder", texto: resposta };
+    return {
+      tipo: "responder",
+      texto: repetida(resposta) ? diferenteDaUltima(MSGS_ENCERRAMENTO, ultimaMsgLoja) : resposta,
+    };
   }
 
-  // Precisa de gente. Se o cliente já foi avisado que alguém vai retornar (ou a
-  // IA falhou), não repete a promessa: só chama você de novo.
-  if (!decisao || jaAguardandoHumano) return { tipo: "humano" };
-  const aviso = resposta || MSG_ESPERA_PADRAO;
-  return repetida(aviso) ? { tipo: "humano" } : { tipo: "espera", texto: aviso };
+  // Precisa de gente. O cliente sempre recebe resposta; o que muda é o texto:
+  // se ele já foi avisado (ou a IA falhou/repetiu), vai um aviso de
+  // acompanhamento em vez da mesma promessa de novo.
+  if (!decisao || !resposta || repetida(resposta)) return avisoEspera();
+  if (jaAguardandoHumano && contemPromessaRetorno(resposta)) return avisoEspera();
+  return { tipo: "espera", texto: resposta };
 }
 
 export const PREFIXO_AGUARDANDO = "aguardando_humano";
