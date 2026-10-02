@@ -55,7 +55,10 @@ export const MSG_PEDIR_DETALHES =
 export const REGRA_SEM_PROMESSA = `VOCÊ NÃO CONSEGUE VOLTAR DEPOIS — regra crítica:
 - Cada resposta sua é a ÚNICA: você não tem como "verificar e retornar". Então NUNCA escreva "já te retorno", "vou verificar", "deixa eu confirmar com a equipe", "volto em poucos minutos" numa resposta normal. Isso deixa o cliente esperando uma resposta que nunca chega.
 - Resolva AGORA com o que você tem (dados do produto, pedidos do cliente, orientações padrão). Se faltar um dado do cliente, PERGUNTE (ex.: o número do pedido).
-- Só existe UM caso em que você pode dizer que alguém vai retornar: quando marcar precisa_humano=true. Aí o sistema chama uma pessoa da loja de verdade.`;
+- Só existe UM caso em que você pode dizer que alguém vai retornar: quando marcar precisa_humano=true. Aí o sistema chama uma pessoa da loja de verdade.
+
+ASSUNTOS QUE NÃO SÃO SEUS — regra crítica:
+- Proposta de parceria, criador de conteúdo/afiliado/influenciador, live, amostra grátis, fornecedor, atacado/revenda, publicidade ou qualquer assunto comercial que não seja a compra do cliente: você NÃO sabe a política da loja. Nunca diga que a loja tem ou não tem programa, parceria ou interesse. Marque precisa_humano=true.`;
 
 export type Decisao = {
   categoria: string;
