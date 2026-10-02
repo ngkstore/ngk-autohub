@@ -26,16 +26,21 @@ export function contemContatoExterno(texto: string | null | undefined) {
 const RE_PROMESSA =
   /te retorno|retorno (com|pra|para|em|assim)|volto (com|a falar|pra|para|em|aqui|j[aá])|deixa eu (confirmar|verificar|conferir|checar|trazer|ver|consultar)|vou (verificar|confirmar|conferir|checar|consultar|averiguar|trazer|acionar|chamar|pedir pra)|te aviso|te dou (um )?retorno|assim que (eu )?(tiver|souber|conseguir)|em (poucos|alguns) minutos|j[aá] te (passo|respondo|falo)|te (respondemos|retornamos|avisamos)|(retornaremos|responderemos|entraremos em contato)|(algu[eé]m|equipe|time|atendente)[^.!?]{0,40}(vai|ir[aá]) (te )?(responder|retornar|olhar|verificar|analisar|conferir)/i;
 
+// Termina perguntando algo ao cliente? (ignora emoji e o "tá?/ok?" de cortesia)
+function terminaEmPergunta(texto: string) {
+  const semCortesia = texto
+    .trim()
+    .replace(/[\s\p{Extended_Pictographic}️]+$/u, "")
+    .replace(/,?\s*(t[aá]|ok|certo|combinado|beleza|viu|pode ser)\s*\?$/i, "");
+  return /\?$/.test(semCortesia);
+}
+
 export function contemPromessaRetorno(texto: string | null | undefined) {
   const t = (texto || "").trim();
   if (!RE_PROMESSA.test(t)) return false;
   // "Deixa eu confirmar: você quer a boneca ou o carrinho?" é pergunta de
   // esclarecimento (o cliente responde e a conversa segue), não promessa.
-  // Tira o "tá?/ok?" de cortesia do fim antes de olhar se termina em pergunta.
-  const semCortesia = t
-    .replace(/[\s\p{Extended_Pictographic}️]+$/u, "")
-    .replace(/,?\s*(t[aá]|ok|certo|combinado|beleza|viu|pode ser)\s*\?$/i, "");
-  return !/\?$/.test(semCortesia);
+  return !terminaEmPergunta(t);
 }
 
 // Mensagem enviada quando o caso precisa de uma pessoa e a IA não escreveu nada.
@@ -168,8 +173,14 @@ export function decidirAcao({
     return { tipo: "humano" };
   }
 
+  // A IA marca precisa_humano também quando só falta um dado do cliente; se a
+  // resposta já é a pergunta pedindo esse dado, a conversa segue sem chamar você.
+  const soPedeDado =
+    !!resposta && terminaEmPergunta(resposta) && !RE_PROMESSA.test(resposta);
   const precisaHumano =
-    !decisao || decisao.precisa_humano === true || contemPromessaRetorno(resposta);
+    !decisao ||
+    (decisao.precisa_humano === true && !soPedeDado) ||
+    contemPromessaRetorno(resposta);
 
   if (!autonomo) {
     if (precisaHumano || decisao?.confianca === "baixa" || !resposta) return { tipo: "humano" };

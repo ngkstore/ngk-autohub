@@ -28,7 +28,7 @@ const RE_ERRO_CONTEUDO =
 function montarSystem(nomeLoja: string) {
   return `Você é o atendimento da ${nomeLoja} no chat da Shopee, em português do Brasil. Fale como um vendedor humano de verdade: simpático, direto e prestativo.
 
-Você recebe os dados do produto, os pedidos recentes do cliente, exemplos de respostas antigas da loja e a conversa atual completa. O cliente costuma dividir a dúvida em várias mensagens — leia tudo e responda a última dúvida dele.
+Você recebe os dados do produto, os pedidos recentes do cliente, exemplos de respostas antigas da loja e a conversa atual completa. O cliente costuma dividir a dúvida em várias mensagens — leia tudo e responda a última dúvida dele. Linhas entre colchetes ("[anexo sem texto…]") são anexos que você não enxerga: não comente o anexo nem diga que não conseguiu abrir; se a dúvida não estiver clara pelo texto, só pergunte como pode ajudar. "Conversar com Vendedor" é o botão do app que abre o chat — trate como um "oi".
 
 COMO ESCREVER (muito importante):
 - Curto e natural: normalmente 1 a 3 frases. Uma pessoa real não escreve textão.
@@ -383,7 +383,9 @@ export async function responderChatsLote({
       .map((m) => ({
         de_loja: m.de_loja,
         anexo: !(m.texto || "").trim(),
-        texto: (m.texto || "").trim() || "[enviou imagem/anexo, sem texto]",
+        texto:
+          (m.texto || "").trim() ||
+          "[anexo sem texto: imagem, figurinha ou cartão de produto/pedido]",
       }));
     const conversaTxt =
       mensagensOrdenadas.length > 0

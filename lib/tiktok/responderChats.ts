@@ -193,12 +193,15 @@ export function analisarConversa(msgsBrutas: MsgTikTok[]) {
   const cliente = msgs[idx];
   const depois = msgs.slice(idx + 1);
   const lojaRespondeu = depois.some(ehDaLoja);
+  // Cartão de produto/pedido sem pergunta: o assistente do TikTok já devolve
+  // "em que posso ajudar?" — perguntar de novo só duplica.
+  const soCartao = !["TEXT", "IMAGE", "VIDEO"].includes(cliente.type);
   const assistenteRespondeu = depois.some(
     (m) =>
       m.sender?.role === "ROBOT" &&
       m.type === "TEXT" &&
       m.create_time - cliente.create_time <= 180 &&
-      !RE_AVISO_TIKTOK.test(textoDaMensagem(m).trim())
+      (soCartao || !RE_AVISO_TIKTOK.test(textoDaMensagem(m).trim()))
   );
   // Só as recentes: responder dias depois não ajuda.
   const recente = Date.now() / 1000 - cliente.create_time <= 48 * 3600;
