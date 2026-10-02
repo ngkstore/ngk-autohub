@@ -62,6 +62,41 @@ type MensagemShopee = {
   created_timestamp?: number;
 };
 
+// Segundos (a API manda created_timestamp em segundos; normaliza se vier em ms/ns).
+function emSegundos(ts: number | undefined) {
+  const n = Number(ts || 0);
+  if (n > 1e14) return n / 1e9;
+  if (n > 1e11) return n / 1e3;
+  return n;
+}
+
+// A lista de conversas diz "a loja falou por último", mas pode ter sido só a
+// AUTO-RESPOSTA da Shopee ("Seja bem-vindo…", "Olá Amigo(a)…"), que sai no
+// mesmo segundo da mensagem do cliente. Nesse caso o cliente continua sem
+// resposta de verdade — e o robô nunca via a conversa. Devolve o texto da
+// última mensagem do cliente quando ela só recebeu auto-resposta (≤2s depois).
+function clienteSoComAutoResposta(msgs: MensagemShopee[], shopId: string) {
+  const doCliente = msgs.filter((m) => String(m.from_shop_id) !== shopId);
+  if (doCliente.length === 0) return null;
+  const ultima = doCliente.reduce((a, b) =>
+    emSegundos(b.created_timestamp) >= emSegundos(a.created_timestamp) ? b : a
+  );
+  const tsCliente = emSegundos(ultima.created_timestamp);
+  // Só as recentes: responder dias depois não ajuda (e a Shopee nem deixa).
+  if (!tsCliente || Date.now() / 1000 - tsCliente > 72 * 3600) return null;
+
+  const daLojaDepois = msgs.filter(
+    (m) =>
+      String(m.from_shop_id) === shopId &&
+      emSegundos(m.created_timestamp) >= tsCliente
+  );
+  if (daLojaDepois.length === 0) return null; // sem dado pra contrariar a lista
+  const teveRespostaReal = daLojaDepois.some(
+    (m) => emSegundos(m.created_timestamp) - tsCliente > 2
+  );
+  return teveRespostaReal ? null : { texto: ultima.content?.text ?? "" };
+}
+
 export type ResultadoSyncChat = {
   conversas: number;
   mensagens: number;
@@ -113,10 +148,43 @@ export async function sincronizarChatsPagina({
   const conversas = lista?.response?.conversations || [];
   let totalMensagens = 0;
 
+  // Como estas conversas estão no banco: pra pular as que não mudaram e pra
+  // encerrar a escalada quando um humano responde pelo Seller Center.
+  const idsPagina = conversas.map((c: { conversation_id: unknown }) =>
+    String(c.conversation_id)
+  );
+  const antes = new Map<
+    string,
+    {
+      latest_message_id: string | null;
+      escalada: boolean | null;
+      robo_msg_id: string | null;
+      resposta_ia: string | null;
+    }
+  >();
+  if (idsPagina.length > 0) {
+    const { data: linhas } = await supabase
+      .from("chat_conversas")
+      .select("conversation_id, latest_message_id, escalada, robo_msg_id, resposta_ia")
+      .eq("marketplace", "shopee")
+      .in("conversation_id", idsPagina);
+    (linhas || []).forEach((l) => antes.set(String(l.conversation_id), l));
+  }
+
   for (const c of conversas) {
     const conversationId = String(c.conversation_id);
     const toId = String(c.to_id);
-    const precisaResposta = String(c.latest_message_from_id) === toId;
+    const latestId = c.latest_message_id ? String(c.latest_message_id) : null;
+    const ant = antes.get(conversationId);
+
+    // Nada de novo desde o último sync: não baixa as mensagens de novo. O
+    // sync relia 60 conversas por loja a cada rodada e levava mais que os
+    // 2 min do cron — o cliente esperava esse tempo todo antes do robô agir.
+    if (ant && latestId && ant.latest_message_id === latestId) continue;
+
+    const ultimaEhCliente = String(c.latest_message_from_id) === toId;
+    let precisaResposta = ultimaEhCliente;
+    let ultimaMensagem: string = c.latest_message_content?.text ?? "";
 
     // Mensagens recentes da conversa (uma página).
     const msgs = await chamar(
@@ -159,7 +227,23 @@ export async function sincronizarChatsPagina({
       }
 
       totalMensagens += registros.length;
+
+      if (!ultimaEhCliente) {
+        const soAuto = clienteSoComAutoResposta(listaMsgs, token.shopId);
+        if (soAuto) {
+          precisaResposta = true;
+          ultimaMensagem = soAuto.texto;
+        }
+      }
     }
+
+    // Loja falou por último e NÃO foi o robô -> um humano respondeu: encerra a
+    // escalada (sem isso ela ficava pra sempre em "Atendimento Pendente").
+    const foiORobo = ant?.robo_msg_id
+      ? latestId === ant.robo_msg_id
+      : (c.latest_message_content?.text ?? "").trim() ===
+        (ant?.resposta_ia || "").trim();
+    const humanoRespondeu = !!ant?.escalada && !precisaResposta && !foiORobo;
 
     // PK de chat_conversas é (marketplace, conversation_id) desde a chegada do
     // chat TikTok — o onConflict TEM de casar com esse índice único, senão o
@@ -171,16 +255,16 @@ export async function sincronizarChatsPagina({
         loja_id: loja.lojaId,
         to_id: toId,
         to_name: c.to_name ?? null,
-        item_id: itemIdConversa,
-        latest_message_id: c.latest_message_id
-          ? String(c.latest_message_id)
-          : null,
+        // só grava quando achou: senão apagava o item já conhecido da conversa
+        ...(itemIdConversa ? { item_id: itemIdConversa } : {}),
+        latest_message_id: latestId,
         ultimo_remetente: precisaResposta ? "cliente" : "loja",
         precisa_resposta: precisaResposta,
         unread_count: c.unread_count ?? 0,
-        ultima_mensagem: c.latest_message_content?.text ?? "",
+        ultima_mensagem: ultimaMensagem,
         ultima_mensagem_ts: c.last_message_timestamp ?? null,
         atualizado_em: new Date().toISOString(),
+        ...(humanoRespondeu ? { escalada: false } : {}),
       },
       { onConflict: "marketplace,conversation_id" }
     );

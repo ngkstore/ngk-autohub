@@ -2,23 +2,20 @@ import crypto from "crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import { supabase } from "@/lib/supabase";
 import { enviarTelegram } from "@/lib/telegram";
-import { registrarUsoIA } from "@/lib/uso";
 import { nomeLojaPublico } from "@/lib/shopee/lojas";
+import {
+  contemContatoExterno,
+  contemPromessaRetorno,
+  decidirAcao,
+  decidirResposta,
+  estaAguardandoHumano,
+  podeReavisar,
+  PREFIXO_AGUARDANDO,
+  REGRA_SEM_PROMESSA,
+  type Decisao,
+} from "@/lib/chat/comum";
 
 const BASE_URL_PADRAO = "https://partner.shopeemobile.com";
-
-// Contato fora da Shopee (WhatsApp, telefone, e-mail, redes sociais, links).
-// A Shopee BLOQUEIA a mensagem no envio e pode penalizar a loja — então isso
-// nunca pode sair do robô: nem como exemplo pra IA, nem na resposta final.
-// Cobre: apps/redes (whats, zap, insta…), e-mail, links (http/www/.com/.br),
-// telefone BR — (11) 91234-5678, 11912345678, 11 1234 5678 — e frases do tipo
-// "me passa seu número" / "fora da Shopee" / "me liga".
-const RE_CONTATO_EXTERNO =
-  /whats|wpp|\bzap\b|zapzap|telegram|instagram|\binsta\b|facebook|messenger|e-?mail|https?:\/\/|www\.|\.com\b|\.br\b|\(?\d{2}\)?\s?9?\s?\d{4}[-.\s]?\d{4}|fora da (shopee|plataforma)|por fora|(meu|seu|teu) n[uú]mero|n[uú]mero (de|do) (telefone|celular|contato|whats)|me liga|te ligo|ligar pra/i;
-
-export function contemContatoExterno(texto: string | null | undefined) {
-  return RE_CONTATO_EXTERNO.test(texto || "");
-}
 
 // Anexado ao contexto na 2ª tentativa, quando a 1ª resposta citou contato externo.
 const AVISO_CONTATO =
@@ -31,7 +28,7 @@ const RE_ERRO_CONTEUDO =
 function montarSystem(nomeLoja: string) {
   return `Você é o atendimento da ${nomeLoja} no chat da Shopee, em português do Brasil. Fale como um vendedor humano de verdade: simpático, direto e prestativo.
 
-Você recebe os dados do produto, exemplos de respostas antigas da loja e a conversa atual completa. O cliente costuma dividir a dúvida em várias mensagens — leia tudo e responda a última dúvida dele.
+Você recebe os dados do produto, os pedidos recentes do cliente, exemplos de respostas antigas da loja e a conversa atual completa. O cliente costuma dividir a dúvida em várias mensagens — leia tudo e responda a última dúvida dele.
 
 COMO ESCREVER (muito importante):
 - Curto e natural: normalmente 1 a 3 frases. Uma pessoa real não escreve textão.
@@ -45,6 +42,12 @@ O QUE VOCÊ RESOLVE (responda, não escale):
 - Pagamento: tratado no próprio app da Shopee (Eu > Central de Ajuda). Oriente com gentileza.
 - Devolução/Reembolso: o cliente abre pelo app (Eu > Minhas Compras > o pedido > "Devolução/Reembolso") e a loja apoia. Seja acolhedor e explique o passo a passo de forma curta.
 
+PEDIDOS DO CLIENTE:
+- Você recebe os pedidos recentes deste cliente na loja (número, data, itens, prazo limite de envio e, quando constar, data de envio/entrega). Use para saber de qual produto/pedido ele está falando e para responder sobre prazo de envio.
+- Se NÃO constar envio ou entrega, não afirme que o pedido ainda não saiu: diga que o andamento em tempo real aparece no acompanhamento do pedido no app da Shopee.
+
+${REGRA_SEM_PROMESSA}
+
 DISPONIBILIDADE / CORES / VARIAÇÕES — regra crítica:
 - Você NÃO tem o estoque por cor/variação. Então NUNCA diga que uma cor, tamanho ou variação específica está indisponível — isso costuma ser informação ERRADA.
 - Se perguntarem sobre uma cor/variação, responda de forma positiva: as opções disponíveis aparecem nas variações do anúncio, é só selecionar na hora de comprar. (Só diga que está esgotado se o estoque geral do produto for 0.)
@@ -55,12 +58,11 @@ CONTATO FORA DA SHOPEE — regra crítica (a Shopee BLOQUEIA a mensagem e pode p
 - Todo o atendimento acontece AQUI, pelo chat da Shopee. Se o cliente pedir contato externo ou mandar um número, responda com gentileza que a loja atende só por aqui mesmo, pelo chat, e resolva a dúvida dele por aqui.
 - Mesmo que os exemplos antigos da loja ou a conversa tenham pedido contato externo, NÃO repita isso.
 
-QUANDO precisa_humano=true: só quando o caso exige uma decisão manual que as orientações não cobrem (loja pagar frete da devolução, desconto/negociação, exceção fora do padrão) ou quando faltam dados pra responder com segurança. MESMO ASSIM, o campo "resposta" deve ser uma mensagem CURTA e tranquila pro cliente, ex.: "Deixa eu confirmar isso certinho pra te passar a resposta correta e já te retorno, tá? 🙏" — sem NUNCA mencionar escalação, prioridade ou processos internos. Na dúvida entre responder e escalar, prefira RESPONDER com a orientação padrão (confianca="alta").
+QUANDO precisa_humano=true: só quando o caso exige uma decisão ou conferência que só uma pessoa da loja consegue fazer (loja pagar frete da devolução, desconto/negociação, pedido que chegou errado ou faltando item, exceção fora do padrão) ou quando faltam dados pra responder com segurança. Se a conversa mostra que a loja JÁ disse que ia verificar/retornar e o cliente está cobrando, marque precisa_humano=true — não invente uma resposta nova nem repita a promessa. Nesses casos o sistema avisa uma pessoa da equipe na hora, e o campo "resposta" deve ser UMA mensagem curta e tranquila dizendo que alguém da equipe vai olhar o caso e responder por aqui — sem prazo em minutos e sem NUNCA mencionar escalação, prioridade ou processos internos. Na dúvida entre responder e escalar, prefira RESPONDER com a orientação padrão (confianca="alta").
 
 Categorias: "produto" | "envio_prazo" | "pagamento" | "devolucao_reembolso" | "defeito" | "outro".
 
-Responda APENAS com um JSON válido, sem nenhum texto fora dele, no formato:
-{"categoria":"produto|envio_prazo|pagamento|devolucao_reembolso|defeito|outro","confianca":"alta|baixa","precisa_humano":true|false,"resposta":"..."}`;
+Responda em JSON com os campos: categoria, confianca ("alta" ou "baixa"), precisa_humano (true/false) e resposta (o texto que vai para o cliente).`;
 }
 
 type Token = { accessToken: string; shopId: string };
@@ -80,6 +82,7 @@ async function obterToken(lojaId: string): Promise<Token> {
   return { accessToken: token.access_token, shopId: String(token.shop_id) };
 }
 
+// Envia e devolve o id da mensagem criada (pra reconhecer depois que foi o robô).
 async function enviarMensagem(token: Token, toId: string, texto: string) {
   const partnerId = process.env.SHOPEE_PARTNER_ID!;
   const partnerKey = process.env.SHOPEE_PARTNER_KEY!;
@@ -114,48 +117,81 @@ async function enviarMensagem(token: Token, toId: string, texto: string) {
   if (!response.ok || data.error) {
     throw new Error(`Erro send_message: ${data?.error || "-"} | ${data?.message || "-"}`);
   }
-  return data;
+  const id = data?.response?.message_id;
+  return id ? String(id) : null;
 }
 
-type Decisao = {
-  categoria: string;
-  confianca: string;
-  precisa_humano: boolean;
-  resposta: string;
+// Só afirma o que é certo: o status gravado pode estar defasado, então envio e
+// entrega só aparecem quando há data registrada.
+const STATUS_PEDIDO: Record<string, string> = {
+  UNPAID: "aguardando pagamento",
+  CANCELLED: "cancelado",
+  IN_CANCEL: "cancelamento solicitado",
+  TO_RETURN: "em devolução/reembolso",
 };
 
-async function decidir(
-  client: Anthropic,
-  contexto: string,
-  lojaId: string,
-  system: string
-): Promise<Decisao | null> {
-  const r = await client.messages.create({
-    model: "claude-haiku-4-5",
-    // Cap baixo: resposta curta e humana (1-3 frases) + os campos do JSON.
-    max_tokens: 400,
-    // system (fixo por loja: instruções + exemplos) marcado para CACHE de prompt.
-    system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
-    messages: [{ role: "user", content: contexto }],
-  });
-  // Mede o consumo (base de cobrança por conta). Best-effort.
-  await registrarUsoIA({
-    lojaId,
-    tipo: "chat",
-    modelo: "claude-haiku-4-5",
-    usage: r.usage,
-  });
-  const bloco = r.content.find((b) => b.type === "text");
-  const txt = bloco && "text" in bloco ? bloco.text.trim() : "";
-  // Extrai o objeto JSON mesmo que venha texto em volta.
-  const inicio = txt.indexOf("{");
-  const fim = txt.lastIndexOf("}");
-  if (inicio === -1 || fim === -1) return null;
-  try {
-    return JSON.parse(txt.slice(inicio, fim + 1)) as Decisao;
-  } catch {
-    return null;
-  }
+function dataBr(iso: string | null | undefined) {
+  if (!iso) return null;
+  return new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+}
+
+type PedidoCliente = {
+  pedido_externo_id: string | null;
+  status: string | null;
+  data_pedido: string | null;
+  enviado_em: string | null;
+  entregue_em: string | null;
+  dados_pedido: {
+    ship_by_date?: number | string;
+    item_list?: {
+      item_id?: number;
+      item_name?: string;
+      model_name?: string;
+      model_quantity_purchased?: number;
+    }[];
+  } | null;
+};
+
+// Pedidos recentes do cliente nesta loja: dão ao robô o produto/pedido de que o
+// cliente fala (ele raramente diz) em vez de "deixa eu confirmar no sistema".
+async function pedidosDoCliente(lojaId: string, clienteNome: string | null) {
+  if (!clienteNome) return [] as PedidoCliente[];
+  const { data } = await supabase
+    .from("pedidos")
+    .select("pedido_externo_id, status, data_pedido, enviado_em, entregue_em, dados_pedido")
+    .eq("marketplace", "shopee")
+    .eq("loja_id", lojaId)
+    .eq("cliente_nome", clienteNome)
+    .order("data_pedido", { ascending: false })
+    .limit(3);
+  return (data || []) as PedidoCliente[];
+}
+
+function pedidosTxt(pedidos: PedidoCliente[]) {
+  if (pedidos.length === 0) return "(nenhum pedido deste cliente encontrado na loja)";
+  return pedidos
+    .map((p) => {
+      const itens = (p.dados_pedido?.item_list || [])
+        .map(
+          (i) =>
+            `${i.model_quantity_purchased ?? 1}x ${i.item_name || "item"}` +
+            (i.model_name ? ` (${i.model_name})` : "")
+        )
+        .join("; ");
+      const prazoEnvio = Number(p.dados_pedido?.ship_by_date || 0);
+      const partes = [
+        `Pedido ${p.pedido_externo_id} — feito em ${dataBr(p.data_pedido) || "?"}`,
+        itens ? `itens: ${itens}` : null,
+        STATUS_PEDIDO[p.status || ""] ? `situação: ${STATUS_PEDIDO[p.status || ""]}` : null,
+        prazoEnvio > 0
+          ? `prazo limite pra loja despachar: ${dataBr(new Date(prazoEnvio * 1000).toISOString())}`
+          : null,
+        p.enviado_em ? `enviado em ${dataBr(p.enviado_em)}` : null,
+        p.entregue_em ? `entregue em ${dataBr(p.entregue_em)}` : null,
+      ];
+      return `- ${partes.filter(Boolean).join(" | ")}`;
+    })
+    .join("\n");
 }
 
 export type PropostaChat = {
@@ -190,15 +226,19 @@ export async function responderChatsLote({
   enviar?: boolean;
   autonomo?: boolean;
 }): Promise<ResultadoChat> {
+  // Busca folgada e filtra aqui: as já tratadas (escaladas esperando você)
+  // continuam com precisa_resposta=true e, com um limite curto, ocupavam a
+  // janela inteira e escondiam as conversas novas.
   const { data: conversas } = await supabase
     .from("chat_conversas")
     .select(
-      "conversation_id, to_id, to_name, item_id, ultima_mensagem, latest_message_id, ultimo_tratado_msg_id"
+      "conversation_id, to_id, to_name, item_id, ultima_mensagem, latest_message_id, ultimo_tratado_msg_id, escalada, motivo_escala, escalada_em"
     )
+    .eq("marketplace", "shopee")
     .eq("loja_id", lojaId)
     .eq("precisa_resposta", true)
     .order("ultima_mensagem_ts", { ascending: false })
-    .limit(limite * 3);
+    .limit(200);
 
   const pendentes = (conversas || [])
     .filter(
@@ -226,7 +266,7 @@ export async function responderChatsLote({
     .not("texto", "is", null)
     .neq("texto", "")
     .order("created_timestamp", { ascending: false })
-    .limit(80);
+    .limit(150);
 
   const vistos = new Set<string>();
   const exemplosLoja: string[] = [];
@@ -238,6 +278,9 @@ export async function responderChatsLote({
     // "modelo" e o robô repetia — a Shopee bloqueia a resposta.
     if (t.length < 20 || t.length > 320 || vistos.has(t)) continue;
     if (contemContatoExterno(t)) continue;
+    // …e as promessas de retorno ("deixa eu confirmar com a equipe e já te
+    // retorno"): eram o modelo mais repetido e ninguém retornava.
+    if (contemPromessaRetorno(t)) continue;
     vistos.add(t);
     exemplosLoja.push(t);
     if (exemplosLoja.length >= 30) break;
@@ -259,25 +302,25 @@ export async function responderChatsLote({
   let erroEnvio: string | undefined;
   const propostas: PropostaChat[] = [];
 
+  // Grava o estado da conversa; falha de gravação NÃO pode passar em silêncio
+  // (a conversa continuaria pendente e o robô responderia de novo).
+  async function marcar(conversationId: string, campos: Record<string, unknown>) {
+    const { error } = await supabase
+      .from("chat_conversas")
+      .update(campos)
+      .eq("marketplace", "shopee")
+      .eq("conversation_id", conversationId);
+    if (error) erroEnvio = `gravar conversa: ${error.message}`;
+  }
+
   for (const c of pendentes) {
+    const pedidos = await pedidosDoCliente(lojaId, c.to_name);
+
     // item_id da conversa; se não houver, infere pelo pedido recente do cliente.
     let itemId: number | null = c.item_id ?? null;
-    if (!itemId && c.to_name) {
-      const { data: ped } = await supabase
-        .from("pedidos")
-        .select("dados_pedido")
-        .eq("marketplace", "shopee")
-        .eq("loja_id", lojaId)
-        .eq("cliente_nome", c.to_name)
-        .order("data_pedido", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      const itens = (
-        ped?.dados_pedido as { item_list?: { item_id?: number }[] } | null
-      )?.item_list;
-      if (Array.isArray(itens) && itens[0]?.item_id) {
-        itemId = Number(itens[0].item_id);
-      }
+    if (!itemId) {
+      const primeiro = pedidos[0]?.dados_pedido?.item_list?.[0]?.item_id;
+      if (primeiro) itemId = Number(primeiro);
     }
 
     // Produto da conversa
@@ -311,7 +354,11 @@ export async function responderChatsLote({
       if (msgs && msgs.length > 0) {
         historicoTxt = msgs
           .reverse()
-          .filter((m) => m.texto && !(m.de_loja && contemContatoExterno(m.texto)))
+          .filter(
+            (m) =>
+              m.texto &&
+              !(m.de_loja && (contemContatoExterno(m.texto) || contemPromessaRetorno(m.texto)))
+          )
           .map((m) => `${m.de_loja ? "Loja" : "Cliente"}: ${m.texto}`)
           .join("\n");
       }
@@ -323,12 +370,20 @@ export async function responderChatsLote({
       .from("chat_mensagens")
       .select("de_loja, texto, created_timestamp")
       .eq("conversation_id", c.conversation_id)
-      .not("texto", "is", null)
-      .neq("texto", "")
       .order("created_timestamp", { ascending: false })
       .limit(40);
 
-    const mensagensOrdenadas = (thread || []).slice().reverse();
+    // Mensagem do cliente sem texto = imagem/figurinha/anexo: entra marcada,
+    // pra IA saber que ele mandou algo (antes sumia do contexto).
+    const mensagensOrdenadas = (thread || [])
+      .slice()
+      .reverse()
+      .filter((m) => (m.texto || "").trim() || !m.de_loja)
+      .map((m) => ({
+        de_loja: m.de_loja,
+        anexo: !(m.texto || "").trim(),
+        texto: (m.texto || "").trim() || "[enviou imagem/anexo, sem texto]",
+      }));
     const conversaTxt =
       mensagensOrdenadas.length > 0
         ? mensagensOrdenadas
@@ -339,17 +394,13 @@ export async function responderChatsLote({
     // Pergunta = última mensagem do cliente (para exibição/notificação).
     const ultimaDoCliente = [...mensagensOrdenadas]
       .reverse()
-      .find((m) => !m.de_loja);
+      .find((m) => !m.de_loja && !m.anexo);
     const pergunta = ultimaDoCliente?.texto || c.ultima_mensagem || "";
 
     let decisao: Decisao | null = null;
-    let escalar: boolean;
     let bloqueadaPorContato = false;
-    let categoria = "outro";
-    let confianca = "baixa";
-    let resposta = "";
 
-    let temTextoCliente = mensagensOrdenadas.some((m) => !m.de_loja);
+    let temTextoCliente = mensagensOrdenadas.some((m) => !m.de_loja && !m.anexo);
     // O texto do cliente às vezes só vem no resumo da conversa (ultima_mensagem)
     // e não nas mensagens sincronizadas (ex.: foto com legenda). Usa o resumo
     // antes de tratar como anexo mudo.
@@ -359,69 +410,52 @@ export async function responderChatsLote({
       temTextoCliente = true;
     }
 
-    if (!temTextoCliente) {
-      // Cliente mandou só imagem/anexo (sem texto) -> escala para humano.
-      escalar = true;
-      categoria = "anexo";
-    } else {
+    if (temTextoCliente) {
       const contexto =
         `=== PRODUTO ===\n${produtoTxt}\n\n` +
+        `=== PEDIDOS RECENTES DESTE CLIENTE NA LOJA ===\n${pedidosTxt(pedidos)}\n\n` +
         `=== RESPOSTAS ANTERIORES DA LOJA NESTE PRODUTO ===\n${historicoTxt}\n\n` +
         `=== CONVERSA ATUAL COM ESTE CLIENTE (do início ao fim) ===\n${conversaComFallback}\n\n` +
         `Responda à(s) última(s) mensagem(ns) do cliente, considerando TODA a conversa acima.`;
+      const pedir = (ctx: string) =>
+        decidirResposta(client, { system, contexto: ctx, lojaId, marketplace: "shopee" });
 
       try {
-        decisao = await decidir(client, contexto, lojaId, system);
+        decisao = await pedir(contexto);
         // Guarda: resposta com contato fora da Shopee (WhatsApp, telefone,
         // e-mail, link) é bloqueada no envio e pode punir a loja. Pede UMA
         // reescrita; se insistir, não envia — vai pra você no Telegram.
         if (decisao?.resposta && contemContatoExterno(decisao.resposta)) {
-          decisao = await decidir(client, contexto + AVISO_CONTATO, lojaId, system);
+          decisao = await pedir(contexto + AVISO_CONTATO);
           if (decisao?.resposta && contemContatoExterno(decisao.resposta)) {
             bloqueadaPorContato = true;
             decisao = { ...decisao, precisa_humano: true, resposta: "" };
           }
         }
-      } catch {
+      } catch (e) {
         // Falha transitória da IA (sobrecarga/rate limit/rede): NÃO derruba o
         // lote inteiro nem marca a conversa. Pula esta e tenta de novo na
-        // próxima rodada — assim nenhuma mensagem fica órfã por causa de 1 erro.
+        // próxima rodada — mas REGISTRA o motivo (erro engolido esconde robô
+        // parado; o vigia avisa se a fila envelhecer).
+        erroEnvio = `IA: ${e instanceof Error ? e.message : String(e)}`.slice(0, 300);
         continue;
       }
-      escalar =
-        !decisao ||
-        decisao.precisa_humano === true ||
-        decisao.confianca === "baixa";
-      resposta = decisao?.resposta || "";
-      categoria = decisao?.categoria || "outro";
-      confianca = decisao?.confianca || "baixa";
     }
 
-    // Modo 100% autônomo: responde TUDO (nunca escala). Se a IA não gerou
-    // texto (ex.: cliente só mandou imagem), envia uma mensagem gentil
-    // pedindo mais detalhes, em vez de deixar pra você.
-    if (autonomo && !bloqueadaPorContato && !resposta.trim()) {
-      resposta =
-        "Oi! 😊 Recebi sua mensagem. Pode me contar com mais detalhes como posso te ajudar?";
-    }
-    // Anti-papagaio: se a loja JÁ mandou exatamente esse texto como última
-    // mensagem, não repete (aconteceu com o fallback genérico em série).
+    const resposta = decisao?.resposta || "";
+    const categoria = temTextoCliente ? decisao?.categoria || "outro" : "anexo";
+    const confianca = decisao?.confianca || "baixa";
+    const aguardando = estaAguardandoHumano(c);
     const ultimaDaLoja = [...mensagensOrdenadas].reverse().find((m) => m.de_loja);
-    const repetida =
-      !!resposta.trim() && (ultimaDaLoja?.texto || "").trim() === resposta.trim();
 
-    const deveResponder =
-      resposta.trim().length > 0 && (autonomo || !escalar) && !repetida;
-
-    if (repetida) {
-      // Marca tratada sem reenviar — o cliente já recebeu esse texto.
-      await supabase
-        .from("chat_conversas")
-        .update({ ultimo_tratado_msg_id: c.latest_message_id })
-        .eq("marketplace", "shopee")
-        .eq("conversation_id", c.conversation_id);
-      continue;
-    }
+    const acao = decidirAcao({
+      decisao,
+      autonomo,
+      temTextoCliente,
+      bloqueadaPorContato,
+      jaAguardandoHumano: aguardando,
+      ultimaMsgLoja: ultimaDaLoja?.texto || "",
+    });
 
     propostas.push({
       conversation_id: c.conversation_id,
@@ -429,76 +463,111 @@ export async function responderChatsLote({
       pergunta: pergunta || "(sem texto — anexo/imagem)",
       categoria,
       confianca,
-      acao: deveResponder ? "responder" : "escalar",
-      resposta,
+      acao: acao.tipo === "humano" ? "escalar" : "responder",
+      resposta: acao.tipo === "humano" ? resposta : acao.texto,
     });
 
     if (!enviar) continue; // modo revisão: não envia nem marca
 
+    const agora = new Date().toISOString();
+    const cabecalho =
+      `Loja: ${nomeLoja}\n` +
+      `Cliente: ${c.to_name || "-"}\n` +
+      `Produto: ${nomeProduto}\n` +
+      `Assunto: ${categoria} (confiança ${confianca})\n\n` +
+      `Cliente disse:\n"${pergunta || "(enviou um anexo/imagem)"}"`;
+
     try {
-      if (!deveResponder) {
-        await supabase
-          .from("chat_conversas")
-          .update({
-            ultimo_tratado_msg_id: c.latest_message_id,
-            escalada: true,
-            motivo_escala: bloqueadaPorContato
-              ? "contato_externo (IA insistiu em contato fora da Shopee)"
+      if (acao.tipo === "humano") {
+        // Cliente já foi avisado e cobrou de novo: re-avisa você, mas sem
+        // metralhar o Telegram a cada "?" dele.
+        const avisar = !aguardando || podeReavisar(c.escalada_em);
+        await marcar(c.conversation_id, {
+          ultimo_tratado_msg_id: c.latest_message_id,
+          escalada: true,
+          motivo_escala: bloqueadaPorContato
+            ? "contato_externo (IA insistiu em contato fora da Shopee)"
+            : aguardando
+              ? c.motivo_escala
               : `${categoria} / confiança ${confianca}`,
-            categoria,
-            confianca,
-            resposta_ia: resposta,
-          })
-          .eq("marketplace", "shopee").eq("conversation_id", c.conversation_id);
+          categoria,
+          confianca,
+          resposta_ia: resposta,
+          ...(avisar ? { escalada_em: agora } : {}),
+        });
 
-        // Notifica você no Telegram. Se houver sugestão, oferece aprovar com 1 toque.
-        const botoes = resposta
-          ? [
-              [
-                {
-                  text: "✅ Aprovar e enviar a sugestão",
-                  callback_data: `ap:${c.conversation_id}`,
-                },
-              ],
-              [
-                {
-                  text: "✏️ Eu respondo",
-                  callback_data: `rj:${c.conversation_id}`,
-                },
-              ],
-            ]
-          : undefined;
+        if (avisar && aguardando) {
+          await enviarTelegram(
+            `🔁 Cliente cobrando o retorno prometido\n\n${cabecalho}\n\n` +
+              `O robô já tinha avisado que alguém da equipe ia responder — ele não vai prometer de novo. Responda pelo chat da Shopee ou em Atendimento.`
+          );
+        } else if (avisar) {
+          // Se houver sugestão, oferece aprovar com 1 toque.
+          const botoes = resposta
+            ? [
+                [
+                  {
+                    text: "✅ Aprovar e enviar a sugestão",
+                    callback_data: `ap:${c.conversation_id}`,
+                  },
+                ],
+                [
+                  {
+                    text: "✏️ Eu respondo",
+                    callback_data: `rj:${c.conversation_id}`,
+                  },
+                ],
+              ]
+            : undefined;
 
-        await enviarTelegram(
-          `🔔 Chat para você responder\n\n` +
-            (bloqueadaPorContato
-              ? `⚠️ A IA insistiu em pedir contato fora da Shopee (bloqueado). Responda por aqui, pelo chat.\n\n`
-              : "") +
-            `Cliente: ${c.to_name || "-"}\n` +
-            `Produto: ${nomeProduto}\n` +
-            `Assunto: ${categoria} (confiança ${confianca})\n\n` +
-            `Cliente disse:\n"${pergunta || "(enviou um anexo/imagem)"}"\n\n` +
-            `Sugestão da IA:\n${resposta || "(sem sugestão)"}`,
-          botoes
-        );
+          await enviarTelegram(
+            `🔔 Chat para você responder\n\n` +
+              (bloqueadaPorContato
+                ? `⚠️ A IA insistiu em pedir contato fora da Shopee (bloqueado). Responda por aqui, pelo chat.\n\n`
+                : "") +
+              `${cabecalho}\n\n` +
+              `Sugestão da IA:\n${resposta || "(sem sugestão)"}`,
+            botoes
+          );
+        }
 
         escalados++;
       } else {
-        await enviarMensagem(token, String(c.to_id), resposta);
-        await supabase
-          .from("chat_conversas")
-          .update({
-            ultimo_tratado_msg_id: c.latest_message_id,
-            precisa_resposta: false,
-            ultimo_remetente: "loja",
-            escalada: false,
-            categoria,
-            confianca,
-            resposta_ia: resposta,
-            respondida_em: new Date().toISOString(),
-          })
-          .eq("marketplace", "shopee").eq("conversation_id", c.conversation_id);
+        const msgId = await enviarMensagem(token, String(c.to_id), acao.texto);
+        const base = {
+          ultimo_tratado_msg_id: c.latest_message_id,
+          precisa_resposta: false,
+          ultimo_remetente: "loja",
+          categoria,
+          confianca,
+          resposta_ia: acao.texto,
+          respondida_em: agora,
+          robo_msg_id: msgId,
+        };
         enviados++;
+
+        if (acao.tipo === "espera") {
+          // O cliente recebeu "alguém da equipe vai te responder": agora isso
+          // TEM de chegar em você (antes a promessa saía e ninguém era avisado).
+          await marcar(c.conversation_id, {
+            ...base,
+            escalada: true,
+            escalada_em: agora,
+            motivo_escala: `${PREFIXO_AGUARDANDO}: ${categoria}`,
+          });
+          await enviarTelegram(
+            `🟡 Cliente aguardando VOCÊ\n\n${cabecalho}\n\n` +
+              `O robô respondeu:\n"${acao.texto}"\n\n` +
+              `Ele não consegue resolver esse caso sozinho. Responda pelo chat da Shopee ou em Atendimento.`
+          );
+          escalados++;
+        } else {
+          // Resposta normal. Se a conversa espera um humano, continua esperando.
+          await marcar(c.conversation_id, {
+            ...base,
+            ...(aguardando ? {} : { escalada: false }),
+          });
+        }
       }
     } catch (e) {
       // falha no envio: registra o motivo (antes era engolido).
@@ -508,19 +577,18 @@ export async function responderChatsLote({
       // o mesmo texto não resolve. Marca como tratada, escala e avisa — antes
       // ficava em loop regenerando (e pagando IA) a cada rodada de 2 min.
       if (RE_ERRO_CONTEUDO.test(msg)) {
-        await supabase
-          .from("chat_conversas")
-          .update({
-            ultimo_tratado_msg_id: c.latest_message_id,
-            escalada: true,
-            motivo_escala: `bloqueado_shopee: ${msg.slice(0, 160)}`,
-            categoria,
-            confianca,
-            resposta_ia: resposta,
-          })
-          .eq("marketplace", "shopee").eq("conversation_id", c.conversation_id);
+        await marcar(c.conversation_id, {
+          ultimo_tratado_msg_id: c.latest_message_id,
+          escalada: true,
+          escalada_em: agora,
+          motivo_escala: `bloqueado_shopee: ${msg.slice(0, 160)}`,
+          categoria,
+          confianca,
+          resposta_ia: resposta,
+        });
         await enviarTelegram(
           `🚫 Shopee bloqueou a resposta do robô\n\n` +
+            `Loja: ${nomeLoja}\n` +
             `Cliente: ${c.to_name || "-"}\n` +
             `Produto: ${nomeProduto}\n` +
             `Motivo: ${msg.slice(0, 200)}\n\n` +
@@ -535,18 +603,15 @@ export async function responderChatsLote({
       // não adianta re-tentar — nem manualmente dá. Marca como tratada pra não
       // travar a fila reprocessando a mesma conversa a cada rodada.
       if (/forbidden|only message the buyer/i.test(msg)) {
-        await supabase
-          .from("chat_conversas")
-          .update({
-            ultimo_tratado_msg_id: c.latest_message_id,
-            precisa_resposta: false,
-            escalada: true,
-            motivo_escala: "fora_janela_shopee",
-            categoria,
-            confianca,
-            resposta_ia: resposta,
-          })
-          .eq("marketplace", "shopee").eq("conversation_id", c.conversation_id);
+        await marcar(c.conversation_id, {
+          ultimo_tratado_msg_id: c.latest_message_id,
+          precisa_resposta: false,
+          escalada: true,
+          motivo_escala: "fora_janela_shopee",
+          categoria,
+          confianca,
+          resposta_ia: resposta,
+        });
         foraJanela++;
       }
       // outros erros (token/rede/transitório): deixa pendente pra próxima rodada.

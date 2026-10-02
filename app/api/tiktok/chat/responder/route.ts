@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { responderChatsTikTokLote, type ResultadoChatTikTok } from "@/lib/tiktok/responderChats";
 import { flagsPorConta } from "@/lib/flags";
+import { vigiarChat } from "@/lib/chat/vigia";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -48,19 +49,34 @@ export async function GET() {
     ]);
 
     const resultados: ResultadoChatTikTok[] = [];
+    const lojasAtivas: string[] = [];
     for (const l of lojas) {
       if (!l.contaId || !ativos[l.contaId]) continue;
-      resultados.push(
-        await responderChatsTikTokLote({
-          lojaId: l.lojaId,
-          limite: 15,
-          enviar: true,
-          autonomo: !!autonomos[l.contaId],
-        })
-      );
+      lojasAtivas.push(l.lojaId);
+      try {
+        resultados.push(
+          await responderChatsTikTokLote({
+            lojaId: l.lojaId,
+            limite: 15,
+            enviar: true,
+            autonomo: !!autonomos[l.contaId],
+          })
+        );
+      } catch (e) {
+        // Uma loja com problema (token, etc.) não pode parar as outras.
+        resultados.push({
+          processados: 0,
+          enviados: 0,
+          escalados: 0,
+          propostas: [],
+          erro: `loja ${l.lojaId}: ${e instanceof Error ? e.message : String(e)}`,
+        });
+      }
     }
 
-    return NextResponse.json({ sucesso: true, ...agregar(resultados) });
+    const total = agregar(resultados);
+    const vigia = await vigiarChat("tiktok_shop", lojasAtivas, total.erro);
+    return NextResponse.json({ sucesso: true, ...total, vigia });
   } catch (error) {
     return NextResponse.json(
       { sucesso: false, erro: error instanceof Error ? error.message : "Erro robô TikTok" },

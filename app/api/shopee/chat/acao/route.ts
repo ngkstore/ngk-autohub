@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { enviarMensagemChat } from "@/lib/shopee/chatSend";
+import { enviarMensagemTikTokPorLoja } from "@/lib/tiktok/responderChats";
 
 export const dynamic = "force-dynamic";
 
+// Ações da tela de Atendimento (enviar resposta / marcar resolvido). Vale para
+// Shopee e TikTok — a tela manda o marketplace da conversa.
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const conversationId = String(body?.conversation_id || "");
     const acao = String(body?.acao || "");
     const textoCustom = typeof body?.texto === "string" ? body.texto : "";
+    const marketplace = body?.marketplace === "tiktok_shop" ? "tiktok_shop" : "shopee";
 
     if (!conversationId || !acao) {
       return NextResponse.json(
@@ -21,7 +25,7 @@ export async function POST(request: NextRequest) {
     const { data: conversa } = await supabase
       .from("chat_conversas")
       .select("to_id, loja_id, resposta_ia")
-      .eq("marketplace", "shopee").eq("conversation_id", conversationId)
+      .eq("marketplace", marketplace).eq("conversation_id", conversationId)
       .maybeSingle();
 
     if (!conversa) {
@@ -39,7 +43,11 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      await enviarMensagemChat(String(conversa.to_id), texto, String(conversa.loja_id));
+      if (marketplace === "tiktok_shop") {
+        await enviarMensagemTikTokPorLoja(String(conversa.loja_id), conversationId, texto);
+      } else {
+        await enviarMensagemChat(String(conversa.to_id), texto, String(conversa.loja_id));
+      }
       await supabase
         .from("chat_conversas")
         .update({
@@ -49,7 +57,7 @@ export async function POST(request: NextRequest) {
           resposta_ia: texto,
           respondida_em: new Date().toISOString(),
         })
-        .eq("marketplace", "shopee").eq("conversation_id", conversationId);
+        .eq("marketplace", marketplace).eq("conversation_id", conversationId);
 
       return NextResponse.json({ sucesso: true, acao: "enviar" });
     }
@@ -58,7 +66,7 @@ export async function POST(request: NextRequest) {
       await supabase
         .from("chat_conversas")
         .update({ escalada: false, precisa_resposta: false })
-        .eq("marketplace", "shopee").eq("conversation_id", conversationId);
+        .eq("marketplace", marketplace).eq("conversation_id", conversationId);
 
       return NextResponse.json({ sucesso: true, acao: "resolver" });
     }

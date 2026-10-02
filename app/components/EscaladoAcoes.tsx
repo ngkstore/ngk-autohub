@@ -4,10 +4,15 @@ import { useState } from "react";
 
 type Props = {
   conversationId: string;
+  marketplace?: string;
   sugestao: string;
 };
 
-export default function EscaladoAcoes({ conversationId, sugestao }: Props) {
+export default function EscaladoAcoes({
+  conversationId,
+  marketplace = "shopee",
+  sugestao,
+}: Props) {
   const [texto, setTexto] = useState(sugestao || "");
   const [loading, setLoading] = useState<"enviar" | "resolver" | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -19,7 +24,12 @@ export default function EscaladoAcoes({ conversationId, sugestao }: Props) {
       const r = await fetch("/api/shopee/chat/acao", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversation_id: conversationId, acao, texto }),
+        body: JSON.stringify({
+          conversation_id: conversationId,
+          marketplace,
+          acao,
+          texto,
+        }),
       });
       const d = await r.json();
       if (d.sucesso) {

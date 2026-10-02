@@ -18,6 +18,7 @@ import {
   lojasShopeeDoEscopo,
 } from "@/lib/shopee/lojas";
 import { escopoDoUsuario } from "@/lib/conta";
+import { registrarSyncOk } from "@/lib/chat/vigia";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -105,38 +106,10 @@ export async function GET() {
   try {
     await fecharEscaladasAntiquas();
     const lojas = await listarLojasShopeeAtivas();
-    const resultados = [];
 
-    for (const loja of lojas) {
-      // 1) Conversas novas (recentes + não-lidas), a partir de agora.
-      const novas = await sincronizarRecentes(loja);
-
-      // 2) Backfill do histórico (cursor por loja).
-      const { data: rows } = await supabase
-        .from("configuracoes")
-        .select("chave, valor")
-        .in("chave", [chaveTs(loja.lojaId), chaveDone(loja.lojaId)]);
-
-      const estado: Record<string, string> = {};
-      (rows || []).forEach((r) => {
-        estado[r.chave] = r.valor;
-      });
-
-      let historico = null;
-      if (estado[chaveDone(loja.lojaId)] !== "true") {
-        historico = await sincronizarChatsPagina({
-          loja,
-          direction: "older",
-          nextTimestamp: estado[chaveTs(loja.lojaId)] || "",
-        });
-        if (!historico.erro) {
-          await setConfig(chaveTs(loja.lojaId), historico.nextTimestamp);
-          if (historico.done) await setConfig(chaveDone(loja.lojaId), "true");
-        }
-      }
-
-      resultados.push({ lojaId: loja.lojaId, novas, historico });
-    }
+    // Lojas em paralelo e isoladas: em fila, a última loja esperava todas as
+    // outras (e uma loja com erro derrubava o sync das demais).
+    const resultados = await Promise.all(lojas.map(sincronizarLoja));
 
     return NextResponse.json({
       sucesso: resultados.every((r) => !r.novas.erro),
@@ -150,5 +123,51 @@ export async function GET() {
       },
       { status: 500 }
     );
+  }
+}
+
+async function sincronizarLoja(
+  loja: Parameters<typeof sincronizarChatsPagina>[0]["loja"]
+) {
+  try {
+    // 1) Conversas novas (recentes + não-lidas), a partir de agora.
+    const novas = await sincronizarRecentes(loja);
+    if (!novas.erro) await registrarSyncOk("shopee", loja.lojaId);
+
+    // 2) Backfill do histórico (cursor por loja).
+    const { data: rows } = await supabase
+      .from("configuracoes")
+      .select("chave, valor")
+      .in("chave", [chaveTs(loja.lojaId), chaveDone(loja.lojaId)]);
+
+    const estado: Record<string, string> = {};
+    (rows || []).forEach((r) => {
+      estado[r.chave] = r.valor;
+    });
+
+    let historico = null;
+    if (estado[chaveDone(loja.lojaId)] !== "true") {
+      historico = await sincronizarChatsPagina({
+        loja,
+        direction: "older",
+        nextTimestamp: estado[chaveTs(loja.lojaId)] || "",
+      });
+      if (!historico.erro) {
+        await setConfig(chaveTs(loja.lojaId), historico.nextTimestamp);
+        if (historico.done) await setConfig(chaveDone(loja.lojaId), "true");
+      }
+    }
+
+    return { lojaId: loja.lojaId, novas, historico };
+  } catch (e) {
+    return {
+      lojaId: loja.lojaId,
+      novas: {
+        conversas: 0,
+        mensagens: 0,
+        erro: e instanceof Error ? e.message : "Erro ao sincronizar chat.",
+      },
+      historico: null,
+    };
   }
 }

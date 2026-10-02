@@ -9,6 +9,7 @@ import {
 } from "@/lib/shopee/lojas";
 import { escopoDoUsuario } from "@/lib/conta";
 import { flagsPorConta } from "@/lib/flags";
+import { vigiarChat } from "@/lib/chat/vigia";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -75,19 +76,33 @@ export async function GET() {
       flagsPorConta(CHAVE_AUTONOMO),
     ]);
 
-    const resultados: ResultadoChat[] = [];
-    for (const loja of lojas) {
-      if (!loja.contaId || !ativos[loja.contaId]) continue;
-      resultados.push(
-        await responderChatsLote({
+    // Lojas em paralelo e isoladas: em fila, 5 lojas com fila cheia estouravam
+    // o tempo do cron e as últimas ficavam sem resposta; e uma loja com
+    // problema (token, etc.) não pode parar as outras.
+    const ligadas = lojas.filter((l) => l.contaId && ativos[l.contaId]);
+    const resultados: ResultadoChat[] = await Promise.all(
+      ligadas.map((loja) =>
+        responderChatsLote({
           lojaId: loja.lojaId,
           limite: 15,
           enviar: true,
-          autonomo: !!autonomos[loja.contaId],
-        })
-      );
-    }
-    return NextResponse.json({ sucesso: true, ...agregar(resultados) });
+          autonomo: !!autonomos[loja.contaId!],
+        }).catch((e) => ({
+          processados: 0,
+          enviados: 0,
+          escalados: 0,
+          propostas: [],
+          erro: `loja ${loja.lojaId}: ${e instanceof Error ? e.message : String(e)}`,
+        }))
+      )
+    );
+    const total = agregar(resultados);
+    const vigia = await vigiarChat(
+      "shopee",
+      ligadas.map((l) => l.lojaId),
+      total.erro
+    );
+    return NextResponse.json({ sucesso: true, ...total, vigia });
   } catch (error) {
     return NextResponse.json(
       {
