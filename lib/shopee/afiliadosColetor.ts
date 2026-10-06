@@ -197,6 +197,16 @@ export async function coletarAfiliados(
         commission_rate?: number; max_commission_rate_current_day?: number;
         period_start_time?: number; period_end_time?: number;
       }>(tok, "get_open_campaign_added_product", "", 50);
+      // O mesmo item pode vir em mais de uma campanha (ex.: uma encerrando e a
+      // nova); fica a "Ongoing" (ou a última listada).
+      const porItem = new Map<number, (typeof itens)[number]>();
+      for (const i of itens) {
+        const atual = porItem.get(i.item_id);
+        if (!atual || atual.campaign_status !== "Ongoing" || i.campaign_status === "Ongoing") {
+          porItem.set(i.item_id, i);
+        }
+      }
+      itens.splice(0, itens.length, ...porItem.values());
       if (itens.length > 0) {
         const { error } = await supabase.from("afiliados_item_taxa").upsert(
           itens.map((i) => ({
