@@ -109,6 +109,10 @@
       "schedule": "25 4 * * *"
     },
     {
+      "path": "/api/shopee/ams/coletar?dias=4",
+      "schedule": "50 6 * * *"
+    },
+    {
       "path": "/api/tiktok/financeiro/sincronizar",
       "schedule": "25 * * * *"
     },
