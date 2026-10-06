@@ -30,7 +30,7 @@ const RE_ERRO_CONTEUDO =
 function montarSystem(nomeLoja: string) {
   return `Você é o atendimento da ${nomeLoja} no chat da Shopee, em português do Brasil. Fale como um vendedor humano de verdade: simpático, direto e prestativo.
 
-Você recebe os dados do produto, os pedidos recentes do cliente, exemplos de respostas antigas da loja e a conversa atual completa. O cliente costuma dividir a dúvida em várias mensagens — leia tudo e responda a última dúvida dele. Linhas entre colchetes ("[anexo sem texto…]") são anexos que você não enxerga: não comente o anexo nem diga que não conseguiu abrir; se a dúvida não estiver clara pelo texto, só pergunte como pode ajudar. "Conversar com Vendedor" é o botão do app que abre o chat — trate como um "oi".
+Você recebe os dados do produto, os pedidos recentes do cliente, exemplos de respostas antigas da loja e a conversa atual completa. O cliente costuma dividir a dúvida em várias mensagens — leia tudo e responda a última dúvida dele. Imagens, figurinhas e cartões que o cliente envia não aparecem para você — responda só pelo texto, sem mencionar anexos; se a dúvida não estiver clara, pergunte como pode ajudar. "Conversar com Vendedor" é o botão do app que abre o chat — trate como um "oi".
 
 COMO ESCREVER (muito importante):
 - Curto e natural: normalmente 1 a 3 frases. Uma pessoa real não escreve textão.
@@ -44,10 +44,18 @@ O QUE VOCÊ RESOLVE (responda, não escale):
 - Pagamento: tratado no próprio app da Shopee (Eu > Central de Ajuda). Oriente com gentileza.
 - Devolução/Reembolso: o cliente abre pelo app (Eu > Minhas Compras > o pedido > "Devolução/Reembolso") e a loja apoia. Seja acolhedor e explique o passo a passo de forma curta.
 
-PEDIDOS DO CLIENTE:
-- Você recebe os pedidos recentes deste cliente na loja (número, data, itens, prazo limite de envio e, quando constar, data de envio/entrega). Use para saber de qual produto/pedido ele está falando e para responder sobre prazo de envio.
-- Se NÃO constar envio ou entrega, não afirme que o pedido ainda não saiu: diga que o andamento em tempo real aparece no acompanhamento do pedido no app da Shopee.
-- A lista pode estar incompleta (só os mais recentes). Se o cliente citar um pedido que não está nela, NUNCA diga que ele "não aparece no sistema" ou que não existe — trate o pedido como válido.
+PEDIDOS DO CLIENTE (consultados AGORA na Shopee):
+- Você recebe os pedidos recentes deste cliente com a situação atual, prazo limite de envio, transportadora e os últimos eventos do rastreio. Use isso para responder "cadê meu pedido", "já foi enviado?", "quando chega?" de forma CONCRETA: diga a situação e o último evento do rastreio com a data. Isso resolve — não marque precisa_humano por causa de status de pedido.
+- Se a situação é "em preparação" e o prazo limite de envio ainda não passou, diga que está dentro do prazo e quando vence. Se passou, peça desculpa, diga que a loja vai despachar e oriente a acompanhar pelo app.
+- Se a linha do pedido NÃO trouxer "situação AGORA", não afirme envio nem entrega: diga que o andamento aparece no acompanhamento do pedido no app da Shopee.
+- A lista pode estar incompleta (só os mais recentes). Se o cliente citar um pedido que não está nela, NUNCA diga que ele "não aparece no sistema" ou que não existe — trate o pedido como válido e oriente pelo app.
+
+PROBLEMA COM O PRODUTO (defeito, veio errado, faltando item, quebrado, não funciona, não chegou mesmo constando entregue):
+- A solução é SEMPRE a mesma e resolve: abrir Devolução/Reembolso pelo app (Eu > Minhas Compras > o pedido > "Devolução/Reembolso"), escolher o motivo e anexar fotos; a Shopee analisa e a loja aprova por lá. Explique o passo a passo com acolhimento. Isso NÃO precisa de humano: precisa_humano=false, confianca="alta".
+- Só marque precisa_humano=true se o cliente JÁ abriu a solicitação e pede algo fora desse fluxo (loja pagar frete de devolução, troca direta sem devolver, desconto, reenvio).
+
+DÚVIDA DE PRODUTO SEM A INFORMAÇÃO NOS DADOS:
+- Se a descrição e os exemplos não trazem o detalhe (medida exata, material, voltagem, compatibilidade), diga com honestidade que esse detalhe não consta no anúncio e aponte onde o cliente consegue ver o que existe (fotos, variações, descrição). Isso NÃO precisa de humano: precisa_humano=false. Nunca invente o dado.
 
 ${REGRA_SEM_PROMESSA}
 
@@ -124,19 +132,33 @@ async function enviarMensagem(token: Token, toId: string, texto: string) {
   return id ? String(id) : null;
 }
 
-// Só afirma o que é certo: o status gravado pode estar defasado, então envio e
-// entrega só aparecem quando há data registrada.
+// Status do pedido em linguagem de cliente.
 const STATUS_PEDIDO: Record<string, string> = {
   UNPAID: "aguardando pagamento",
+  READY_TO_SHIP: "pago, em preparação para envio",
+  PROCESSED: "em preparação, aguardando a coleta da transportadora",
+  RETRY_SHIP: "nova tentativa de envio",
+  SHIPPED: "enviado, em transporte",
+  TO_CONFIRM_RECEIVE: "entregue, aguardando confirmação do cliente",
+  COMPLETED: "concluído (entregue)",
   CANCELLED: "cancelado",
   IN_CANCEL: "cancelamento solicitado",
   TO_RETURN: "em devolução/reembolso",
+  INVOICE_PENDING: "aguardando nota fiscal",
 };
 
 function dataBr(iso: string | null | undefined) {
   if (!iso) return null;
   return new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
 }
+const dataHoraBr = (seg: number) =>
+  new Date(seg * 1000).toLocaleString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
 type PedidoCliente = {
   pedido_externo_id: string | null;
@@ -153,11 +175,35 @@ type PedidoCliente = {
       model_quantity_purchased?: number;
     }[];
   } | null;
+  // preenchidos ao vivo pela Shopee
+  statusVivo?: string;
+  prazoEnvioVivo?: number;
+  transportadora?: string;
+  rastreio?: string[];
 };
 
-// Pedidos recentes do cliente nesta loja: dão ao robô o produto/pedido de que o
-// cliente fala (ele raramente diz) em vez de "deixa eu confirmar no sistema".
-async function pedidosDoCliente(lojaId: string, clienteNome: string | null) {
+// GET assinado na API da Shopee com o token da loja.
+async function chamarShopee(token: Token, path: string, extra: string) {
+  const partnerId = process.env.SHOPEE_PARTNER_ID!;
+  const partnerKey = process.env.SHOPEE_PARTNER_KEY!;
+  const baseUrl = process.env.SHOPEE_API_BASE_URL || BASE_URL_PADRAO;
+  const ts = Math.floor(Date.now() / 1000);
+  const sign = crypto
+    .createHmac("sha256", partnerKey)
+    .update(`${partnerId}${path}${ts}${token.accessToken}${token.shopId}`)
+    .digest("hex");
+  const url =
+    `${baseUrl}${path}?partner_id=${partnerId}&timestamp=${ts}` +
+    `&access_token=${encodeURIComponent(token.accessToken)}&shop_id=${token.shopId}&sign=${sign}${extra}`;
+  const r = await fetch(url, { cache: "no-store" });
+  return r.json().catch(() => null);
+}
+
+// Pedidos recentes do cliente nesta loja, com status e rastreio consultados
+// AGORA na Shopee: é o que permite responder "cadê meu pedido" de verdade em
+// vez de "deixa eu confirmar no sistema". Best-effort: se a consulta ao vivo
+// falhar, fica o que está no banco (sem afirmar envio/entrega).
+async function pedidosDoCliente(token: Token, lojaId: string, clienteNome: string | null) {
   if (!clienteNome) return [] as PedidoCliente[];
   const { data } = await supabase
     .from("pedidos")
@@ -165,13 +211,57 @@ async function pedidosDoCliente(lojaId: string, clienteNome: string | null) {
     .eq("marketplace", "shopee")
     .eq("loja_id", lojaId)
     .eq("cliente_nome", clienteNome)
+    .gte("data_pedido", new Date(Date.now() - 90 * 864e5).toISOString())
     .order("data_pedido", { ascending: false })
     .limit(3);
-  return (data || []) as PedidoCliente[];
+  const pedidos = (data || []) as PedidoCliente[];
+  const sns = pedidos.map((p) => p.pedido_externo_id).filter(Boolean) as string[];
+  if (sns.length === 0) return pedidos;
+
+  try {
+    const det = await chamarShopee(
+      token,
+      "/api/v2/order/get_order_detail",
+      `&order_sn_list=${sns.join(",")}&response_optional_fields=order_status,ship_by_date,package_list,item_list`
+    );
+    const lista: {
+      order_sn: string;
+      order_status?: string;
+      ship_by_date?: number;
+      package_list?: { shipping_carrier?: string }[];
+    }[] = det?.response?.order_list || [];
+    for (const o of lista) {
+      const p = pedidos.find((x) => x.pedido_externo_id === o.order_sn);
+      if (!p) continue;
+      p.statusVivo = o.order_status;
+      p.prazoEnvioVivo = o.ship_by_date;
+      p.transportadora = o.package_list?.[0]?.shipping_carrier;
+    }
+    // Rastreio só dos que já saíram (até 2, pra não estourar o tempo).
+    const enviados = pedidos
+      .filter((p) => ["SHIPPED", "TO_CONFIRM_RECEIVE", "COMPLETED", "RETRY_SHIP"].includes(p.statusVivo || ""))
+      .slice(0, 2);
+    for (const p of enviados) {
+      const r = await chamarShopee(
+        token,
+        "/api/v2/logistics/get_tracking_info",
+        `&order_sn=${p.pedido_externo_id}`
+      );
+      const eventos: { update_time?: number; description?: string }[] = r?.response?.tracking_info || [];
+      // A Shopee devolve do mais recente pro mais antigo.
+      p.rastreio = eventos
+        .slice(0, 4)
+        .map((e) => `${e.update_time ? dataHoraBr(e.update_time) : "?"}: ${(e.description || "").trim()}`)
+        .filter((t) => t.length > 3);
+    }
+  } catch {
+    // fica o que o banco tem
+  }
+  return pedidos;
 }
 
 function pedidosTxt(pedidos: PedidoCliente[]) {
-  if (pedidos.length === 0) return "(nenhum pedido deste cliente encontrado na loja)";
+  if (pedidos.length === 0) return "(nenhum pedido deste cliente encontrado na loja nos últimos 90 dias)";
   return pedidos
     .map((p) => {
       const itens = (p.dados_pedido?.item_list || [])
@@ -181,18 +271,28 @@ function pedidosTxt(pedidos: PedidoCliente[]) {
             (i.model_name ? ` (${i.model_name})` : "")
         )
         .join("; ");
-      const prazoEnvio = Number(p.dados_pedido?.ship_by_date || 0);
+      const status = p.statusVivo || null;
+      const prazoEnvio = Number(p.prazoEnvioVivo || p.dados_pedido?.ship_by_date || 0);
       const partes = [
         `Pedido ${p.pedido_externo_id} — feito em ${dataBr(p.data_pedido) || "?"}`,
         itens ? `itens: ${itens}` : null,
-        STATUS_PEDIDO[p.status || ""] ? `situação: ${STATUS_PEDIDO[p.status || ""]}` : null,
-        prazoEnvio > 0
+        status
+          ? `situação AGORA na Shopee: ${STATUS_PEDIDO[status] || status}`
+          : STATUS_PEDIDO[p.status || ""] && ["CANCELLED", "UNPAID", "IN_CANCEL", "TO_RETURN"].includes(p.status || "")
+            ? `situação: ${STATUS_PEDIDO[p.status || ""]}`
+            : null,
+        prazoEnvio > 0 && !["SHIPPED", "TO_CONFIRM_RECEIVE", "COMPLETED", "CANCELLED"].includes(status || "")
           ? `prazo limite pra loja despachar: ${dataBr(new Date(prazoEnvio * 1000).toISOString())}`
           : null,
-        p.enviado_em ? `enviado em ${dataBr(p.enviado_em)}` : null,
-        p.entregue_em ? `entregue em ${dataBr(p.entregue_em)}` : null,
+        p.transportadora ? `transportadora: ${p.transportadora}` : null,
+        !status && p.enviado_em ? `enviado em ${dataBr(p.enviado_em)}` : null,
+        !status && p.entregue_em ? `entregue em ${dataBr(p.entregue_em)}` : null,
       ];
-      return `- ${partes.filter(Boolean).join(" | ")}`;
+      const linha = `- ${partes.filter(Boolean).join(" | ")}`;
+      const rastreio = p.rastreio && p.rastreio.length > 0
+        ? `\n  rastreio (do mais recente ao mais antigo):\n` + p.rastreio.map((r) => `    • ${r}`).join("\n")
+        : "";
+      return linha + rastreio;
     })
     .join("\n");
 }
@@ -317,7 +417,7 @@ export async function responderChatsLote({
   }
 
   for (const c of pendentes) {
-    const pedidos = await pedidosDoCliente(lojaId, c.to_name);
+    const pedidos = await pedidosDoCliente(token, lojaId, c.to_name);
 
     // item_id da conversa; se não houver, infere pelo pedido recente do cliente.
     let itemId: number | null = c.item_id ?? null;
@@ -381,18 +481,18 @@ export async function responderChatsLote({
       .order("created_timestamp", { ascending: false })
       .limit(40);
 
-    // Mensagem do cliente sem texto = imagem/figurinha/anexo: entra marcada,
-    // pra IA saber que ele mandou algo (antes sumia do contexto).
+    // Só mensagens com texto. Anexos (imagem/figurinha/cartão) ficam de fora
+    // do contexto: quando entravam marcados, a IA respondia "vi que você mandou
+    // uma imagem, mas não consigo abrir" em 81 respostas em 4 dias. Cliente que
+    // só mandou anexo cai no caminho "sem texto" (pede detalhes).
     const mensagensOrdenadas = (thread || [])
       .slice()
       .reverse()
-      .filter((m) => (m.texto || "").trim() || !m.de_loja)
+      .filter((m) => (m.texto || "").trim())
       .map((m) => ({
         de_loja: m.de_loja,
-        anexo: !(m.texto || "").trim(),
-        texto:
-          (m.texto || "").trim() ||
-          "[anexo sem texto: imagem, figurinha ou cartão de produto/pedido]",
+        anexo: false,
+        texto: (m.texto || "").trim(),
       }));
     const conversaTxt =
       mensagensOrdenadas.length > 0
