@@ -51,16 +51,22 @@ function conferir(r: Record<string, unknown>, ep: string) {
 }
 
 // Percorre todas as páginas de um endpoint de lista (teto de segurança).
-async function paginar<T>(tok: TokenAms, ep: string, q: string, maxPaginas: number): Promise<T[]> {
+async function paginar<T>(
+  tok: TokenAms,
+  ep: string,
+  q: string,
+  maxPaginas: number,
+  tamanho = PAGINA
+): Promise<T[]> {
   const saida: T[] = [];
   for (let p = 1; p <= maxPaginas; p++) {
     const r = conferir(
-      await chamarAms(`/api/v2/ams/${ep}`, tok, `${q}&page_no=${p}&page_size=${PAGINA}`),
+      await chamarAms(`/api/v2/ams/${ep}`, tok, `${q}&page_no=${p}&page_size=${tamanho}`),
       ep
     );
     const lista = (r.list || r.item_list || []) as T[];
     saida.push(...lista);
-    if (!r.has_more || lista.length < PAGINA) break;
+    if (!r.has_more || lista.length < tamanho) break;
   }
   return saida;
 }
@@ -196,7 +202,7 @@ export async function coletarAfiliados(
         item_id: number; item_name?: string; campaign_id?: number; campaign_status?: string;
         commission_rate?: number; max_commission_rate_current_day?: number;
         period_start_time?: number; period_end_time?: number;
-      }>(tok, "get_open_campaign_added_product", "", 50);
+      }>(tok, "get_open_campaign_added_product", "", 50, 100); // este aceita 100 (e nao sinaliza has_more direito)
       // O mesmo item pode vir em mais de uma campanha (ex.: uma encerrando e a
       // nova); fica a "Ongoing" (ou a última listada).
       const porItem = new Map<number, (typeof itens)[number]>();
