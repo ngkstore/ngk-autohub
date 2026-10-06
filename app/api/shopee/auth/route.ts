@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { supabase } from "@/lib/supabase";
 import { escopoDoUsuario } from "@/lib/conta";
+import { urlAutorizacaoAms } from "@/lib/shopee/ams";
 
 const CHAVE_LOJA_PENDENTE = "oauth_loja_pendente";
 const CHAVE_CONTA_PENDENTE = "oauth_conta_pendente";
@@ -43,6 +44,22 @@ export async function GET(request: NextRequest) {
     // Qual loja estamos conectando? Vem de /api/shopee/auth?loja=<id>.
     // Repassamos no redirect para o callback amarrar o token à loja certa.
     const lojaId = request.nextUrl.searchParams.get("loja");
+
+    // ?app=afiliados: autoriza o SEGUNDO app (só módulo de Afiliados) numa loja
+    // já cadastrada. O callback recebe ?app=afiliados&loja=<id> e guarda o
+    // token em shopee_ams_tokens, sem tocar no token principal.
+    if (request.nextUrl.searchParams.get("app") === "afiliados") {
+      if (!lojaId || !redirectUrl) {
+        return NextResponse.json(
+          { sucesso: false, erro: "Informe a loja (?loja=) para conectar o app de afiliados." },
+          { status: 400 }
+        );
+      }
+      const u = new URL(redirectUrl);
+      u.searchParams.set("app", "afiliados");
+      u.searchParams.set("loja", lojaId);
+      return NextResponse.redirect(urlAutorizacaoAms(u.toString()));
+    }
 
     if (!partnerId || !partnerKey || !redirectUrl) {
       return NextResponse.json(

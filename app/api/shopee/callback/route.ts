@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { supabase } from "@/lib/supabase";
+import { conectarAms } from "@/lib/shopee/ams";
 
 function gerarAssinatura(
   partnerId: string,
@@ -35,6 +36,45 @@ export async function GET(request: NextRequest) {
         },
         { status: 400 }
       );
+    }
+
+    // App de afiliados (2º app): troca o code com as credenciais dele e guarda
+    // em shopee_ams_tokens. Exige a loja (?loja=) ou o shop_id já cadastrado.
+    if (searchParams.get("app") === "afiliados") {
+      let lojaAms = searchParams.get("loja") || null;
+      if (!lojaAms) {
+        const { data } = await supabase
+          .from("lojas")
+          .select("id")
+          .eq("shop_id", String(shopId))
+          .maybeSingle();
+        lojaAms = data?.id ?? null;
+      }
+      if (!lojaAms) {
+        return NextResponse.json(
+          { sucesso: false, erro: "Loja não identificada para o app de afiliados. Conecte pelo botão Afiliados em Integrações." },
+          { status: 404 }
+        );
+      }
+      try {
+        await conectarAms(lojaAms, String(shopId), code);
+      } catch (e) {
+        return NextResponse.json(
+          { sucesso: false, erro: e instanceof Error ? e.message : "Erro ao conectar app de afiliados." },
+          { status: 500 }
+        );
+      }
+      await supabase.from("sincronizacoes").insert({
+        loja_id: lojaAms,
+        marketplace: "shopee",
+        tipo: "oauth_afiliados",
+        status: "sucesso",
+        registros_importados: 1,
+        mensagem: `App de Afiliados autorizado. Shop ID: ${shopId}.`,
+        iniciado_em: new Date().toISOString(),
+        finalizado_em: new Date().toISOString(),
+      });
+      return NextResponse.redirect(new URL("/integracoes?afiliados=conectado", request.url));
     }
 
     const partnerId = process.env.SHOPEE_PARTNER_ID;

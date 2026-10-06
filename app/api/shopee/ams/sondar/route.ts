@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { escopoDoUsuario } from "@/lib/conta";
-import { obterToken, chamar } from "@/lib/shopee/adsColetor";
+import { obterTokenAms as obterToken, chamarAms as chamar } from "@/lib/shopee/ams";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -36,8 +36,9 @@ export async function GET(request: NextRequest) {
   }
   const sp = request.nextUrl.searchParams;
   const loja = sp.get("loja") || "";
+  // Token do app de AFILIADOS (2º app), não o principal.
   const tok = await obterToken(loja);
-  if (!tok) return NextResponse.json({ sucesso: false, erro: "loja sem token ativo" });
+  if (!tok) return NextResponse.json({ sucesso: false, erro: "loja sem o app de afiliados conectado (Integrações > Afiliados)" });
 
   const ep = sp.get("ep");
   if (ep) {

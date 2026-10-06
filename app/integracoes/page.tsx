@@ -48,10 +48,15 @@ export default async function IntegracoesPage() {
   let tokensQuery = supabase.from("marketplace_tokens").select("*");
   if (!escopo.preSetup) tokensQuery = tokensQuery.in("loja_id", lojaIds);
 
-  const [{ data: sincronizacoes }, { data: tokens }] = await Promise.all([
-    sincQuery,
-    tokensQuery,
-  ]);
+  // Token do 2º app da Shopee (só Afiliados), por loja.
+  let amsQuery = supabase.from("shopee_ams_tokens").select("loja_id, status");
+  if (!escopo.preSetup) amsQuery = amsQuery.in("loja_id", lojaIds);
+
+  const [{ data: sincronizacoes }, { data: tokens }, { data: amsTokens }] =
+    await Promise.all([sincQuery, tokensQuery, amsQuery]);
+  const afiliadosPorLoja = new Map(
+    (amsTokens || []).map((t) => [t.loja_id as string, t.status as string])
+  );
 
   return (
     <div className="p-8 text-white">
@@ -104,6 +109,7 @@ export default async function IntegracoesPage() {
 
                 const conectado =
                   !!token?.access_token;
+                const afiliados = afiliadosPorLoja.get(loja.id);
 
                 return (
                   <div
@@ -156,6 +162,26 @@ export default async function IntegracoesPage() {
                           {conectado
                             ? "Reconectar"
                             : "Conectar"}
+                        </Link>
+                      )}
+
+                      {marketplaceNormalizado === "shopee" && (
+                        <Link
+                          href={`/api/shopee/auth?app=afiliados&loja=${loja.id}`}
+                          title="Autoriza o 2º app da Shopee (módulo Programa de Afiliados)"
+                          className={`rounded-lg px-4 py-2 text-sm font-semibold ring-1 ${
+                            afiliados === "ativo"
+                              ? "bg-slate-900 text-green-300 ring-green-800 hover:bg-slate-800"
+                              : afiliados
+                                ? "bg-slate-900 text-red-300 ring-red-800 hover:bg-slate-800"
+                                : "bg-slate-900 text-white ring-slate-600 hover:bg-slate-800"
+                          }`}
+                        >
+                          {afiliados === "ativo"
+                            ? "Afiliados: conectado"
+                            : afiliados
+                              ? "Afiliados: reconectar"
+                              : "Conectar Afiliados"}
                         </Link>
                       )}
 
