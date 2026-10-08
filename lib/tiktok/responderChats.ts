@@ -56,7 +56,9 @@ CONTATO FORA DO TIKTOK SHOP — regra crítica:
 - NUNCA peça nem ofereça WhatsApp, telefone, celular, e-mail, Instagram, Telegram, link ou qualquer contato fora do TikTok Shop.
 - Todo o atendimento acontece aqui, pelo chat. Se o cliente pedir contato externo, responda com gentileza que a loja atende só por aqui e resolva a dúvida por aqui.
 
-QUANDO precisa_humano=true (raro): só quando o cliente pede algo que SÓ a loja decide e que não existe no fluxo do app — enviar uma peça avulsa sem devolver, desconto, reenvio por conta da loja, personalização do produto — ou assunto comercial (parceria, criador, atacado). Problema de pedido, pagamento, reembolso, defeito ou item faltando NÃO é caso de humano: é orientação pelo TikTok Shop (acima). Se a conversa mostra que a loja JÁ disse que ia verificar/retornar e o cliente está cobrando, dê a orientação pelo TikTok Shop em vez de repetir a promessa. Nesses casos o sistema avisa uma pessoa da equipe na hora, e o campo "resposta" deve ser UMA mensagem curta e tranquila que (1) quando existir, diga o que o cliente JÁ pode fazer agora pelo app do TikTok Shop (ex.: abrir a devolução/reembolso do pedido) e (2) diga que alguém da equipe vai olhar o caso e responder por aqui — sem prazo em minutos e sem mencionar processos internos. O campo "resposta" NUNCA fica vazio: todo cliente recebe uma resposta.
+PARCERIA / CRIADOR / AFILIADO (proposta de divulgar, fazer vídeo ou live, amostra, comissão): não é assunto deste chat. Responda com simpatia que parcerias são tratadas pelo canal de afiliados do TikTok Shop: no app, Centro de Criadores > Afiliado, achar a nossa loja, adicionar os produtos à vitrine pelo plano aberto ou mandar a proposta pelo chat de afiliados de lá. precisa_humano=false. Nunca prometa que "a equipe vai analisar a proposta" por aqui.
+
+QUANDO precisa_humano=true (raro): só quando o cliente pede algo que SÓ a loja decide e que não existe no fluxo do app — enviar uma peça avulsa sem devolver, desconto, reenvio por conta da loja, personalização do produto. Problema de pedido, pagamento, reembolso, defeito ou item faltando NÃO é caso de humano: é orientação pelo TikTok Shop (acima). Se a conversa mostra que a loja JÁ disse que ia verificar/retornar e o cliente está cobrando, dê a orientação pelo TikTok Shop em vez de repetir a promessa. Nesses casos o sistema avisa uma pessoa da equipe na hora, e o campo "resposta" deve ser UMA mensagem curta e tranquila que (1) quando existir, diga o que o cliente JÁ pode fazer agora pelo app do TikTok Shop (ex.: abrir a devolução/reembolso do pedido) e (2) diga que alguém da equipe vai olhar o caso e responder por aqui — sem prazo em minutos e sem mencionar processos internos. O campo "resposta" NUNCA fica vazio: todo cliente recebe uma resposta.
 
 Categorias: "produto" | "envio_prazo" | "pagamento" | "devolucao_reembolso" | "defeito" | "outro".
 
@@ -640,6 +642,15 @@ const ORIENTACAO_TIKTOK: Record<string, string[]> = {
   ],
 };
 
+// Criador/afiliado pedindo parceria, amostra, live ou "quero divulgar": o
+// canal é o de afiliados do TikTok Shop, não o chat de compradores.
+const RE_PARCERIA =
+  /parceri|afiliad|criador|criadora|influenc|divulg|fazer (v[ií]deos|lives?)|amostra|oferta de live|comiss[aã]o|vitrine|trabalh(o|ar) com|impulsion/i;
+const ORIENTACAO_PARCERIA = [
+  "Que bom que você quer divulgar nossos produtos! Parcerias com criadores são tratadas pelo canal de afiliados do TikTok Shop, não por este chat. No app, entre no Centro de Criadores (TikTok Shop para criadores) > Afiliado, procure a nossa loja e adicione os produtos à sua vitrine pelo plano aberto — ou mande a proposta pelo chat de afiliados de lá, que é por onde a equipe de parcerias responde 🙏",
+  "Obrigado pelo interesse em trabalhar com a gente! Esse assunto é tratado no canal de afiliados do TikTok Shop: no Centro de Criadores > Afiliado você encontra a nossa loja, adiciona os produtos à sua vitrine e fala com a equipe de parcerias pelo chat de afiliados. Por aqui é só o atendimento de pedidos 🙏",
+];
+
 export type ResultadoChatTikTok = {
   processados: number;
   enviados: number;
@@ -804,7 +815,8 @@ export async function responderChatsTikTokLote({
     });
     // A IA quis chamar gente num assunto que é do TikTok Shop: vai a
     // orientação do app (resolve) em vez da promessa.
-    const orientacoes = ORIENTACAO_TIKTOK[categoria];
+    const ehParceria = RE_PARCERIA.test(pergunta) || RE_PARCERIA.test(conversaTxt.slice(-600));
+    const orientacoes = ehParceria ? ORIENTACAO_PARCERIA : ORIENTACAO_TIKTOK[categoria];
     if (autonomo && acao.tipo === "espera" && orientacoes && !bloqueadaPorContato && temTextoCliente) {
       const ultima = (ultimaDaLoja?.texto || "").trim();
       const texto = orientacoes.find((o) => o !== ultima) ?? orientacoes[0];
