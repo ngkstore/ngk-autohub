@@ -266,7 +266,11 @@ const ehTransferencia = (m: Pick<MsgTikTok, "type" | "content">) =>
 // Avisos automáticos do TikTok que NÃO respondem dúvida nenhuma (menu de boas-
 // vindas, confirmação de endereço, "enviamos seu pedido"…).
 const RE_AVISO_TIKTOK =
-  /^(agradecemos por entrar em contato|agradecemos por confirmar|agradecemos pelo seu pedido|thank you for|enviamos seu pedido|seu pacote est[aá] pronto|obrigado por ter(es)? (partilhado|compartilhado)|prezado\(a\))/i;
+  /^(agradecemos por entrar em contato|agradecemos por confirmar|agradecemos pelo seu pedido|thank you for|enviamos seu pedido|seu pacote est[aá] pronto|obrigado por ter(es)? (partilhado|compartilhado)|prezado\(a\)|obrigado por seu interesse em trabalhar|ol[aá], obrigado pelo seu interesse em nosso produto|consulte (as nossas|nossa) p[aá]gina|voc[eê] pode consultar nossa p[aá]gina|¡gracias por)/i;
+
+// Resposta de IA do TikTok leva 8-20 s; o que chega em menos de 5 s é FAQ
+// enlatada (deflexão), não resposta.
+const MIN_SEG_RESPOSTA_IA = 5;
 
 // A última mensagem da conversa quase sempre é do robô do PRÓPRIO TikTok
 // (role ROBOT). Decidir por "quem falou por último" fazia o sync achar que a
@@ -329,12 +333,25 @@ export function analisarConversa(msgsBrutas: MsgTikTok[]) {
       m.sender?.role === "ROBOT" &&
       m.type === "TEXT" &&
       m.create_time - cliente.create_time <= 180 &&
-      (soCartao || !RE_AVISO_TIKTOK.test(textoDaMensagem(m).trim()))
+      (soCartao ||
+        (m.create_time - cliente.create_time >= MIN_SEG_RESPOSTA_IA &&
+          !RE_AVISO_TIKTOK.test(textoDaMensagem(m).trim())))
   );
+  // Cliente insistindo: 3+ mensagens dele desde a última fala da loja, e só o
+  // assistente do TikTok respondendo (repete a mesma coisa). A loja entra.
+  let idxLoja = -1;
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    if (ehDaLoja(msgs[i])) {
+      idxLoja = i;
+      break;
+    }
+  }
+  const insistindo =
+    msgs.slice(idxLoja + 1).filter((m) => m.sender?.role === "BUYER" && m.type === "TEXT").length >= 3;
   const recente = agoraSeg - cliente.create_time <= JANELA;
   return {
     msgs,
-    aguardando: recente && !lojaRespondeu && !assistenteRespondeu,
+    aguardando: recente && !lojaRespondeu && (!assistenteRespondeu || insistindo),
     pediuHumano: false,
     cliente,
   };

@@ -103,5 +103,27 @@ export async function vigiarChat(mkt: Marketplace, lojaIds: string[], erroDaRoda
     );
   }
 
-  return { filaParada, syncParado: paradas.length };
+  // 3) Lembrete diário do que espera uma PESSOA: o robô já respondeu e marcou
+  //    o caso, mas ninguém resolveu. Sem isso o caso só existe no Telegram do
+  //    momento e some (eram 240 na fila sem ninguém saber).
+  const { count: esperandoHumano } = await supabase
+    .from("chat_conversas")
+    .select("conversation_id", { count: "exact", head: true })
+    .eq("marketplace", mkt)
+    .in("loja_id", lojaIds)
+    .eq("escalada", true)
+    .lt("escalada_em", new Date(agora - 24 * 3600_000).toISOString());
+  if ((esperandoHumano ?? 0) > 0) {
+    const chave = `chat_alerta:${mkt}:humano`;
+    const ultimo = await lerConfig(chave);
+    if (!ultimo || agora - new Date(ultimo).getTime() > 24 * 3600_000) {
+      await gravarConfig(chave, new Date().toISOString());
+      await enviarTelegram(
+        `📋 ${NOME[mkt]}: ${esperandoHumano} conversa(s) esperam uma pessoa há mais de 24h.\n` +
+          `O robô já respondeu e avisou o cliente que alguém da equipe ia olhar. Resolva em /atendimento ou no Seller Center.`
+      );
+    }
+  }
+
+  return { filaParada, syncParado: paradas.length, esperandoHumano: esperandoHumano ?? 0 };
 }
