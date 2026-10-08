@@ -168,14 +168,19 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
     const len = new Date(periodo.fim).getTime() - ini;
     prevPer = { inicio: new Date(ini - len).toISOString(), fim: periodo.inicio };
   }
-  const [{ data }, { data: dataCmv }, { data: dataEvo }, { data: dataPrev }] = await Promise.all([
+  const [{ data }, { data: dataCmv }, { data: dataEvo }, { data: dataPrev }, { data: dataEmp }] = await Promise.all([
     supabase.rpc("resumo_financas", { p_loja_ids: lojas, p_inicio: periodo?.inicio ?? null, p_fim: periodo?.fim ?? null, p_conta: conta }),
     supabase.rpc("resumo_cmv", { p_loja_ids: lojas, p_inicio: periodo?.inicio ?? null, p_fim: periodo?.fim ?? null }),
     supabase.rpc("evolucao_mensal", { p_loja_ids: lojas, p_meses: 6 }),
     prevPer
       ? supabase.rpc("resumo_financas", { p_loja_ids: lojas, p_inicio: prevPer.inicio, p_fim: prevPer.fim, p_conta: conta })
       : Promise.resolve({ data: null }),
+    // Parcelas do Empréstimo para Vendedores (Shopee) pagas pela carteira no
+    // período. Não é despesa: fica fora do resultado, só informado.
+    supabase.rpc("carteira_emprestimo", { p_loja_ids: lojas, p_inicio: periodo?.inicio ?? null, p_fim: periodo?.fim ?? null }),
   ]);
+  const emp = ((dataEmp as { total: number; parcelas: number }[] | null)?.[0]) || { total: 0, parcelas: 0 };
+  const emprestimo = n(emp.total);
   const r = (data as Record<string, unknown>) || {};
   const c = (dataCmv as Record<string, unknown>) || {};
   const evo = (dataEvo as { mes: string; receita: number; resultado: number; margem_pct: number; pedidos: number }[]) || [];
@@ -283,6 +288,17 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
             </div>
           ))}
         </div>
+        {emprestimo > 0 && (
+          <div className="mt-3 flex items-center justify-between rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300">
+            <span>
+              Parcelas do Empréstimo para Vendedores (Shopee) pagas pela carteira no período
+              <span className="ml-2 text-xs text-slate-500">
+                {emp.parcelas} parcela(s) · fora do resultado: empréstimo não é despesa, é devolução de dinheiro adiantado
+              </span>
+            </span>
+            <span className="text-slate-400">{brl(emprestimo)}</span>
+          </div>
+        )}
         <p className="mt-4 text-xs text-slate-500">
           {cobertura < 100 ? (
             <>O <b>lucro líquido</b> considera o custo de <b>{cobertura.toFixed(0)}%</b> dos itens vendidos —

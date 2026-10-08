@@ -29,6 +29,11 @@ function categoria(tipo: string, descricao: string): string {
   if (t.includes("FAST_ESCROW") || d.includes("acelera")) return "antecipacao";
   if (t.includes("ADJUSTMENT_FOR_RR") || d.includes("reembolso") || d.includes("devolu"))
     return "reembolso";
+  // Parcela do "Empréstimo para Vendedores" da Shopee vem como SPM_DEDUCT_DIRECT
+  // (mesmo prefixo dos Ads) — caía na linha de Ads do DRE e inflava o custo.
+  // Empréstimo não é despesa: fica fora do resultado, só aparece na carteira.
+  if (d.includes("empr") && d.includes("stimo")) return "emprestimo";
+  if (d.includes("loan")) return "emprestimo";
   if (t.includes("SPM_DEDUCT") || d.includes("ads")) return "ads";
   if (t.includes("WITHDRAW") || d.includes("saque")) return "saque";
   return "outro";
