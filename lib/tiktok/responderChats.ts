@@ -701,13 +701,22 @@ export async function responderChatsTikTokLote({
     // Confere de novo na hora de responder: entre o sync e agora a loja ou o
     // assistente do TikTok podem já ter respondido (evita resposta em dobro).
     const analise = analisarConversa(msgResp.msgs);
-    if (!analise.aguardando || !analise.cliente) {
+    // Reprocesso explícito (conversa escalada devolvida à fila com
+    // ultimo_tratado_msg_id = null): responde de novo mesmo que a última fala
+    // seja o aviso de espera do próprio robô — ex.: mudou a regra e o cliente
+    // precisa receber a orientação certa. A referência é a última fala dele.
+    const reprocesso = !!c.escalada && !c.ultimo_tratado_msg_id;
+    let cliente = analise.aguardando ? analise.cliente : null;
+    if (!cliente && reprocesso) {
+      cliente = [...analise.msgs].reverse().find((m) => m.sender?.role === "BUYER") || null;
+    }
+    if (!cliente) {
       if (enviar) await marcar(c.conversation_id, { precisa_resposta: false, ultimo_remetente: "loja" });
       continue;
     }
     // Dá ~45s pro assistente do TikTok responder primeiro (ele leva ~10s).
-    if (Date.now() / 1000 - analise.cliente.create_time < 45) continue;
-    const clienteMsgId = analise.cliente.id;
+    if (Date.now() / 1000 - cliente.create_time < 45) continue;
+    const clienteMsgId = cliente.id;
 
     const mensagensOrdenadas = analise.msgs
       .map((m) => ({
