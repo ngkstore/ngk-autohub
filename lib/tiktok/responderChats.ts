@@ -93,16 +93,89 @@ async function listarConversas(t: TokenInfo, pageToken = "") {
   });
 }
 
-async function listarMensagens(t: TokenInfo, conversationId: string) {
+async function listarMensagens(t: TokenInfo, conversationId: string, pageToken = "") {
   // Atenção: o endpoint de MENSAGENS aceita page_size <= 10.
   // need_plaintext traz o conteúdo dos cartões (nome do produto, pedido,
   // rastreio) em texto — sem isso o robô só via "cliente mandou um cartão".
+  const query: Record<string, string> = { page_size: "10", need_plaintext: "true" };
+  if (pageToken) query.page_token = pageToken;
   return chamarTikTok(`${BASE_PATH}/conversations/${conversationId}/messages`, {
     method: "GET",
     accessToken: t.accessToken,
     shopCipher: t.shopCipher,
-    query: { page_size: "10", need_plaintext: "true" },
+    query,
   });
+}
+
+// Carrega as mensagens recentes e, se o CLIENTE não aparecer entre as 10
+// últimas, volta mais páginas até achá-lo (máx. 4 páginas = 40 msgs). O robô
+// do TikTok manda 3-6 mensagens por evento (rastreio, "enviamos", "entregue",
+// menu…), então a pergunta do cliente some das 10 últimas em poucas horas — e
+// a conversa era dada como "sem cliente" (caso real: cliente transferido pra
+// loja, nunca respondido, só avisos do TikTok depois).
+async function carregarMensagens(
+  t: TokenInfo,
+  conversationId: string,
+  maxPaginas = 4
+): Promise<{ code: number; message?: string; msgs: MsgTikTok[] }> {
+  const todas: MsgTikTok[] = [];
+  let token = "";
+  for (let p = 0; p < maxPaginas; p++) {
+    const r = await listarMensagens(t, conversationId, token);
+    if (r.code !== 0) {
+      if (p === 0) return { code: r.code, message: r.message, msgs: [] };
+      break; // fica com o que já veio
+    }
+    const msgs = (r.data?.messages || []) as MsgTikTok[];
+    todas.push(...msgs);
+    token = r.data?.next_page_token || "";
+    const temCliente = msgs.some((m) => m.is_visible && m.sender?.role === "BUYER");
+    if (temCliente || !token || msgs.length === 0) break;
+    await pausa(300);
+  }
+  return { code: 0, msgs: todas };
+}
+
+// Encerra a sessão de atendimento (tira a conversa da caixa "Atribuído" do
+// Seller Center). Só roda com a chave `tiktok_encerrar_sessao` = 'true' em
+// configuracoes — é uma ação visível pro cliente (TikTok pede avaliação do
+// atendimento), então fica a critério do dono ligar. Best-effort.
+let encerrarSessaoLigado: boolean | null = null;
+async function podeEncerrarSessao() {
+  if (encerrarSessaoLigado === null) {
+    const { data } = await supabase
+      .from("configuracoes")
+      .select("valor")
+      .eq("chave", "tiktok_encerrar_sessao")
+      .maybeSingle();
+    encerrarSessaoLigado = data?.valor === "true";
+  }
+  return encerrarSessaoLigado;
+}
+
+async function encerrarSessao(t: TokenInfo, conversationId: string) {
+  try {
+    if (!(await podeEncerrarSessao())) return false;
+    const agora = Math.floor(Date.now() / 1000);
+    const r = await chamarTikTok(`/customer_service/202602/sessions/search`, {
+      method: "POST",
+      accessToken: t.accessToken,
+      shopCipher: t.shopCipher,
+      query: { page_size: "50" },
+      body: { begin_time_ge: agora - 7 * 86400, begin_time_lt: agora + 60 },
+    });
+    const sessoes: { id: string; conversation_id: string; end_time?: number }[] =
+      r?.data?.sessions || [];
+    const ativa = sessoes.find((s) => s.conversation_id === conversationId && !s.end_time);
+    if (!ativa) return false;
+    const fim = await chamarTikTok(
+      `/customer_service/202605/conversations/${conversationId}/sessions/${ativa.id}/end`,
+      { method: "POST", accessToken: t.accessToken, shopCipher: t.shopCipher, body: {} }
+    );
+    return fim?.code === 0;
+  } catch {
+    return false;
+  }
 }
 
 async function enviarMensagem(t: TokenInfo, conversationId: string, texto: string) {
@@ -214,17 +287,38 @@ export function analisarConversa(msgsBrutas: MsgTikTok[]) {
       break;
     }
   }
+  const agoraSeg = Date.now() / 1000;
+  const JANELA = 7 * 24 * 3600; // can_send_message é o limite real; 7 dias é o teto nosso
+
+  // Transferência pra loja tem precedência sobre tudo: a partir dela o
+  // assistente do TikTok pode até continuar falando ("[chatbot]…"), mas só
+  // resposta da LOJA atende — e a conversa fica em "Atribuído" até isso.
+  let idxTransf = -1;
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    if (ehTransferencia(msgs[i])) {
+      idxTransf = i;
+      break;
+    }
+  }
+  if (idxTransf !== -1 && !msgs.slice(idxTransf + 1).some(ehDaLoja)) {
+    // Referência = última msg do cliente; se ela não está na janela carregada,
+    // usa o próprio evento de transferência (o responder trata como "sem texto").
+    const ref = idx !== -1 ? msgs[idx] : msgs[idxTransf];
+    const noPrazo = agoraSeg - ref.create_time <= JANELA;
+    return { msgs, aguardando: noPrazo, pediuHumano: true, cliente: ref };
+  }
+
   const semCliente = { msgs, aguardando: false, pediuHumano: false, cliente: null as MsgTikTok | null };
   if (idx === -1) return semCliente;
 
   const cliente = msgs[idx];
   const depois = msgs.slice(idx + 1);
   const lojaRespondeu = depois.some(ehDaLoja);
-  const pediuHumano = depois.some(ehTransferencia);
-  if (pediuHumano) {
-    // Fica aberta no Seller Center até a loja responder, então vale por mais
-    // tempo que uma dúvida comum.
-    const noPrazo = Date.now() / 1000 - cliente.create_time <= 7 * 24 * 3600;
+  // Conversa já atribuída à loja (transferência antes desta mensagem do
+  // cliente): o "[chatbot]" do TikTok que responde depois não conta — a
+  // conversa continua em "Atribuído" até a LOJA falar.
+  if (idxTransf !== -1 && idxTransf < idx) {
+    const noPrazo = agoraSeg - cliente.create_time <= JANELA;
     return { msgs, aguardando: noPrazo && !lojaRespondeu, pediuHumano: true, cliente };
   }
   // Cartão de produto/pedido sem pergunta: o assistente do TikTok já devolve
@@ -237,8 +331,7 @@ export function analisarConversa(msgsBrutas: MsgTikTok[]) {
       m.create_time - cliente.create_time <= 180 &&
       (soCartao || !RE_AVISO_TIKTOK.test(textoDaMensagem(m).trim()))
   );
-  // Só as recentes: responder dias depois não ajuda.
-  const recente = Date.now() / 1000 - cliente.create_time <= 48 * 3600;
+  const recente = agoraSeg - cliente.create_time <= JANELA;
   return {
     msgs,
     aguardando: recente && !lojaRespondeu && !assistenteRespondeu,
@@ -330,7 +423,7 @@ export async function sincronizarChatsTikTok(
       } else if (candidata) {
         // Robô/sistema do TikTok falou por último: só as mensagens dizem se o
         // cliente foi atendido.
-        const m = await listarMensagens(t, c.id);
+        const m = await carregarMensagens(t, c.id);
         if (m.code !== 0) {
           // Rate limit/erro: não grava nada — a conversa é relida na próxima rodada.
           erro = `messages[${c.id}]: ${m.code} ${m.message}`;
@@ -338,7 +431,7 @@ export async function sincronizarChatsTikTok(
           continue;
         }
         analisadas++;
-        const a = analisarConversa((m.data?.messages || []) as MsgTikTok[]);
+        const a = analisarConversa(m.msgs);
         precisa = a.aguardando && c.can_send_message;
         clienteMsgId = a.cliente?.id || null;
         ultimaMensagem = a.cliente ? textoDaMensagem(a.cliente) : undefined;
@@ -405,14 +498,14 @@ export async function reavaliarNaoLidasTikTok(
   let erro: string | undefined;
   for (const l of linhas || []) {
     const id = String(l.conversation_id);
-    const m = await listarMensagens(t, id);
+    const m = await carregarMensagens(t, id);
     if (m.code !== 0) {
       erro = `messages[${id}]: ${m.code} ${m.message}`;
       if (m.code === 36009002) break;
       continue;
     }
     analisadas++;
-    const a = analisarConversa((m.data?.messages || []) as MsgTikTok[]);
+    const a = analisarConversa(m.msgs);
     if (a.aguardando && a.cliente) {
       const { error } = await supabase
         .from("chat_conversas")
@@ -431,6 +524,70 @@ export async function reavaliarNaoLidasTikTok(
     await pausa(400);
   }
   return { candidatas: (linhas || []).length, analisadas, aguardando, erro };
+}
+
+// Reanalisa as conversas com SESSÃO DE ATENDIMENTO ATIVA (= caixa "Atribuído"
+// do Seller Center) nos últimos 7 dias: é a lista exata do que o dono vê como
+// aberto. As que estiverem esperando a loja voltam pra fila do robô.
+export async function reavaliarSessoesAtivasTikTok(lojaId: string) {
+  const t = await obterTokenTikTok(lojaId);
+  const agora = Math.floor(Date.now() / 1000);
+  const sessoes: { id: string; conversation_id: string; end_time?: number; buyer_nickname?: string }[] = [];
+  let token = "";
+  for (let p = 0; p < 10; p++) {
+    const q: Record<string, string> = { page_size: "100" };
+    if (token) q.page_token = token;
+    const r = await chamarTikTok(`/customer_service/202602/sessions/search`, {
+      method: "POST",
+      accessToken: t.accessToken,
+      shopCipher: t.shopCipher,
+      query: q,
+      body: { begin_time_ge: agora - 7 * 86400, begin_time_lt: agora + 60 },
+    });
+    if (r?.code !== 0) throw new Error(`sessions/search: ${r?.code} ${r?.message}`);
+    sessoes.push(...((r.data?.sessions || []) as typeof sessoes));
+    token = r.data?.next_page_token || "";
+    if (!token) break;
+    await pausa(300);
+  }
+  const ativas = sessoes.filter((s) => !s.end_time);
+  const vistas = new Set<string>();
+  let aguardando = 0;
+  let analisadas = 0;
+  let erro: string | undefined;
+  const esperando: string[] = [];
+  for (const s of ativas) {
+    if (vistas.has(s.conversation_id)) continue;
+    vistas.add(s.conversation_id);
+    const m = await carregarMensagens(t, s.conversation_id);
+    if (m.code !== 0) {
+      erro = `messages[${s.conversation_id}]: ${m.code} ${m.message}`;
+      if (m.code === 36009002) break;
+      continue;
+    }
+    analisadas++;
+    const a = analisarConversa(m.msgs);
+    if (a.aguardando && a.cliente) {
+      const { error } = await supabase
+        .from("chat_conversas")
+        .update({
+          precisa_resposta: true,
+          ultimo_remetente: "cliente",
+          cliente_msg_id: a.cliente.id,
+          ultima_mensagem: textoDaMensagem(a.cliente),
+          atualizado_em: new Date().toISOString(),
+        })
+        .eq("marketplace", "tiktok_shop")
+        .eq("conversation_id", s.conversation_id);
+      if (error) erro = `gravar conversa: ${error.message}`;
+      else {
+        aguardando++;
+        esperando.push(`${s.buyer_nickname || s.conversation_id}`);
+      }
+    }
+    await pausa(400);
+  }
+  return { sessoes: sessoes.length, ativas: ativas.length, analisadas, aguardando, esperando, erro };
 }
 
 // ── Responder conversas pendentes ────────────────────────────────────────────
@@ -510,7 +667,7 @@ export async function responderChatsTikTokLote({
 
   for (const c of pendentes) {
     // Buscar mensagens
-    const msgResp = await listarMensagens(t, c.conversation_id);
+    const msgResp = await carregarMensagens(t, c.conversation_id);
     if (msgResp.code !== 0) {
       erroEnvio = `messages[${c.conversation_id}]: ${msgResp.code} ${msgResp.message}`;
       if (msgResp.code === 36009002) break; // rate limit: para e retoma na próxima rodada
@@ -519,7 +676,7 @@ export async function responderChatsTikTokLote({
 
     // Confere de novo na hora de responder: entre o sync e agora a loja ou o
     // assistente do TikTok podem já ter respondido (evita resposta em dobro).
-    const analise = analisarConversa((msgResp.data?.messages || []) as MsgTikTok[]);
+    const analise = analisarConversa(msgResp.msgs);
     if (!analise.aguardando || !analise.cliente) {
       if (enviar) await marcar(c.conversation_id, { precisa_resposta: false, ultimo_remetente: "loja" });
       continue;
@@ -690,13 +847,19 @@ export async function responderChatsTikTokLote({
             );
           }
           escalados++;
+          // O selo de não-lida sai sempre: pro dono, "não lida" = "aberta". O
+          // caso continua esperando gente em Atendimento + Telegram; a sessão
+          // segue ativa no Seller Center (não encerramos o que precisa de humano).
+          await marcarComoLida(t, c.conversation_id);
         } else {
           await marcar(c.conversation_id, {
             ...base,
             ...(aguardando ? {} : { escalada: false }),
           });
-          // Resolvido pelo robô: tira o selo de não-lida (se espera você, mantém).
-          if (!aguardando) await marcarComoLida(t, c.conversation_id);
+          await marcarComoLida(t, c.conversation_id);
+          // Resolvido pelo robô: encerra a sessão de atendimento (sai de
+          // "Atribuído") — só se a chave tiktok_encerrar_sessao estiver ligada.
+          if (!aguardando) await encerrarSessao(t, c.conversation_id);
         }
       }
     } catch (e) {

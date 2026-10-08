@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import {
   reavaliarNaoLidasTikTok,
+  reavaliarSessoesAtivasTikTok,
   sincronizarChatsTikTok,
 } from "@/lib/tiktok/responderChats";
 import { registrarSyncOk } from "@/lib/chat/vigia";
@@ -42,6 +43,25 @@ async function processarLojas(opcoes: {
 export async function GET(request: NextRequest) {
   try {
     const sp = request.nextUrl.searchParams;
+    // ?sessoes=1: reanalisa as conversas com sessão de atendimento ATIVA (a
+    // caixa "Atribuído" do Seller Center).
+    if (sp.get("sessoes") === "1") {
+      const { data: lojas } = await supabase
+        .from("marketplace_tokens")
+        .select("loja_id")
+        .eq("marketplace", "tiktok_shop")
+        .eq("status", "ativo");
+      const ids = [...new Set((lojas || []).map((l) => l.loja_id as string))];
+      const resultados = [];
+      for (const lojaId of ids) {
+        try {
+          resultados.push({ lojaId, ...(await reavaliarSessoesAtivasTikTok(lojaId)) });
+        } catch (e) {
+          resultados.push({ lojaId, erro: e instanceof Error ? e.message : String(e) });
+        }
+      }
+      return NextResponse.json({ sucesso: true, sessoes: resultados });
+    }
     const reavaliar = Number(sp.get("reavaliar")) || 0;
     if (reavaliar > 0) {
       const { data: lojas } = await supabase
