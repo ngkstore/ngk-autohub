@@ -645,7 +645,7 @@ const ORIENTACAO_TIKTOK: Record<string, string[]> = {
 // Criador/afiliado pedindo parceria, amostra, live ou "quero divulgar": o
 // canal é o de afiliados do TikTok Shop, não o chat de compradores.
 const RE_PARCERIA =
-  /parceri|afiliad|criador|criadora|influenc|divulg|lives?|v[ií]deos? (pra|para|do|dos|de) (voc[eê]s|tiktok|seu|seus)|amostra|comiss[aã]o|vitrine|trabalh(o|ar) com|impulsion|proposta|conte[uú]do/i;
+  /parceri|afiliad|criador|criadora|influenc|divulg|\blives?\b|v[ií]deos? (pra|para|do|dos|de) (voc[eê]s|tiktok|seu|seus)|amostra|comiss[aã]o|vitrine|trabalh(o|ar) com|impulsion|proposta|conte[uú]do/i;
 const ORIENTACAO_PARCERIA = [
   "Que bom que você quer divulgar nossos produtos! Parcerias com criadores são tratadas pelo canal de afiliados do TikTok Shop, não por este chat. No app, entre no Centro de Criadores (TikTok Shop para criadores) > Afiliado, procure a nossa loja e adicione os produtos à sua vitrine pelo plano aberto — ou mande a proposta pelo chat de afiliados de lá, que é por onde a equipe de parcerias responde 🙏",
   "Obrigado pelo interesse em trabalhar com a gente! Esse assunto é tratado no canal de afiliados do TikTok Shop: no Centro de Criadores > Afiliado você encontra a nossa loja, adiciona os produtos à sua vitrine e fala com a equipe de parcerias pelo chat de afiliados. Por aqui é só o atendimento de pedidos 🙏",
