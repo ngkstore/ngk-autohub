@@ -359,7 +359,7 @@ type ConversaTikTok = {
 export async function sincronizarChatsTikTok(
   lojaId: string,
   {
-    paginas = 5,
+    paginas = 8,
     forcar = false,
     token = "",
   }: { paginas?: number; forcar?: boolean; token?: string } = {}
@@ -367,6 +367,7 @@ export async function sincronizarChatsTikTok(
   const t = await obterTokenTikTok(lojaId);
 
   let pageToken = token;
+  let paginasSemMudanca = 0;
   let sincronizados = 0;
   let aguardando = 0;
   let analisadas = 0;
@@ -463,8 +464,12 @@ export async function sincronizarChatsTikTok(
     }
 
     pageToken = resp.data?.next_page_token || "";
-    // Página inteira já conhecida = chegamos no que o sync anterior já viu.
-    if (!pageToken || (!forcar && mudaram === 0)) break;
+    // Duas páginas seguidas sem mudança = chegamos no que o sync anterior já
+    // viu. (Uma só não basta: a lista não é estritamente ordenada por última
+    // mensagem — eventos de rastreio não sobem a conversa — e uma página sem
+    // mudança pode esconder conversa mexida na seguinte.)
+    paginasSemMudanca = mudaram === 0 ? paginasSemMudanca + 1 : 0;
+    if (!pageToken || (!forcar && paginasSemMudanca >= 2)) break;
     await pausa(300);
   }
 

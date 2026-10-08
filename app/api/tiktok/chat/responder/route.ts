@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { responderChatsTikTokLote, type ResultadoChatTikTok } from "@/lib/tiktok/responderChats";
+import {
+  reavaliarSessoesAtivasTikTok,
+  responderChatsTikTokLote,
+  type ResultadoChatTikTok,
+} from "@/lib/tiktok/responderChats";
 import { flagsPorConta } from "@/lib/flags";
 import { vigiarChat } from "@/lib/chat/vigia";
 
@@ -48,11 +52,26 @@ export async function GET() {
       flagsPorConta(CHAVE_AUTONOMO),
     ]);
 
+    // Rede de segurança a cada ~20 min: reanalisa a caixa "Atribuído" (sessões
+    // de atendimento ativas) direto na API. Se o sync perdeu alguma conversa
+    // (lista fora de ordem, não-lida zerada no Seller Center, cliente fora da
+    // janela…), ela volta pra fila aqui — sem depender do que o sync enxergou.
+    const minuto = new Date().getUTCMinutes();
+    const redeSeguranca = minuto % 20 < 2;
+
     const resultados: ResultadoChatTikTok[] = [];
     const lojasAtivas: string[] = [];
+    const sessoes: unknown[] = [];
     for (const l of lojas) {
       if (!l.contaId || !ativos[l.contaId]) continue;
       lojasAtivas.push(l.lojaId);
+      if (redeSeguranca) {
+        try {
+          sessoes.push({ lojaId: l.lojaId, ...(await reavaliarSessoesAtivasTikTok(l.lojaId)) });
+        } catch (e) {
+          sessoes.push({ lojaId: l.lojaId, erro: e instanceof Error ? e.message : String(e) });
+        }
+      }
       try {
         resultados.push(
           await responderChatsTikTokLote({
@@ -76,7 +95,7 @@ export async function GET() {
 
     const total = agregar(resultados);
     const vigia = await vigiarChat("tiktok_shop", lojasAtivas, total.erro);
-    return NextResponse.json({ sucesso: true, ...total, vigia });
+    return NextResponse.json({ sucesso: true, ...total, vigia, ...(redeSeguranca ? { sessoes } : {}) });
   } catch (error) {
     return NextResponse.json(
       { sucesso: false, erro: error instanceof Error ? error.message : "Erro robô TikTok" },
