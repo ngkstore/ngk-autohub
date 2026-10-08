@@ -44,6 +44,7 @@ Tudo isso resolve: precisa_humano=false, confianca="alta". Nunca diga que a loja
 O QUE VOCÊ NÃO ENXERGA — regra crítica:
 - Você NÃO tem acesso ao sistema de pedidos nem ao estoque: só vê o que está na conversa (inclusive os cartões de produto/pedido/rastreio, quando aparecem). Então NÃO peça o número do pedido "pra verificar" e não diga que vai conferir onde o pedido está — você não consegue.
 - Medida, cor, material, compatibilidade: só confirme se a informação estiver na conversa (por exemplo no nome do produto do cartão). Senão, diga que os detalhes estão na descrição do anúncio — nunca confirme "de cabeça".
+- "Homem Aranha", "Homem de Ferro", "Frozen", "Barbie" etc. são TEMAS/personagens dos produtos infantis (bicicleta, cozinha, carrinho). "tem homem aranha?" = pergunta se existe a versão com esse personagem — não é arranhão nem defeito.
 
 ${REGRA_SEM_PROMESSA}
 
@@ -616,6 +617,29 @@ export async function reavaliarSessoesAtivasTikTok(lojaId: string) {
 
 // ── Responder conversas pendentes ────────────────────────────────────────────
 
+// Garantia por código (igual à Shopee): pedido, pagamento, reembolso, defeito
+// e entrega são resolvidos pelo PRÓPRIO TikTok Shop. Se a IA ainda assim
+// tentar passar o caso pra "alguém da equipe", o cliente recebe a orientação
+// do caminho no app em vez da promessa — e o caso não vira chamado.
+const ORIENTACAO_TIKTOK: Record<string, string[]> = {
+  devolucao_reembolso: [
+    "Reembolso e devolução são processados pelo próprio TikTok Shop, não pela loja. Confira em Pedidos > seu pedido > detalhes do reembolso. Se passou do prazo ou o valor está errado, fale com o Suporte do TikTok Shop pelo app (Perfil > Suporte ao cliente > Fale conosco) — eles resolvem direto 🙏",
+    "Esse ponto quem resolve é o TikTok Shop: o estorno sai por eles, não pela loja. Em Pedidos > seu pedido você vê o status do reembolso; se estiver atrasado ou errado, o Suporte ao cliente do TikTok Shop (no app, em Perfil) corrige pra você 🙏",
+  ],
+  pagamento: [
+    "O pagamento é processado pelo próprio TikTok Shop, não pela loja. Confira em Pedidos > seu pedido o status do pagamento; se você pagou e não atualizou, ou cobrou um valor diferente, fale com o Suporte do TikTok Shop pelo app (Perfil > Suporte ao cliente > Fale conosco) — eles ajustam direto 🙏",
+    "Quem confirma e corrige pagamento é o TikTok Shop (a loja não vê essa parte). Dá uma olhada em Pedidos > seu pedido e, se continuar errado, chama o Suporte ao cliente do TikTok Shop pelo app, em Perfil — eles resolvem 🙏",
+  ],
+  defeito: [
+    "Pra resolver, abra a devolução/reembolso pelo app: Pedidos > seu pedido > Devolver/Reembolsar, escolha o motivo e anexe as fotos. O TikTok Shop analisa e a loja aprova por lá — é o caminho mais rápido 🙏",
+    "O jeito certo é pelo app do TikTok Shop: em Pedidos > seu pedido > Devolver/Reembolsar, com fotos do problema. A solicitação chega pra loja aprovar e o TikTok cuida do reembolso 🙏",
+  ],
+  envio_prazo: [
+    "O andamento aparece em Pedidos > seu pedido > Rastrear. Se o prazo passou ou o rastreio parou, fale com o Suporte do TikTok Shop pelo app (Perfil > Suporte ao cliente) — eles acionam a transportadora direto 🙏",
+    "Pelo app você acompanha em Pedidos > seu pedido > Rastrear. Atrasou ou parou de atualizar? O Suporte ao cliente do TikTok Shop (Perfil, no app) abre o chamado com a transportadora pra você 🙏",
+  ],
+};
+
 export type ResultadoChatTikTok = {
   processados: number;
   enviados: number;
@@ -770,7 +794,7 @@ export async function responderChatsTikTokLote({
     const aguardando = estaAguardandoHumano(c);
     const ultimaDaLoja = [...mensagensOrdenadas].reverse().find((m) => m.papel === "Loja");
 
-    const acao = decidirAcao({
+    let acao = decidirAcao({
       decisao,
       autonomo,
       temTextoCliente,
@@ -778,6 +802,14 @@ export async function responderChatsTikTokLote({
       jaAguardandoHumano: aguardando,
       ultimaMsgLoja: ultimaDaLoja?.texto || "",
     });
+    // A IA quis chamar gente num assunto que é do TikTok Shop: vai a
+    // orientação do app (resolve) em vez da promessa.
+    const orientacoes = ORIENTACAO_TIKTOK[categoria];
+    if (autonomo && acao.tipo === "espera" && orientacoes && !bloqueadaPorContato && temTextoCliente) {
+      const ultima = (ultimaDaLoja?.texto || "").trim();
+      const texto = orientacoes.find((o) => o !== ultima) ?? orientacoes[0];
+      acao = { tipo: "responder", texto };
+    }
 
     propostas.push({
       conversation_id: c.conversation_id,
