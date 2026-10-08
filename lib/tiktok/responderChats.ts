@@ -645,7 +645,7 @@ const ORIENTACAO_TIKTOK: Record<string, string[]> = {
 // Criador/afiliado pedindo parceria, amostra, live ou "quero divulgar": o
 // canal é o de afiliados do TikTok Shop, não o chat de compradores.
 const RE_PARCERIA =
-  /parceri|afiliad|criador|criadora|influenc|divulg|fazer (v[ií]deos|lives?)|amostra|oferta de live|comiss[aã]o|vitrine|trabalh(o|ar) com|impulsion/i;
+  /parceri|afiliad|criador|criadora|influenc|divulg|lives?|v[ií]deos? (pra|para|do|dos|de) (voc[eê]s|tiktok|seu|seus)|amostra|comiss[aã]o|vitrine|trabalh(o|ar) com|impulsion|proposta|conte[uú]do/i;
 const ORIENTACAO_PARCERIA = [
   "Que bom que você quer divulgar nossos produtos! Parcerias com criadores são tratadas pelo canal de afiliados do TikTok Shop, não por este chat. No app, entre no Centro de Criadores (TikTok Shop para criadores) > Afiliado, procure a nossa loja e adicione os produtos à sua vitrine pelo plano aberto — ou mande a proposta pelo chat de afiliados de lá, que é por onde a equipe de parcerias responde 🙏",
   "Obrigado pelo interesse em trabalhar com a gente! Esse assunto é tratado no canal de afiliados do TikTok Shop: no Centro de Criadores > Afiliado você encontra a nossa loja, adiciona os produtos à sua vitrine e fala com a equipe de parcerias pelo chat de afiliados. Por aqui é só o atendimento de pedidos 🙏",
@@ -815,9 +815,13 @@ export async function responderChatsTikTokLote({
     });
     // A IA quis chamar gente num assunto que é do TikTok Shop: vai a
     // orientação do app (resolve) em vez da promessa.
-    const ehParceria = RE_PARCERIA.test(pergunta) || RE_PARCERIA.test(conversaTxt.slice(-600));
+    // Parceria/criador: qualquer resposta nesse assunto vira a orientação do
+    // canal de afiliados (a IA chegou a dizer que a loja 'não tem parceria').
+    const textosCliente = mensagensOrdenadas.filter((m) => m.papel === "Cliente").map((m) => m.texto).join(" ");
+    const ehParceria = RE_PARCERIA.test(textosCliente);
     const orientacoes = ehParceria ? ORIENTACAO_PARCERIA : ORIENTACAO_TIKTOK[categoria];
-    if (autonomo && acao.tipo === "espera" && orientacoes && !bloqueadaPorContato && temTextoCliente) {
+    const trocar = ehParceria ? acao.tipo !== "humano" : acao.tipo === "espera";
+    if (autonomo && trocar && orientacoes && !bloqueadaPorContato && temTextoCliente) {
       const ultima = (ultimaDaLoja?.texto || "").trim();
       const texto = orientacoes.find((o) => o !== ultima) ?? orientacoes[0];
       acao = { tipo: "responder", texto };
