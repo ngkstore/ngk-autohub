@@ -35,8 +35,9 @@ function num(v: unknown) {
 function moeda(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
-function faixa(preco: number) {
-  if (preco < 80) return { pct: 0.2, fixa: 4 };
+// Mesma tabela da funcao SQL shopee_taxa_esperada_item: taxa fixa da 1a faixa R$4,50 desde 01/10/2026.
+function faixa(preco: number, dataPedido: Date) {
+  if (preco < 80) return { pct: 0.2, fixa: dataPedido >= new Date("2026-10-01T03:00:00Z") ? 4.5 : 4 };
   if (preco < 100) return { pct: 0.14, fixa: 16 };
   if (preco < 200) return { pct: 0.14, fixa: 20 };
   return { pct: 0.14, fixa: 26 };
@@ -62,7 +63,7 @@ export default async function DetalhePedidoPage({ searchParams }: Props) {
 
   const { data: pedido } = await supabase
     .from("pedidos")
-    .select("pedido_externo_id, cliente_nome, valor_total, dados_pedido")
+    .select("pedido_externo_id, cliente_nome, valor_total, dados_pedido, data_pedido")
     .eq("pedido_externo_id", orderSn)
     .maybeSingle();
 
@@ -75,10 +76,11 @@ export default async function DetalhePedidoPage({ searchParams }: Props) {
     : [];
 
   // Esperado item a item (sua regra).
+  const dataPedido = pedido?.data_pedido ? new Date(pedido.data_pedido as string) : new Date();
   const linhasItens = itens.map((it) => {
     const preco = num(it.model_discounted_price);
     const qtd = num(it.model_quantity_purchased) || 1;
-    const f = faixa(preco);
+    const f = faixa(preco, dataPedido);
     const esperadoUn = preco * f.pct + f.fixa;
     return {
       nome: it.item_name || "Item",
