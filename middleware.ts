@@ -62,7 +62,14 @@ export async function middleware(request: NextRequest) {
   //    Enquanto CRON_SECRET não estiver configurado, libera por caminho.
   if (ROTAS_CRON.includes(pathname)) {
     const segredo = process.env.CRON_SECRET;
-    if (!segredo) return NextResponse.next();
+    // Sem CRON_SECRET configurado NÃO libera (fail-closed): antes caía em next() e
+    // deixava públicas rotas que alteram Ads e mandam mensagem a clientes.
+    if (!segredo) {
+      return NextResponse.json(
+        { sucesso: false, erro: "CRON_SECRET não configurado no servidor; rotas de cron bloqueadas." },
+        { status: 503 }
+      );
+    }
     const auth = request.headers.get("authorization");
     if (auth === `Bearer ${segredo}`) return NextResponse.next(); // cron Vercel
     return atualizarSessao(request); // usuário logado acionando pela tela
