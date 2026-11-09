@@ -40,49 +40,75 @@ export async function GET(request: NextRequest) {
   if (error) return NextResponse.json({ sucesso: false, erro: error.message }, { status: 500 });
   const lista = (pendentes as { loja_id: string; pedido_externo_id: string }[]) || [];
 
-  const tokens = new Map<string, TokenLoja>();
-  const brutos: EscrowBruto[] = [];
+  // Paralelismo: a Shopee responde em ~0,7 s por pedido; com um pedido por vez a
+  // rodada parava em ~330. Com CONCORRENCIA trabalhadores puxando da mesma fila
+  // passa de ~900 por rodada, ainda longe do limite de chamadas da Shopee.
+  const CONCORRENCIA = Math.min(6, Math.max(1, Number(sp.get("paralelo")) || 3));
+  const tokens = new Map<string, Promise<TokenLoja>>();
+  const obterToken = (lojaId: string) => {
+    let t = tokens.get(lojaId);
+    if (!t) {
+      t = obterTokenLoja(lojaId);
+      tokens.set(lojaId, t);
+    }
+    return t;
+  };
+  let brutos: EscrowBruto[] = [];
   let erros = 0;
+  let errosToken = 0;
   let ultimoErro: string | undefined;
   let processados = 0;
+  let parar = false;
+  let proximo = 0;
+  let gravando: Promise<void> = Promise.resolve();
 
-  for (const p of lista) {
-    if (Date.now() - inicio > ORCAMENTO_MS) break;
-    processados++;
-    try {
-      let token = tokens.get(p.loja_id);
-      if (!token) {
-        token = await obterTokenLoja(p.loja_id);
-        tokens.set(p.loja_id, token);
-      }
-      const escrow = await buscarEscrow({ baseUrl, partnerId, partnerKey, token, orderSn: p.pedido_externo_id });
-      if (escrow?.order_income) {
-        brutos.push({ lojaId: p.loja_id, orderSn: p.pedido_externo_id, income: escrow.order_income, buyer: escrow.buyer_payment_info ?? null });
-      } else {
-        erros++;
-        ultimoErro = "escrow sem order_income";
-      }
-    } catch (e) {
-      erros++;
-      ultimoErro = e instanceof Error ? e.message : "erro";
-      // Erro de token/permissão repetido: para a rodada para não queimar cota.
-      if (/token|permission|unauthor/i.test(ultimoErro) && erros > 5) break;
-    }
-    // Grava a cada 100 p/ não perder tudo se estourar o tempo.
-    if (brutos.length >= 100) {
-      const g = await guardarEscrowBruto(brutos.splice(0, brutos.length));
+  // Grava em blocos de 100 p/ não perder tudo se estourar o tempo (sem bloquear
+  // os trabalhadores: a gravação anterior encadeia com a próxima).
+  const gravarBloco = () => {
+    const bloco = brutos;
+    brutos = [];
+    gravando = gravando.then(async () => {
+      const g = await guardarEscrowBruto(bloco);
       if (g.erro) ultimoErro = g.erro;
+    });
+  };
+
+  const trabalhador = async () => {
+    while (!parar) {
+      if (Date.now() - inicio > ORCAMENTO_MS) break;
+      const p = lista[proximo++];
+      if (!p) break;
+      processados++;
+      try {
+        const token = await obterToken(p.loja_id);
+        const escrow = await buscarEscrow({ baseUrl, partnerId, partnerKey, token, orderSn: p.pedido_externo_id });
+        if (escrow?.order_income) {
+          brutos.push({ lojaId: p.loja_id, orderSn: p.pedido_externo_id, income: escrow.order_income, buyer: escrow.buyer_payment_info ?? null });
+        } else {
+          erros++;
+          ultimoErro = "escrow sem order_income";
+        }
+      } catch (e) {
+        erros++;
+        ultimoErro = e instanceof Error ? e.message : "erro";
+        // Erro de token/permissão repetido: para a rodada para não queimar cota.
+        if (/token|permission|unauthor/i.test(ultimoErro) && ++errosToken > 5) parar = true;
+      }
+      if (brutos.length >= 100) gravarBloco();
     }
-  }
-  const g = await guardarEscrowBruto(brutos);
+  };
+  await Promise.all(Array.from({ length: CONCORRENCIA }, trabalhador));
+  gravarBloco();
+  await gravando;
 
   return NextResponse.json({
     sucesso: true,
     pendentes_na_fila: lista.length,
+    paralelo: CONCORRENCIA,
     processados,
     gravados_rodada: processados - erros,
     erros,
-    ultimo_erro: g.erro ?? ultimoErro ?? null,
+    ultimo_erro: ultimoErro ?? null,
     segundos: Math.round((Date.now() - inicio) / 1000),
   });
 }
