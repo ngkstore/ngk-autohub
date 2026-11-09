@@ -66,9 +66,14 @@ export function categoriaCarteira(tipo: string | null | undefined, descricao: st
     if (d.includes("creditado a maior")) return "estorno_credito";
     return "ajuste_debito";
   }
-  // Parcela do "Empréstimo para Vendedores" vem como SPM_DEDUCT_DIRECT (mesmo
-  // prefixo dos Ads). Empréstimo não é despesa: fica fora do resultado.
-  if (tipo === "SPM_DEDUCT_DIRECT" && !(d.includes("empr") && d.includes("stimo")) && !d.includes("loan")) return "ads";
+  // SPM_DEDUCT_DIRECT (tipo 801 no Seller Center) é parcela do "Empréstimo para
+  // Vendedores"; só vira ads com texto de recarga. Texto desconhecido -> desconhecido
+  // (alerta na conferência 8), nunca ads por padrão (F3 do plano de melhorias).
+  if (tipo === "SPM_DEDUCT_DIRECT") {
+    if ((d.includes("empr") && d.includes("stimo")) || d.includes("loan")) return "emprestimo";
+    if (d.includes("ads") || d.includes("anúncio") || d.includes("anuncio") || d.includes("recarga")) return "ads";
+    return "desconhecido";
+  }
   return MAPA_TIPO[tipo] ?? "desconhecido";
 }
 
