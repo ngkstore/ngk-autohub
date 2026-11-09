@@ -228,7 +228,7 @@ export default async function Custos({ lojas, periodo, pedido }: { lojas: string
               )}
               {cf.n === 4 && (
                 <div className="mt-2 space-y-3">
-                  <p className="text-xs text-slate-400">A fatura mensal de afiliados é extrato, não cobrança extra: o afiliado já está descontado em cada pedido (comissão + taxa de serviço). Aqui ela só é comparada com a soma do detalhamento em três janelas (A: pedido no mês · B: pedido no mês anterior · C: repasse no mês) e duas somas (só comissão / comissão + taxa). "Cobertura" é a parte dos pedidos do mês que já tem detalhamento: abaixo de 100% a soma é parcial.</p>
+                  <p className="text-xs text-slate-400">A fatura mensal de afiliados é extrato, não cobrança extra: o afiliado já está descontado em cada pedido (comissão + taxa de serviço). Aqui ela só é comparada com a soma do detalhamento em três janelas (A: pedido no mês · B: pedido no mês anterior · C: repasse no mês) e duas somas (só comissão / comissão + taxa). &quot;Cobertura&quot; é a parte dos pedidos do mês que já tem detalhamento: abaixo de 100% a soma é parcial.</p>
                   {confFat.map((x) => (
                     <div key={x.id}>
                       <p className="mb-1 text-xs font-semibold text-slate-300">{nomeLoja.get(x.id) || x.id}</p>
