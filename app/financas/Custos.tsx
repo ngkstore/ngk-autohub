@@ -83,6 +83,13 @@ export default async function Custos({ lojas, periodo, pedido }: { lojas: string
   const nomeLoja = new Map(((lojasNome.data as { id: string; nome: string; apelido: string | null }[]) || []).map((l) => [l.id, l.apelido || l.nome]));
   const refIds = Array.from(new Set(((refLojas.data as { loja_id: string }[]) || []).map((r) => r.loja_id)));
   const confMes = await Promise.all(refIds.map(async (id) => ({ id, rows: ((await supabase.rpc("conferencia_carteira_mes", { p_loja: id })).data as Json[]) || [] })));
+  // Conferência 4: fatura mensal de afiliados × soma do detalhamento (lojas com fatura cadastrada).
+  let qFat = supabase.from("afiliado_fatura").select("loja_id");
+  if (lojas) qFat = qFat.in("loja_id", lojas);
+  const fatIds = Array.from(new Set((((await qFat).data as { loja_id: string }[]) || []).map((r) => r.loja_id)));
+  const confFat = await Promise.all(fatIds.map(async (id) => ({ id, rows: ((await supabase.rpc("conferencia_afiliado_fatura", { p_loja: id })).data as Json[]) || [] })));
+  const fatTotal = confFat.reduce((s, x) => s + x.rows.length, 0);
+  const fatOk = confFat.reduce((s, x) => s + x.rows.filter((r) => String(r.bate || "") !== "").length, 0);
 
   const m = (mensal.data as { pedido: Json[]; carteira: Json[] }) || { pedido: [], carteira: [] };
   const f = (fecha.data as Json) || {};
@@ -122,7 +129,7 @@ export default async function Custos({ lojas, periodo, pedido }: { lojas: string
     { n: 1, nome: "Pedido fecha (soma das linhas = Renda do pedido, R$ 0,01)", ok: n(f.total) === 0 ? null : n(f.diferenca) === 0, resumo: n(f.total) === 0 ? "ainda sem detalhamento no período" : `${int(f.ok)} de ${int(f.total)} fecham · ${int(f.diferenca)} com diferença (${brl(f.diferenca_valor)})`, detalhe: (f.exemplos as Json[]) || [], colunas: ["order_sn", "residual", "data"] },
     { n: 2, nome: "Pedido × carteira (Renda do pedido × tipo 101, R$ 0,01)", ok: n(c.total) === 0 ? null : n(c.diferenca) === 0, resumo: n(c.total) === 0 ? "—" : `${int(c.ok)} iguais · ${int(c.ok_com_ajuste)} iguais após ajuste 411/102 · ${int(c.sem_repasse)} ainda sem repasse · ${int(c.diferenca)} com diferença`, detalhe: (c.exemplos as Json[]) || [], colunas: ["order_sn", "repasse", "carteira", "ajustes", "acelera", "data"] },
     { n: 3, nome: "Mês × referência da Shopee (R$ 0,05)", ok: confMesTotal === 0 ? null : confMesOk === confMesTotal, resumo: confMesTotal === 0 ? "sem tabela de referência para estas lojas" : `${confMesOk} de ${confMesTotal} valores batem` },
-    { n: 4, nome: "Afiliado × fatura mensal (1%)", ok: null, resumo: "a fatura de afiliados não está na Open Platform; pendente de fonte (ver nota)" },
+    { n: 4, nome: "Afiliado × fatura mensal (1%)", ok: fatTotal === 0 ? null : (fatOk === fatTotal ? true : fatOk > 0 ? null : false), resumo: fatTotal === 0 ? "sem fatura cadastrada para estas lojas" : `${fatOk} de ${fatTotal} meses batem em alguma janela · depende da cobertura do detalhamento` },
     { n: 5, nome: "Taxa de serviço do afiliado ÷ comissão do afiliado (12% a 15%)", ok: n(a.pedidos_com_afiliado) === 0 ? null : n(a.fora_da_faixa) === 0, resumo: n(a.pedidos_com_afiliado) === 0 ? "—" : `${int(a.pedidos_com_afiliado)} pedidos · média ${n(a.razao_media).toFixed(2)}% · ${int(a.fora_da_faixa)} fora da faixa`, detalhe: (a.exemplos as Json[]) || [], colunas: ["order_sn", "comissao", "taxa", "razao", "data"] },
     { n: 6, nome: "Comissão × tabela vigente (R$ 0,02)", ok: null, resumo: "na aba Conciliação & Taxas (auditoria por pedido)" },
     { n: 7, nome: "Frete pago pelo vendedor (campo 50 ≠ 0)", ok: n(fr.pedidos) === 0 ? true : false, resumo: n(fr.pedidos) === 0 ? "nenhum pedido com frete por conta do vendedor" : `${int(fr.pedidos)} pedidos · custo ${brl(fr.custo_total)} · crédito ${brl(fr.credito_total)}`, detalhe: (fr.exemplos as Json[]) || [], colunas: ["order_sn", "frete", "data"] },
@@ -220,7 +227,26 @@ export default async function Custos({ lojas, periodo, pedido }: { lojas: string
                 <p className="mt-2 text-xs text-orange-300">Regras de taxa de serviço sem classificação: {(f.campos_desconhecidos as Json[]).map((d) => `${d.rotulo} (${int(d.qtd)} · ${brl(d.total)})`).join("; ")}</p>
               )}
               {cf.n === 4 && (
-                <p className="mt-2 text-xs text-slate-400">A fatura mensal de afiliados (Afiliados do Vendedor › Transações e Pagamentos) é extrato, não cobrança extra: o afiliado já está descontado em cada pedido (comissão + taxa de serviço). Quando houver fonte na API, a regra testa as janelas de criação, conclusão e repasse.</p>
+                <div className="mt-2 space-y-3">
+                  <p className="text-xs text-slate-400">A fatura mensal de afiliados é extrato, não cobrança extra: o afiliado já está descontado em cada pedido (comissão + taxa de serviço). Aqui ela só é comparada com a soma do detalhamento em três janelas (A: pedido no mês · B: pedido no mês anterior · C: repasse no mês) e duas somas (só comissão / comissão + taxa). "Cobertura" é a parte dos pedidos do mês que já tem detalhamento: abaixo de 100% a soma é parcial.</p>
+                  {confFat.map((x) => (
+                    <div key={x.id}>
+                      <p className="mb-1 text-xs font-semibold text-slate-300">{nomeLoja.get(x.id) || x.id}</p>
+                      <table className="w-full text-xs">
+                        <thead className="text-left text-slate-500"><tr><th>Mês</th><th className="text-right">Fatura</th><th className="text-right">Cobertura</th><th className="text-right">A comissão</th><th className="text-right">A total</th><th className="text-right">B comissão</th><th className="text-right">B total</th><th className="text-right">C comissão</th><th className="text-right">C total</th><th>Bate</th></tr></thead>
+                        <tbody className="divide-y divide-slate-800">
+                          {x.rows.map((r) => (
+                            <tr key={String(r.mes_validade)} className={String(r.bate || "") ? "text-emerald-300" : ""}>
+                              <td className="py-0.5">{String(r.mes_validade)}</td><td className="text-right">{brl(r.despesa)}</td><td className="text-right">{n(r.cobertura).toFixed(0)}%</td>
+                              <td className="text-right">{brl(r.a_comissao)}</td><td className="text-right">{brl(r.a_total)}</td><td className="text-right">{brl(r.b_comissao)}</td><td className="text-right">{brl(r.b_total)}</td><td className="text-right">{brl(r.c_comissao)}</td><td className="text-right">{brl(r.c_total)}</td>
+                              <td className="text-slate-400">{String(r.bate || "—")}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ))}
+                </div>
               )}
             </details>
           ))}

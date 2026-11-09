@@ -182,6 +182,12 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
     // período. Não é despesa: fica fora do resultado, só informado.
     supabase.rpc("carteira_emprestimo", { p_loja_ids: lojas, p_inicio: periodo?.inicio ?? null, p_fim: periodo?.fim ?? null }),
   ]);
+  // F6: topo do DRE pelas linhas do detalhamento (custos_pedido), quando a cobertura é alta.
+  const { data: dataCd } = await supabase.rpc("custos_resumo_dre", { p_loja_ids: lojas, p_inicio: periodo?.inicio ?? null, p_fim: periodo?.fim ?? null });
+  const cd = (dataCd as Record<string, unknown>) || {};
+  const cdPedidos = n(cd.pedidos);
+  const cdCobertura = cdPedidos > 0 ? (n(cd.com_detalhamento) / cdPedidos) * 100 : 0;
+  const usaDetalhe = cdCobertura >= 95 && n(cd.com_detalhamento) > 0;
   const emp = ((dataEmp as { total: number; parcelas: number }[] | null)?.[0]) || { total: 0, parcelas: 0 };
   const emprestimo = n(emp.total);
   const r = (data as Record<string, unknown>) || {};
@@ -226,14 +232,39 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
   const deltaResultado = Math.abs(resultadoPrev) > 0 ? ((resultado - resultadoPrev) / Math.abs(resultadoPrev)) * 100 : null;
   const maxEvoR = Math.max(1, ...evo.map((e) => n(e.receita)));
 
+  // Topo do DRE: com cobertura >= 95% do detalhamento, as linhas vêm de custos_pedido e
+  // fecham com a renda do pedido (resíduo = "diferença não mapeada"); senão, fonte atual.
+  const topo = usaDetalhe
+    ? [
+        { l: `Receita (preço de venda · ${int(cd.com_detalhamento)} pedidos detalhados)`, v: n(cd.receita), tot: false },
+        ...(n(cd.desconto_pix) !== 0 ? [{ l: "(−) Desconto Pix ao comprador", v: n(cd.desconto_pix), tot: false }] : []),
+        ...(n(cd.cupom_vendedor) !== 0 ? [{ l: "(−) Cupom do vendedor", v: n(cd.cupom_vendedor), tot: false }] : []),
+        ...(n(cd.cupom_shopee) !== 0 ? [{ l: "(+) Desconto da plataforma ressarcido pela Shopee", v: n(cd.cupom_shopee), tot: false }] : []),
+        ...(n(cd.frete) !== 0 ? [{ l: "(±) Frete por conta do vendedor", v: n(cd.frete), tot: false }] : []),
+        { l: "(−) Comissão bruta", v: n(cd.comissao), tot: false },
+        ...(n(cd.comissao_rebate) !== 0 ? [{ l: "(+) Abatimento de comissão (ação comercial / Pix)", v: n(cd.comissao_rebate), tot: false }] : []),
+        { l: "(−) Taxa de transação", v: n(cd.serv_transacao), tot: false },
+        { l: "(−) Taxa por item vendido", v: n(cd.serv_item), tot: false },
+        ...(n(cd.serv_outros) !== 0 ? [{ l: "(−) Taxa de serviço (regra nova, ver Custos Shopee)", v: n(cd.serv_outros), tot: false }] : []),
+        ...(n(cd.acao_comercial) !== 0 ? [{ l: "(−) Participação em ação comercial (cupom / Pix do vendedor)", v: n(cd.acao_comercial), tot: false }] : []),
+        { l: "(−) Comissão de afiliado", v: n(cd.afiliado), tot: false },
+        { l: "(−) Taxa de serviço de afiliado", v: n(cd.serv_afiliado), tot: false },
+        ...(n(cd.taxa_outros) !== 0 ? [{ l: "(−) Outras taxas", v: n(cd.taxa_outros), tot: false }] : []),
+        ...(n(cd.compensacao) !== 0 ? [{ l: "(+) Compensações dentro do pedido", v: n(cd.compensacao), tot: false }] : []),
+        { l: "(±) Diferença não mapeada", v: n(cd.residual), tot: false },
+        { l: "= Renda do pedido (repasse da Shopee)", v: n(cd.repasse), tot: true },
+      ]
+    : [
+        { l: "Receita (pedidos pagos)", v: receita, tot: false },
+        { l: "(−) Taxas do marketplace (comissão + serviço; TikTok inclui taxa fixa e Frete Grátis)", v: -taxas, tot: false },
+        { l: "(−) Comissão de afiliado (liquida ~30 dias depois)", v: -afiliado, tot: false },
+        { l: "(−) Taxa de serviço de afiliado", v: -taxaServAfiliado, tot: false },
+        { l: "(−) Cupom próprio (o do marketplace não entra)", v: -cupom, tot: false },
+        ...(freteCusto !== 0 ? [{ l: "(−) Frete cobrado pelo TikTok (líquido do subsídio e do frete do cliente; detalhe em Conciliação)", v: -freteCusto, tot: false }] : []),
+        { l: "= Receita líquida (escrow / extrato)", v: liquida, tot: true },
+      ];
   const linhas = [
-    { l: "Receita (pedidos pagos)", v: receita, tot: false },
-    { l: "(−) Taxas do marketplace (comissão + serviço; TikTok inclui taxa fixa e Frete Grátis)", v: -taxas, tot: false },
-    { l: "(−) Comissão de afiliado (liquida ~30 dias depois)", v: -afiliado, tot: false },
-    { l: "(−) Taxa de serviço de afiliado", v: -taxaServAfiliado, tot: false },
-    { l: "(−) Cupom próprio (o do marketplace não entra)", v: -cupom, tot: false },
-    ...(freteCusto !== 0 ? [{ l: "(−) Frete cobrado pelo TikTok (líquido do subsídio e do frete do cliente; detalhe em Conciliação)", v: -freteCusto, tot: false }] : []),
-    { l: "= Receita líquida (escrow / extrato)", v: liquida, tot: true },
+    ...topo,
     ...(reembTiktok !== 0 ? [{ l: "(+) Reembolsos do TikTok (logística / plataforma)", v: reembTiktok, tot: false }] : []),
     { l: "(−) Ads (saída da carteira)", v: -ads, tot: false },
     { l: "(−) Reembolsos / devoluções após o repasse", v: -reemb, tot: false },
@@ -316,6 +347,11 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
             </span>
             <span className="text-slate-400">{brl(emprestimo)}</span>
           </div>
+        )}
+        {!usaDetalhe && cdPedidos > 0 && (
+          <p className="mt-3 text-xs text-slate-500">
+            Topo do DRE pela fonte resumida: só {cdCobertura.toFixed(0)}% dos pedidos do período têm detalhamento linha a linha (o backfill roda a cada 10 min). Com 95% ou mais, as linhas passam a vir do detalhamento e fecham com a renda do pedido.
+          </p>
         )}
         <p className="mt-4 text-xs text-slate-500">
           {cobertura < 100 ? (
