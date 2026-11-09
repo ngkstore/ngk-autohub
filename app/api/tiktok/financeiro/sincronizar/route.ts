@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sincronizarFinanceiroTikTok } from "@/lib/tiktok/financeiro";
+import { autorizar } from "@/lib/autorizacao";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -23,5 +24,10 @@ async function rodar(request: NextRequest) {
     );
   }
 }
-export async function GET(request: NextRequest) { return rodar(request); }
+export async function GET(request: NextRequest) {
+  // Cron (Bearer CRON_SECRET) ou admin; em lote não tem loja no pedido.
+  const autz = await autorizar(request);
+  if (!autz.ok) return autz.resposta;
+  return rodar(request);
+}
 export async function POST(request: NextRequest) { return rodar(request); }

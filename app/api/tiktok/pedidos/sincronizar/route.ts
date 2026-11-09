@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sincronizarPedidosTikTok } from "@/lib/tiktok/pedidos";
+import { autorizar } from "@/lib/autorizacao";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -24,7 +25,10 @@ async function rodar(maxPaginas: number, desdeUnix?: number, ateUnix?: number, p
 }
 
 // GET (cron): só os recentes (últimos ~120 dias), rápido.
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // Cron (Bearer CRON_SECRET) ou usuário com acesso à loja; em lote só cron/admin.
+  const autz = await autorizar(request);
+  if (!autz.ok) return autz.resposta;
   const desde = Math.floor(Date.now() / 1000) - 120 * 86400;
   return rodar(4, desde);
 }

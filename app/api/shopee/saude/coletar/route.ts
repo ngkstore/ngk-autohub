@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { coletarSaudeLoja } from "@/lib/shopee/saudeConta";
 import { listarLojasShopeeAtivas } from "@/lib/shopee/lojas";
+import { autorizar } from "@/lib/autorizacao";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -8,6 +9,9 @@ export const maxDuration = 120;
 // Coletor diário de Saúde da conta (Account Health). GET = cron (todas as lojas Shopee
 // ativas). ?loja=<id> roda só uma loja; ?cru=1 devolve as respostas cruas da Shopee.
 export async function GET(request: NextRequest) {
+  // Cron (Bearer CRON_SECRET) ou usuário com acesso à loja; em lote só cron/admin.
+  const autz = await autorizar(request, [request.nextUrl.searchParams.get("loja")]);
+  if (!autz.ok) return autz.resposta;
   try {
     const loja = request.nextUrl.searchParams.get("loja");
     const cru = request.nextUrl.searchParams.get("cru") === "1";

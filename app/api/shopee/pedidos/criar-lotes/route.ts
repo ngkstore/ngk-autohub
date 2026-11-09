@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { escopoDoUsuario, podeVerLoja } from "@/lib/conta";
 
 function adicionarHoras(data: Date, horas: number) {
   const novaData = new Date(data);
@@ -21,6 +22,10 @@ export async function POST(request: NextRequest) {
         { sucesso: false, erro: "lojaId não informado." },
         { status: 400 }
       );
+    }
+    const escopo = await escopoDoUsuario();
+    if (!podeVerLoja(escopo, String(lojaId))) {
+      return NextResponse.json({ sucesso: false, erro: "Loja fora da sua conta." }, { status: 403 });
     }
 
     if (!dataInicio || !dataFim) {

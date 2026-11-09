@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listarLojasShopeeAtivas } from "@/lib/shopee/lojas";
 import { sincronizarVariacoesLoja } from "@/lib/shopee/produtoVariacoes";
+import { autorizar } from "@/lib/autorizacao";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -10,6 +11,9 @@ export const maxDuration = 300;
 // pega os nunca sincronizados / mais antigos primeiro, então tudo se renova ao
 // longo do dia).
 export async function GET(request: NextRequest) {
+  // Cron (Bearer CRON_SECRET) ou usuário com acesso à loja; em lote só cron/admin.
+  const autz = await autorizar(request);
+  if (!autz.ok) return autz.resposta;
   try {
     const sp = request.nextUrl.searchParams;
     const limite = Math.min(500, Math.max(1, Number(sp.get("limite")) || 150));

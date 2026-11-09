@@ -6,6 +6,7 @@ import {
   type LojaShopee,
 } from "@/lib/shopee/lojas";
 import { escopoDoUsuario } from "@/lib/conta";
+import { autorizar } from "@/lib/autorizacao";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -42,6 +43,9 @@ async function rodar(limite: number, lojas: LojaShopee[]) {
 
 // GET: cron -> todas as lojas.
 export async function GET(request: NextRequest) {
+  // Cron (Bearer CRON_SECRET) ou usuário com acesso à loja; em lote só cron/admin.
+  const autz = await autorizar(request);
+  if (!autz.ok) return autz.resposta;
   const limite = Number(request.nextUrl.searchParams.get("limite")) || 200;
   return rodar(limite, await listarLojasShopeeAtivas());
 }

@@ -6,6 +6,7 @@ import {
 } from "@/lib/shopee/lojas";
 import { escopoDoUsuario } from "@/lib/conta";
 import { flagsPorConta } from "@/lib/flags";
+import { autorizar } from "@/lib/autorizacao";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -54,6 +55,9 @@ export async function POST(request: NextRequest) {
 // GET: usado pelo cron (a cada minuto). Só age se o robô estiver ligado e
 // dentro da janela de sprint (primeiros 30 min de cada hora).
 export async function GET(request: NextRequest) {
+  // Cron (Bearer CRON_SECRET) ou usuário com acesso à loja; em lote só cron/admin.
+  const autz = await autorizar(request);
+  if (!autz.ok) return autz.resposta;
   try {
     const minuto = new Date().getUTCMinutes();
     if (minuto >= FIM_JANELA_ATIVA) {

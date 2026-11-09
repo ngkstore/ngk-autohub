@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { reforcarLoja, reverterLoja } from "@/lib/shopee/adsReforco";
+import { autorizar } from "@/lib/autorizacao";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -10,6 +11,9 @@ export const maxDuration = 120;
 //   GET /api/shopee/ads/reforco?reverter=1   → 00h05 BRT: volta tudo ao orçamento base
 //   ?loja=<id> restringe a uma loja · ?dry=1 só simula (nenhuma escrita na Shopee nem no banco)
 export async function GET(request: NextRequest) {
+  // Cron (Bearer CRON_SECRET) ou usuário com acesso à loja; em lote só cron/admin.
+  const autz = await autorizar(request);
+  if (!autz.ok) return autz.resposta;
   try {
     const sp = request.nextUrl.searchParams;
     const reverter = sp.get("reverter") === "1";

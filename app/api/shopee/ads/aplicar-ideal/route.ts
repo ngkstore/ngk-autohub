@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { aplicarAjuste } from "@/lib/shopee/adsAjuste";
+import { autorizar } from "@/lib/autorizacao";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -14,6 +15,9 @@ type Row = Record<string, unknown>;
 const n = (v: unknown) => Number(v || 0);
 
 export async function GET(request: NextRequest) {
+  // Cron (Bearer CRON_SECRET) ou usuário com acesso à loja; em lote só cron/admin.
+  const autz = await autorizar(request);
+  if (!autz.ok) return autz.resposta;
   try {
     const sp = request.nextUrl.searchParams;
     const lojaId = sp.get("loja") || "";

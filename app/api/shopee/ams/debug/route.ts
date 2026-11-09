@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
+import { autorizar } from "@/lib/autorizacao";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -8,6 +9,9 @@ export const maxDuration = 30;
 // Não expõe a chave: mostra tamanho/espaços e testa a assinatura na Shopee
 // com um endpoint público (get_shops_by_partner), que só exige partner_id+key.
 export async function GET(request: Request) {
+  // Cron (Bearer CRON_SECRET) ou usuário com acesso à loja; em lote só cron/admin.
+  const autz = await autorizar(request);
+  if (!autz.ok) return autz.resposta;
   const auth = request.headers.get("authorization");
   if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ sucesso: false }, { status: 401 });

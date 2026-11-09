@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
 // Fecha conversas escaladas sem cliente esperando há mais de 7 dias.
@@ -19,6 +19,7 @@ import {
 } from "@/lib/shopee/lojas";
 import { escopoDoUsuario } from "@/lib/conta";
 import { registrarSyncOk } from "@/lib/chat/vigia";
+import { autorizar } from "@/lib/autorizacao";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -102,7 +103,10 @@ export async function POST() {
 
 // GET: cron. Para CADA loja: puxa as conversas novas primeiro (responsivo) e,
 // se o histórico ainda não terminou, avança uma página antiga (cursor por loja).
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // Cron (Bearer CRON_SECRET) ou usuário com acesso à loja; em lote só cron/admin.
+  const autz = await autorizar(request);
+  if (!autz.ok) return autz.resposta;
   try {
     await fecharEscaladasAntiquas();
     const lojas = await listarLojasShopeeAtivas();

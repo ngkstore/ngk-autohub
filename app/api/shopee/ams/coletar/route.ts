@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { coletarAfiliados, type ResultadoColeta } from "@/lib/shopee/afiliadosColetor";
+import { autorizar } from "@/lib/autorizacao";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -9,6 +10,9 @@ export const maxDuration = 300;
 // lojas listadas em configuracoes.afiliados_coleta_lojas (ids separados por
 // vírgula; vazio = todas as conectadas). ?loja=<id>&dias=N&max=N pra backfill.
 export async function GET(request: NextRequest) {
+  // Cron (Bearer CRON_SECRET) ou usuário com acesso à loja; em lote só cron/admin.
+  const autz = await autorizar(request);
+  if (!autz.ok) return autz.resposta;
   try {
     const sp = request.nextUrl.searchParams;
     const dias = Math.min(Number(sp.get("dias")) || 3, 90);

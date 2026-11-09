@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { enriquecerRegiaoLoja } from "@/lib/shopee/regiao";
 import { listarLojasShopeeAtivas, lojasShopeeDoEscopo } from "@/lib/shopee/lojas";
 import { escopoDoUsuario } from "@/lib/conta";
+import { autorizar } from "@/lib/autorizacao";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 800;
@@ -20,6 +21,9 @@ async function rodar(lojas: { lojaId: string }[], limite: number) {
 // cron usa 30 (todas as lojas, cabe no tempo). Backfill manual de UF:
 //   ?loja=<id>&limite=250   (uma loja por vez, lotes grandes)
 export async function GET(request: NextRequest) {
+  // Cron (Bearer CRON_SECRET) ou usuário com acesso à loja; em lote só cron/admin.
+  const autz = await autorizar(request, [request.nextUrl.searchParams.get("loja")]);
+  if (!autz.ok) return autz.resposta;
   const loja = request.nextUrl.searchParams.get("loja");
   const limite = Number(request.nextUrl.searchParams.get("limite")) || 30;
   let lojas = await listarLojasShopeeAtivas();

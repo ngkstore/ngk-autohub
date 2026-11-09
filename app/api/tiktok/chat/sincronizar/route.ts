@@ -6,6 +6,7 @@ import {
   sincronizarChatsTikTok,
 } from "@/lib/tiktok/responderChats";
 import { registrarSyncOk } from "@/lib/chat/vigia";
+import { autorizar } from "@/lib/autorizacao";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -41,6 +42,9 @@ async function processarLojas(opcoes: {
 // reanalisa as conversas do banco com não-lidas. As duas formas recuperam
 // clientes que ficaram sem resposta.
 export async function GET(request: NextRequest) {
+  // Cron (Bearer CRON_SECRET) ou usuário com acesso à loja; em lote só cron/admin.
+  const autz = await autorizar(request);
+  if (!autz.ok) return autz.resposta;
   try {
     const sp = request.nextUrl.searchParams;
     // ?sessoes=1: reanalisa as conversas com sessão de atendimento ATIVA (a

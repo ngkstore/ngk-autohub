@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { enviarTelegram } from "@/lib/telegram";
 import { obterDiagnosticoRoas, textoDiagnostico } from "@/lib/shopee/adsDiagnostico";
+import { autorizar } from "@/lib/autorizacao";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -136,6 +137,9 @@ function partes(texto: string, max = 3900): string[] {
 }
 
 export async function GET(request: NextRequest) {
+  // Cron (Bearer CRON_SECRET) ou usuário com acesso à loja; em lote só cron/admin.
+  const autz = await autorizar(request, [request.nextUrl.searchParams.get("loja")]);
+  if (!autz.ok) return autz.resposta;
   try {
     const dry = request.nextUrl.searchParams.get("dry") === "1";
     const lojaParam = request.nextUrl.searchParams.get("loja");

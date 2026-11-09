@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { enviarMensagemChat } from "@/lib/shopee/chatSend";
 import { enviarMensagemTikTokPorLoja } from "@/lib/tiktok/responderChats";
+import { escopoDoUsuario, podeVerLoja } from "@/lib/conta";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,14 @@ export async function POST(request: NextRequest) {
       .select("to_id, loja_id, resposta_ia")
       .eq("marketplace", marketplace).eq("conversation_id", conversationId)
       .maybeSingle();
+
+    // Só quem tem acesso à loja da conversa (S2 do plano de melhorias).
+    if (conversa?.loja_id) {
+      const escopo = await escopoDoUsuario();
+      if (!podeVerLoja(escopo, String(conversa.loja_id))) {
+        return NextResponse.json({ sucesso: false, erro: "Conversa de loja fora da sua conta." }, { status: 403 });
+      }
+    }
 
     if (!conversa) {
       return NextResponse.json(

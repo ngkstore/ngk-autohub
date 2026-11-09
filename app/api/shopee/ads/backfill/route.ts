@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sincronizarAdsLoja } from "@/lib/shopee/ads";
 import { listarLojasShopeeAtivas } from "@/lib/shopee/lojas";
+import { autorizar } from "@/lib/autorizacao";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -15,6 +16,9 @@ export const maxDuration = 300;
 const dia = (t: number) => new Date(t).toISOString().slice(0, 10);
 
 export async function GET(request: NextRequest) {
+  // Cron (Bearer CRON_SECRET) ou usuário com acesso à loja; em lote só cron/admin.
+  const autz = await autorizar(request);
+  if (!autz.ok) return autz.resposta;
   const sp = request.nextUrl.searchParams;
   const loja = sp.get("loja");
   const de = sp.get("de") || "2026-01"; // YYYY-MM inicial

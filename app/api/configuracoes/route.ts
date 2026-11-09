@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { escopoDoUsuario } from "@/lib/conta";
 
 export async function POST(request: Request) {
   try {
+    // Chaves de parceiro (Shopee/TikTok): só o administrador altera.
+    const escopo = await escopoDoUsuario();
+    if (!escopo.admin) {
+      return NextResponse.json({ sucesso: false, erro: "Só o administrador." }, { status: 403 });
+    }
     const body = await request.json();
 
     const configuracoes = [

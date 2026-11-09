@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { enriquecerEscrowPendentes } from "@/lib/shopee/enriquecerEscrow";
 import { escopoDoUsuario } from "@/lib/conta";
+import { autorizar } from "@/lib/autorizacao";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -33,6 +34,9 @@ async function enriquecer(limite: number, lojaIds: string[] | null, reconferir =
 }
 
 export async function GET(request: NextRequest) {
+  // Cron (Bearer CRON_SECRET) ou usuário com acesso à loja; em lote só cron/admin.
+  const autz = await autorizar(request);
+  if (!autz.ok) return autz.resposta;
   // Cron da Vercel: processa TODAS as lojas (lojaIds = null).
   // ?reconferir=1 -> re-puxa o escrow de pedidos 32+ dias (afiliado tardio).
   const limite = Number(request.nextUrl.searchParams.get("limite")) || 200;

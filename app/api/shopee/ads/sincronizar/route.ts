@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sincronizarAdsLoja, buscarAdsBruto } from "@/lib/shopee/ads";
 import { listarLojasShopeeAtivas, lojasShopeeDoEscopo } from "@/lib/shopee/lojas";
 import { escopoDoUsuario } from "@/lib/conta";
+import { autorizar } from "@/lib/autorizacao";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -17,6 +18,9 @@ async function rodar(lojas: { lojaId: string }[], dias: number) {
 
 // GET = cron (todas as lojas). ?debug=1&loja=<id> mostra a resposta crua (sonda).
 export async function GET(request: NextRequest) {
+  // Cron (Bearer CRON_SECRET) ou usuário com acesso à loja; em lote só cron/admin.
+  const autz = await autorizar(request, [request.nextUrl.searchParams.get("loja")]);
+  if (!autz.ok) return autz.resposta;
   const dias = Number(request.nextUrl.searchParams.get("dias")) || 29;
   const loja = request.nextUrl.searchParams.get("loja");
 

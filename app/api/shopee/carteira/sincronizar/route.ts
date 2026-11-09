@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sincronizarCarteiraLoja } from "@/lib/shopee/carteira";
 import { listarLojasShopeeAtivas, lojasShopeeDoEscopo } from "@/lib/shopee/lojas";
 import { escopoDoUsuario } from "@/lib/conta";
+import { autorizar } from "@/lib/autorizacao";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 800;
@@ -17,6 +18,9 @@ async function rodar(lojas: { lojaId: string }[], dias: number, pular = 0) {
 }
 
 export async function GET(request: NextRequest) {
+  // Cron (Bearer CRON_SECRET) ou usuário com acesso à loja; em lote só cron/admin.
+  const autz = await autorizar(request, [request.nextUrl.searchParams.get("loja")]);
+  if (!autz.ok) return autz.resposta;
   // cron usa 14 dias (todas as lojas). Backfill manual em janelas:
   //   ?loja=<id>&dias=14&pular=0   (0-14 dias)
   //   ?loja=<id>&dias=14&pular=14  (14-28 dias) ...

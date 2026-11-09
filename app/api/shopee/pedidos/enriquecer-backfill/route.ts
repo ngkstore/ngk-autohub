@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { enriquecerPedidosPendentes } from "@/lib/shopee/enriquecerPedidos";
+import { autorizar } from "@/lib/autorizacao";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -27,6 +28,9 @@ async function rodar(limite: number, loja: string | null, offset: number) {
 }
 
 export async function GET(request: NextRequest) {
+  // Cron (Bearer CRON_SECRET) ou usuário com acesso à loja; em lote só cron/admin.
+  const autz = await autorizar(request, [request.nextUrl.searchParams.get("loja")]);
+  if (!autz.ok) return autz.resposta;
   const limite = Math.min(1000, Math.max(1, Number(request.nextUrl.searchParams.get("limite")) || 300));
   return rodar(limite, request.nextUrl.searchParams.get("loja"), Math.max(0, Number(request.nextUrl.searchParams.get("offset")) || 0));
 }

@@ -10,6 +10,7 @@ import {
 import { escopoDoUsuario } from "@/lib/conta";
 import { flagsPorConta } from "@/lib/flags";
 import { vigiarChat } from "@/lib/chat/vigia";
+import { autorizar } from "@/lib/autorizacao";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -68,7 +69,10 @@ export async function POST(request: NextRequest) {
 
 // GET: cron. Processa TODAS as lojas, mas só age nas cujas CONTAS têm o robô
 // ligado (flag por conta). O modo autônomo também é por conta.
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // Cron (Bearer CRON_SECRET) ou usuário com acesso à loja; em lote só cron/admin.
+  const autz = await autorizar(request);
+  if (!autz.ok) return autz.resposta;
   try {
     const lojas = await listarLojasShopeeAtivas();
     const [ativos, autonomos] = await Promise.all([
