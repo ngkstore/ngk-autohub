@@ -73,6 +73,7 @@ configuração), `tiktok/probe`, `tiktok/probe2`, `insights/debug`,
 
 ### [x] S4. Supabase: chave anon + tabelas sem RLS **[PERGUNTAR antes de cada etapa]**
 > **Feito 09/11/2026:** Gabriel confirmou: TODAS as tabelas sem RLS. Etapas 3 e 4 feitas: `lib/supabase.ts` tem `import "server-only"` e usa `SUPABASE_SERVICE_ROLE_KEY` (cai na anon enquanto a variável não existir); nenhum componente `"use client"` importa o cliente de dados. **Pendente:** (2) Gabriel criar `SUPABASE_SERVICE_ROLE_KEY` na Vercel e no `.env.local`; (5) testar logado após o deploy; (6) rodar `supabase/migrations/0001_rls.sql` (liga RLS em tudo + revoga execute de anon/authenticated).
+> **Concluído 09/11/2026 (noite):** `SUPABASE_SERVICE_ROLE_KEY` (formato novo `sb_secret_`) criada na Vercel e no `.env.local`; deploy c4378e7; teste por etapas (RLS em `marketplace_tokens` → rota leu normalmente = service role ativa); `0001_rls.sql` aplicada: 69/69 tabelas com RLS, execute revogado de anon/authenticated. Conferido: anon via REST devolve 0 linhas em lojas/pedidos/marketplace_tokens/carteira_transacoes e não chama RPC; crons (avaliacoes/sincronizar, criar-lotes-automatico, escrow/backfill) seguem 200.
 **Contexto:** `lib/supabase.ts` usa `NEXT_PUBLIC_SUPABASE_ANON_KEY` para **todos** os
 dados, e o escopo por conta é feito só no código. A chave anon é pública (vai para o
 navegador no login). Nos SQL do projeto não há `enable row level security` nem
@@ -354,5 +355,5 @@ Resultado: de 32 para 29 crons e cerca de 40% menos execuções por hora, sem to
 ## Resumo final (parcial — 09/11/2026)
 
 - **Feito:** S1, S2, S3, S4 (código; falta a chave e ligar o RLS), F1, F3, F4 (incluindo a marcação em lotes: 232.678 pedidos com escrow final), F5, F6, F7 (corrigido, não apagado), O1, O2 (proposta), O3, O4, O5. F2 verificado e mantido como está (ver nota). Tudo com `tsc` e `npm run build` limpos; `npm run lint` tem erros pré-existentes em arquivos não tocados (listados no chat). Commits e25fd84 → 7d22805, publicados.
-- **Pendente de ação/resposta do Gabriel:** S4 — criar `SUPABASE_SERVICE_ROLE_KEY` (Vercel + `.env.local`) e avisar; depois eu rodo `0001_rls.sql`. O2 — aprovar a tabela acima para eu alterar o `vercel.json`.
+- **Pendente de ação/resposta do Gabriel:** O2 — aprovar a tabela de crons acima para eu alterar o `vercel.json`. (S4 concluído.)
 - **Ações manuais do Gabriel (Supabase / Vercel):** criar `SUPABASE_SERVICE_ROLE_KEY` na Vercel (Settings → API → service_role) e no `.env.local`; confirmar `CRON_SECRET` na Vercel (já em uso pelos crons).
