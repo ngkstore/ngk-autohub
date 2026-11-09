@@ -10,6 +10,9 @@ const PRECOS: Record<
 > = {
   "claude-opus-4-8": { entrada: 5, saida: 25, cacheLeitura: 0.5, cacheEscrita: 6.25 },
   "claude-haiku-4-5": { entrada: 1, saida: 5, cacheLeitura: 0.1, cacheEscrita: 1.25 },
+  // Haiku 5.5 (tabela oficial, prompts até 100K tokens): US$ 0,10 entrada / US$ 0,50 saída por 1M.
+  // Acima de 100K tokens de prompt sobe para 0,50 / 2,50. Cache: leitura ~0,1x e escrita ~1,25x da entrada.
+  "claude-haiku-5-5": { entrada: 0.1, saida: 0.5, cacheLeitura: 0.01, cacheEscrita: 0.125 },
 };
 
 type Usage = {

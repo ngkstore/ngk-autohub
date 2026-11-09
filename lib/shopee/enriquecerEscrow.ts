@@ -226,13 +226,25 @@ export async function enriquecerEscrowPendentes({
     return { processados: 0, atualizados: 0, erros: 0, restantes: 0 };
   }
 
-  let pedidos: { id: string; loja_id: string; pedido_externo_id: string }[] | null = null;
+  type PedidoRef = { id: string; loja_id: string; pedido_externo_id: string };
+  let pedidos: PedidoRef[] | null = null;
+  const idsRepasse = new Set<string>(); // F4: escrow lido depois do repasse -> escrow_final
   if (reconferir) {
     // Re-conferência: re-puxa o escrow de pedidos que já passaram de ~32 dias
     // (janela em que a comissão de afiliado costuma ser aplicada) mas foram
     // enriquecidos ANTES disso — capturando o afiliado tardio que faltava.
-    const { data } = await supabase.rpc("reconferencia_escrow_ids", { p_limite: limite });
-    pedidos = (data as typeof pedidos) ?? null;
+    // Duas listas: (1) afiliado tardio 32–45 dias; (2) F4: pedidos cujo repasse (101) ou
+    // taxa do Acelera (458) já caiu na carteira DEPOIS da leitura do escrow — o valor
+    // deixou de ser "renda estimada" e virou final. Metade do limite para cada.
+    const metade = Math.max(1, Math.ceil(limite / 2));
+    const [{ data: afil }, { data: rep }] = await Promise.all([
+      supabase.rpc("reconferencia_escrow_ids", { p_limite: metade }),
+      supabase.rpc("pedidos_para_reconferir_repasse", { p_limite: metade }),
+    ]);
+    const listaRep: PedidoRef[] = (rep as PedidoRef[] | null) ?? [];
+    for (const r of listaRep) idsRepasse.add(r.id);
+    const vistos = new Set<string>();
+    pedidos = [...((afil as PedidoRef[] | null) ?? []), ...listaRep].filter((x) => (vistos.has(x.id) ? false : (vistos.add(x.id), true)));
   } else {
     // Pedidos pagos/válidos, reais, que ainda não tiveram o escrow puxado.
     // lojaIds null = todas as lojas (cron); [...] = só as lojas da conta.
@@ -318,6 +330,7 @@ export async function enriquecerEscrowPendentes({
           desconto_vendedor: n(income.order_seller_discount),
           comissao_afiliado: n(income.order_ams_commission_fee), // Programa de Afiliados (comissão)
           escrow_atualizado_em: new Date().toISOString(),
+          ...(idsRepasse.has(pedido.id) ? { escrow_final: true } : {}),
           // Reversão: escrow líquido zerado = cancelado/devolvido depois do
           // pagamento -> tira do faturamento (senão fica contado como venda).
           ...(n(income.escrow_amount) <= 0

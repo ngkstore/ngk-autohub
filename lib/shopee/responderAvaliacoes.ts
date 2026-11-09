@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { supabase } from "@/lib/supabase";
 import { registrarUsoIA } from "@/lib/uso";
 import { nomeLojaPublico } from "@/lib/shopee/lojas";
+import { MODELO_IA } from "@/lib/ia";
 
 const BASE_URL_PADRAO = "https://partner.shopeemobile.com";
 
@@ -92,7 +93,7 @@ async function gerarRespostaIA(
     `Comentário do cliente: ${avaliacao.comentario?.trim() || "(sem texto, apenas a nota)"}`;
 
   const resposta = await client.messages.create({
-    model: "claude-haiku-4-5",
+    model: MODELO_IA,
     max_tokens: 300,
     system,
     messages: [{ role: "user", content: conteudo }],
@@ -102,7 +103,7 @@ async function gerarRespostaIA(
   await registrarUsoIA({
     lojaId,
     tipo: "avaliacao",
-    modelo: "claude-haiku-4-5",
+    modelo: MODELO_IA,
     usage: resposta.usage,
   });
 

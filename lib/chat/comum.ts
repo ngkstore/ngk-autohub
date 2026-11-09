@@ -1,9 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { registrarUsoIA } from "@/lib/uso";
+import { MODELO_IA } from "@/lib/ia";
 
 // Regras compartilhadas pelos robôs de chat (Shopee e TikTok Shop).
 
-const MODELO = "claude-haiku-4-5";
+const MODELO = MODELO_IA;
 
 // Contato fora da plataforma (WhatsApp, telefone, e-mail, redes sociais, links).
 // A Shopee BLOQUEIA a mensagem no envio e pode penalizar a loja — então isso
