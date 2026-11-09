@@ -38,8 +38,13 @@
 - Nunca ler nem imprimir `.env.local`; para saber se uma variável existe, perguntar.
 
 ### Banco
-- Mudança de schema = arquivo novo em `supabase/`, idempotente (`create or replace`,
-  `if not exists`). `delete`/`update` em massa só com aprovação do Gabriel.
+- Baseline do schema em `supabase/migrations/0000_baseline.sql` (gerado dos catálogos em 09/11/2026);
+  os SQL antigos ficaram em `supabase/legado/` só para consulta.
+- Mudança de schema = arquivo novo `supabase/migrations/NNNN_descricao.sql`, idempotente
+  (`create or replace`, `if not exists`), aplicado no painel ou pela Management API.
+  `delete`/`update` em massa só com aprovação do Gabriel; em lotes quando passar de ~100 s.
+- RLS ligado em todas as tabelas sem policies (`0001_rls.sql`): o servidor usa a service role
+  (`lib/supabase.ts`, só servidor); anon/authenticated não leem nada nem chamam RPC.
 - Tabelas derivadas (`custos_pedido`, `financas_resumo_diario`) podem ser regeradas;
   tabelas de origem (`pedidos`, `carteira_transacoes`, `pedido_escrow`) não se apagam.
 

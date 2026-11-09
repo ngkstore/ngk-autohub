@@ -35,7 +35,6 @@ const ROTAS_CRON = [
   "/api/shopee/ams/debug",
   "/api/shopee/ams/coletar",
   "/api/shopee/saude/coletar",
-  "/api/shopee/rastreio/debug",
   "/api/shopee/produtos/sincronizar-todos",
   "/api/tiktok/pedidos/sincronizar",
   "/api/tiktok/token/refresh",

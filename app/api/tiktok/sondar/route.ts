@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { chamarTikTok } from "@/lib/tiktok/client";
 import { garantirTokenTikTok, type LinhaTokenTikTok } from "@/lib/tiktok/token";
-import { autorizar } from "@/lib/autorizacao";
+import { autorizarAdmin } from "@/lib/autorizacao";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -23,8 +23,8 @@ type Alvo = {
 };
 
 export async function GET(request: NextRequest) {
-  // Cron (Bearer CRON_SECRET) ou usuário com acesso à loja; em lote só cron/admin.
-  const autz = await autorizar(request);
+  // Sondagem: só cron (Bearer CRON_SECRET) ou administrador (S3 do plano).
+  const autz = await autorizarAdmin(request);
   if (!autz.ok) return autz.resposta;
   const sp = request.nextUrl.searchParams;
   const { data: token } = await supabase

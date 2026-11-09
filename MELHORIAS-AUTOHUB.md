@@ -59,7 +59,8 @@ não conferem se a loja pertence à conta do usuário. Um usuário de outra cont
 - Rotas que alteram dados em lote para todas as lojas (`aplicar-ideal` sem loja,
   backfills) → só cron ou admin (`escopo.admin`).
 
-### [ ] S3. Rotas de teste em produção
+### [x] S3. Rotas de teste em produção
+> **Feito 09/11/2026:** apagadas 18 rotas (shopee/debug, chat/debug, chat/debug-contexto, chat/raw, chat/sync-test, avaliacoes/debug, pedidos/debug-detalhe, pedidos/debug-escrow, produtos/metricas-debug, telegram/test, tiktok/debug, tiktok/probe, tiktok/probe2, ads/debug, ads/debug-gms, ads/debug-produto, etiqueta/debug, rastreio/debug). Ficaram, só admin ou cron: escrow/debug, carteira/debug, ams/debug, ams/sondar, tiktok/sondar, chat/diagnostico, debug/lojas, ads/probe-gms, insights/debug, insights/coletor/debug.
 **Onde:** `app/api/**/debug*`, `probe*`, `sondar`, `raw`, `sync-test`,
 `metricas-debug`, `debug-*`, `diagnostico`, `shopee/debug` (expõe IDs de
 configuração), `tiktok/probe`, `tiktok/probe2`, `insights/debug`,
@@ -70,7 +71,8 @@ configuração), `tiktok/probe`, `tiktok/probe2`, `insights/debug`,
 2. As que não usa: apagar.
 3. As que ficam: tirar de `ROTAS_CRON` e exigir `escopo.admin`.
 
-### [ ] S4. Supabase: chave anon + tabelas sem RLS **[PERGUNTAR antes de cada etapa]**
+### [x] S4. Supabase: chave anon + tabelas sem RLS **[PERGUNTAR antes de cada etapa]**
+> **Feito 09/11/2026:** Gabriel confirmou: TODAS as tabelas sem RLS. Etapas 3 e 4 feitas: `lib/supabase.ts` tem `import "server-only"` e usa `SUPABASE_SERVICE_ROLE_KEY` (cai na anon enquanto a variável não existir); nenhum componente `"use client"` importa o cliente de dados. **Pendente:** (2) Gabriel criar `SUPABASE_SERVICE_ROLE_KEY` na Vercel e no `.env.local`; (5) testar logado após o deploy; (6) rodar `supabase/migrations/0001_rls.sql` (liga RLS em tudo + revoga execute de anon/authenticated).
 **Contexto:** `lib/supabase.ts` usa `NEXT_PUBLIC_SUPABASE_ANON_KEY` para **todos** os
 dados, e o escopo por conta é feito só no código. A chave anon é pública (vai para o
 navegador no login). Nos SQL do projeto não há `enable row level security` nem
@@ -229,7 +231,8 @@ e apagar.
 
 ## P2 — Operação e manutenção
 
-### [ ] O1. Migrações do banco
+### [x] O1. Migrações do banco
+> **Feito 09/11/2026:** baseline gerado dos catálogos (tabelas, constraints, índices, views, funções, grants, triggers, pg_cron em comentário) em `supabase/migrations/0000_baseline.sql`; 93 arquivos antigos movidos para `supabase/legado/`; regra registrada no `CLAUDE.md`. Daqui em diante: `supabase/migrations/NNNN_descricao.sql`.
 **Problema:** cerca de 90 arquivos `.sql` soltos em `supabase/` (`v2`, `fix`,
 `reaplicar`, `limpeza`), rodados à mão no painel. Não dá para saber o que já foi
 aplicado nem a ordem.
@@ -240,7 +243,8 @@ aplicado nem a ordem.
 3. Daqui em diante, toda mudança vira `supabase/migrations/NNNN_descricao.sql`.
 4. Registrar a regra no `CLAUDE.md` (item O4).
 
-### [ ] O2. Crons demais **[PERGUNTAR antes de alterar `vercel.json`]**
+### [x] O2. Crons demais **[PERGUNTAR antes de alterar `vercel.json`]**
+> **Feito 09/11/2026:** tabela atual → proposto montada (abaixo). Nada alterado no `vercel.json` ainda.
 Hoje são 31 crons:
 - `avaliacoes/responder` a cada 1 min;
 - `chat/sincronizar` e `chat/responder` a cada 2 min (e o mesmo para o TikTok);
@@ -253,6 +257,7 @@ avaliações a cada 10–15 min; juntar `resync-status` e `revisar-status`; junt
 três backfills numa rota só. Aplicar só o que ele aprovar.
 
 ### [x] O3. Modelo de IA do atendimento
+> **Atualização 09/11/2026:** `lib/ia.ts`: `MODELO_IA` padrão `claude-haiku-5-5` (aprovado; mais barato: US$ 0,10/0,50 contra 1,00/5,00 por 1M) com `ESFORCO_IA = "low"` e `max_tokens` com folga para o raciocínio (2048 no chat, 1024 nas avaliações). Preço na tabela de `lib/uso.ts`. Para voltar sem deploy: `MODELO_IA=claude-haiku-4-5` na Vercel. Etapa 3 (modo sugestão) dispensada pelo Gabriel; acompanhar os primeiros dias em `/uso` e no Telegram.
 > **Feito 09/11/2026:** etapas 1 e 2: `lib/ia.ts` (`MODELO_IA`, com override por variável de ambiente) usado pelo chat e pelas avaliações; preço do Haiku 5.5 em `lib/uso.ts` (US$ 0,10 / 0,50 por 1M, prompts até 100K). **O padrão continua `claude-haiku-4-5`** até o Gabriel aprovar a troca (etapa 3).
 **Onde:** `lib/chat/comum.ts` (`MODELO = "claude-haiku-4-5"`) e
 `lib/shopee/responderAvaliacoes.ts` (`model: "claude-haiku-4-5"`).
@@ -308,7 +313,8 @@ O `CLAUDE.md` hoje só importa o `AGENTS.md`. Acrescentar uma seção **abaixo**
 Trocar também o `README.md` padrão do Next.js por um resumo curto do sistema:
 o que é, módulos, variáveis de ambiente necessárias (só os nomes) e como rodar.
 
-### [ ] O5. Testes nas regras que mexem com dinheiro
+### [x] O5. Testes nas regras que mexem com dinheiro
+> **Feito 09/11/2026:** `vitest` + `vite` (devDependencies, `npm test`), `vitest.config.ts` com alias `@`. Testes: `tests/carteira.test.ts` (um caso por tipo, textos do 407, os três textos do SPM_DEDUCT_DIRECT), `tests/comissao.test.ts` (`lib/shopee/comissaoTabela.ts`, espelho TS da função SQL: 79,99→20,50; 80→27,20; 99,90→29,99; 1.000 em fev→104; virada 01/10), `tests/escrowLinhas.test.ts` (`lib/shopee/escrowLinhas.ts`, espelho TS do mapeamento, com 3 fixtures reais: Pix 10,62, afiliado 21,43, devolução −69,25). Os casos de borda do Ads (item 5) ficaram para depois.
 **Fazer [PERGUNTAR antes de instalar dependência]:**
 1. Adicionar `vitest` como devDependency e o script `"test": "vitest run"`.
 2. Testes de `categoriaCarteira()` (`lib/shopee/carteira.ts`): um caso por tipo da
@@ -328,8 +334,25 @@ o que é, módulos, variáveis de ambiente necessárias (só os nomes) e como ro
 
 ---
 
+## O2 — crons: atual → proposto (para aprovação)
+
+| Rota | Atual | Proposto | Motivo |
+|---|---|---|---|
+| avaliacoes/responder | a cada 1 min | a cada 10 min | resposta de avaliação não é urgente; corta 54 execuções/hora |
+| avaliacoes/sincronizar | 5 min | 15 min | idem |
+| produtos/descricoes | 15 min | 1 h | descrição muda raramente |
+| produtos/variacoes | 1 h | 6 h | variação muda raramente |
+| revisar-status | 2×/hora (5,35) | 1×/hora (35) | sobrepõe resync-status; manter os dois, metade da frequência |
+| processar-backfill, enriquecer-backfill, enriquecer-financeiro-backfill | 6×/hora cada | **remover** | fila do backfill histórico vazia (sobram 15 lotes em erro, 15 pedidos sem detalhe) |
+| enriquecer-financeiro?reconferir=1&limite=150 | 1 h | limite=400 | 15.088 pedidos esperando a reconferência pós-repasse (F4); com 75/h levaria 8 dias |
+| escrow/backfill | 10 min, 400 | manter até acabar; depois 1×/dia | ~280 mil pedidos; depois só os novos |
+| chat/sincronizar, chat/responder (Shopee e TikTok) | 2 min | manter | regra do Gabriel: toda mensagem respondida rápido |
+| demais (pedidos 5–10 min, carteira 30 min, ads, saúde, tokens, AMS, TikTok) | — | manter | sem sobreposição |
+
+Resultado: de 32 para 29 crons e cerca de 40% menos execuções por hora, sem tocar no atendimento.
+
 ## Resumo final (parcial — 09/11/2026)
 
-- **Feito:** S1, S2, F1, F3, F4 (menos o update em massa), F5, F6, F7 (corrigido, não apagado), O3 (etapas 1–2), O4. F2 verificado e mantido como está (ver nota). Tudo com `tsc` e `npm run build` limpos; `npm run lint` tem erros pré-existentes em arquivos não tocados (listados no chat). Commits e25fd84 → 7d22805, publicados.
-- **Pendente de resposta do Gabriel:** S3 (quais rotas debug/probe ainda usa), S4 (RLS no painel do Supabase + criar `SUPABASE_SERVICE_ROLE_KEY`), O1 (baseline + pasta `migrations/`), O2 (tabela de crons atual → proposto), O3 etapa 3 (quando trocar para Haiku 5.5 em modo sugestão), O5 (instalar vitest), F4 (rodar o `update` em massa de `escrow_final`).
-- **Ações manuais do Gabriel (Supabase / Vercel):** confirmar `CRON_SECRET` na Vercel (S1); conferir RLS das tabelas e criar a service role (S4); se aprovar, rodar o bloco final de `supabase/reconferencia_repasse.sql`.
+- **Feito:** S1, S2, S3, S4 (código; falta a chave e ligar o RLS), F1, F3, F4 (incluindo a marcação em lotes: 232.678 pedidos com escrow final), F5, F6, F7 (corrigido, não apagado), O1, O2 (proposta), O3, O4, O5. F2 verificado e mantido como está (ver nota). Tudo com `tsc` e `npm run build` limpos; `npm run lint` tem erros pré-existentes em arquivos não tocados (listados no chat). Commits e25fd84 → 7d22805, publicados.
+- **Pendente de ação/resposta do Gabriel:** S4 — criar `SUPABASE_SERVICE_ROLE_KEY` (Vercel + `.env.local`) e avisar; depois eu rodo `0001_rls.sql`. O2 — aprovar a tabela acima para eu alterar o `vercel.json`.
+- **Ações manuais do Gabriel (Supabase / Vercel):** criar `SUPABASE_SERVICE_ROLE_KEY` na Vercel (Settings → API → service_role) e no `.env.local`; confirmar `CRON_SECRET` na Vercel (já em uso pelos crons).

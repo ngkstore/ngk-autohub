@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { registrarUsoIA } from "@/lib/uso";
-import { MODELO_IA } from "@/lib/ia";
+import { MODELO_IA, ESFORCO_IA } from "@/lib/ia";
 
 // Regras compartilhadas pelos robôs de chat (Shopee e TikTok Shop).
 
@@ -98,7 +98,7 @@ export async function decidirResposta(
 ): Promise<Decisao | null> {
   const pedido = {
     model: MODELO,
-    max_tokens: 1024,
+    max_tokens: 2048, // inclui o raciocínio do Haiku 5.5 (esforço baixo)
     // system (fixo por loja: instruções + exemplos) marcado para CACHE de prompt.
     system: [{ type: "text" as const, text: system, cache_control: { type: "ephemeral" as const } }],
     messages: [{ role: "user" as const, content: contexto }],
@@ -108,7 +108,7 @@ export async function decidirResposta(
   try {
     r = await client.messages.create({
       ...pedido,
-      output_config: { format: { type: "json_schema", schema: ESQUEMA_DECISAO } },
+      output_config: { effort: ESFORCO_IA, format: { type: "json_schema", schema: ESQUEMA_DECISAO } },
     });
   } catch (e) {
     // Se a API recusar o formato estruturado, o robô não pode parar por isso:

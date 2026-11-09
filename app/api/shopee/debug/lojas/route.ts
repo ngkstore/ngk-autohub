@@ -1,11 +1,15 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { autorizarAdmin } from "@/lib/autorizacao";
 import { supabase } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
 // Diagnóstico: mostra as lojas e a qual loja cada token Shopee está amarrado.
 // Serve para conferir se a conexão da 2ª loja caiu na loja certa.
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // Diagnóstico: só cron (Bearer CRON_SECRET) ou administrador (S3 do plano).
+  const autz = await autorizarAdmin(request);
+  if (!autz.ok) return autz.resposta;
   const { data: lojas } = await supabase
     .from("lojas")
     .select("id, apelido, marketplace, shop_id")

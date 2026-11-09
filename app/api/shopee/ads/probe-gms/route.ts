@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { supabase } from "@/lib/supabase";
-import { autorizar } from "@/lib/autorizacao";
+import { autorizarAdmin } from "@/lib/autorizacao";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -63,8 +63,8 @@ function resumo(r: unknown): { error?: string; message?: string; temResposta: bo
 }
 
 export async function GET(request: NextRequest) {
-  // Cron (Bearer CRON_SECRET) ou usuário com acesso à loja; em lote só cron/admin.
-  const autz = await autorizar(request, [request.nextUrl.searchParams.get("loja")]);
+  // Sondagem de permissão: só cron (Bearer CRON_SECRET) ou administrador (S3 do plano).
+  const autz = await autorizarAdmin(request);
   if (!autz.ok) return autz.resposta;
   const loja = request.nextUrl.searchParams.get("loja");
   const cru = request.nextUrl.searchParams.get("cru") === "1";

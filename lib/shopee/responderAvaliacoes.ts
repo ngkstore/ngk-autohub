@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { supabase } from "@/lib/supabase";
 import { registrarUsoIA } from "@/lib/uso";
 import { nomeLojaPublico } from "@/lib/shopee/lojas";
-import { MODELO_IA } from "@/lib/ia";
+import { MODELO_IA, ESFORCO_IA } from "@/lib/ia";
 
 const BASE_URL_PADRAO = "https://partner.shopeemobile.com";
 
@@ -94,7 +94,8 @@ async function gerarRespostaIA(
 
   const resposta = await client.messages.create({
     model: MODELO_IA,
-    max_tokens: 300,
+    max_tokens: 1024, // inclui o raciocínio do Haiku 5.5 (esforço baixo)
+    output_config: { effort: ESFORCO_IA },
     system,
     messages: [{ role: "user", content: conteudo }],
   });

@@ -11,6 +11,10 @@ export const maxDuration = 60;
 // Diagnóstico do robô de chat: por que não está respondendo?
 export async function GET() {
   const escopo = await escopoDoUsuario();
+  // Diagnóstico do robô: só administrador (S3 do plano).
+  if (!escopo.admin) {
+    return NextResponse.json({ sucesso: false, erro: "Só o administrador." }, { status: 403 });
+  }
 
   // 1) Flags por conta (o cron só age se a flag da conta estiver 'true').
   const [ativos, autonomos] = await Promise.all([
