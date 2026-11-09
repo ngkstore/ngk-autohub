@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { supabase } from "@/lib/supabase";
+import { guardarEscrowBruto, type EscrowBruto } from "@/lib/shopee/escrowBruto";
 
 const BASE_URL_PADRAO = "https://partner.shopeemobile.com";
 
@@ -29,7 +30,7 @@ function gerarAssinaturaSimples(
     .digest("hex");
 }
 
-type TokenLoja = {
+export type TokenLoja = {
   id: string;
   accessToken: string;
   refreshToken: string;
@@ -97,7 +98,7 @@ async function atualizarToken(params: {
   };
 }
 
-async function obterTokenLoja(lojaId: string): Promise<TokenLoja> {
+export async function obterTokenLoja(lojaId: string): Promise<TokenLoja> {
   const { data: token, error } = await supabase
     .from("marketplace_tokens")
     .select("*")
@@ -130,7 +131,7 @@ type EscrowResposta = {
 };
 
 // Busca o escrow de um pedido, com refresh de token automático.
-async function buscarEscrow(params: {
+export async function buscarEscrow(params: {
   baseUrl: string;
   partnerId: string;
   partnerKey: string;
@@ -259,6 +260,7 @@ export async function enriquecerEscrowPendentes({
   let erros = 0;
   let mensagemErro: string | undefined;
   const tokensPorLoja = new Map<string, TokenLoja>();
+  const brutos: EscrowBruto[] = []; // Camada 1: detalhamento bruto p/ custos_pedido
 
   for (const pedido of pedidos) {
     try {
@@ -278,6 +280,9 @@ export async function enriquecerEscrowPendentes({
 
       const income = escrow?.order_income || {};
       const buyer = escrow?.buyer_payment_info || {};
+      if (escrow?.order_income) {
+        brutos.push({ lojaId: pedido.loja_id, orderSn: pedido.pedido_externo_id, income, buyer: escrow.buyer_payment_info ?? null });
+      }
 
       // "Vendas (Pedidos Pagos)": subtotal de mercadoria após todos os
       // descontos (vendedor + Shopee), sem frete.
@@ -331,6 +336,14 @@ export async function enriquecerEscrowPendentes({
       erros++;
       mensagemErro = e instanceof Error ? e.message : "Erro desconhecido.";
     }
+  }
+
+  // Guarda o bruto e gera as linhas de custo por pedido (não derruba o lote se falhar).
+  try {
+    const g = await guardarEscrowBruto(brutos);
+    if (g.erro) mensagemErro = mensagemErro ?? `custos_pedido: ${g.erro}`;
+  } catch (e) {
+    mensagemErro = mensagemErro ?? (e instanceof Error ? e.message : "Erro ao guardar escrow bruto.");
   }
 
   let countQuery = supabase

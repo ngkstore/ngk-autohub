@@ -7,11 +7,12 @@ import CustoVariacaoInput from "../components/CustoVariacaoInput";
 import UploadCustos from "../components/UploadCustos";
 import ImpostoForm from "../components/ImpostoForm";
 import SeletorEstado from "../components/SeletorEstado";
+import Custos from "./Custos";
 
 export const dynamic = "force-dynamic";
 
 type Props = {
-  searchParams: Promise<{ aba?: string; periodo?: string; loja?: string; ufTend?: string; pMargem?: string; q?: string; semCusto?: string; semVenda?: string }>;
+  searchParams: Promise<{ aba?: string; periodo?: string; loja?: string; ufTend?: string; pMargem?: string; q?: string; semCusto?: string; semVenda?: string; pedido?: string }>;
 };
 
 // ---------- período (Brasília, fim exclusivo) ----------
@@ -50,6 +51,7 @@ const ABAS = [
   { k: "conciliacao", r: "🧮 Conciliação & Taxas" },
   { k: "previsao", r: "📅 Previsão" },
   { k: "carteira", r: "👛 Carteira" },
+  { k: "custos", r: "📑 Custos Shopee" },
   { k: "produtos", r: "🏷️ Produtos & Margem" },
   { k: "impostos", r: "🧾 Impostos" },
 ];
@@ -139,6 +141,7 @@ export default async function FinancasPage({ searchParams }: Props) {
         {(aba === "conciliacao" || aba === "divergencias") && <Conciliacao lojas={lojas} periodo={periodo} />}
         {aba === "previsao" && <Previsao lojas={lojas} ufTend={params.ufTend} sufixo={sufixo} />}
         {aba === "carteira" && <Carteira lojas={lojas} />}
+        {aba === "custos" && <Custos lojas={lojas} periodo={periodo} pedido={params.pedido} />}
         {(aba === "produtos" || aba === "variacoes") && (
           <Produtos
             lojas={lojas}
@@ -196,7 +199,15 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
   const imposto = n(r.imposto);
   const freteCusto = n(r.frete_custo); // TikTok: frete real − subsídio Frete Grátis − pago pelo cliente (já dentro do líquido)
   const reembTiktok = n(r.reembolsos_tiktok); // TikTok: reembolsos de logística/plataforma (fora do pedido)
-  const resultado = liquida + reembTiktok - ads - reemb - imposto;
+  // Carteira Shopee classificada por tipo (custos_camadas.sql)
+  const acelera = n(r.acelera_taxa); // taxa do Shopee Acelera (antecipação)
+  const estornos = n(r.estornos); // renda do pedido negativa (102)
+  const compens = n(r.compensacoes); // compensações da Shopee (perda, devolução, Full, ajustes a favor)
+  const difal = n(r.difal); // DIFAL cobrado pela Shopee
+  const ajustes = n(r.ajustes); // volumoso, peso cubado, Full, crédito a maior
+  const afilAjuste = n(r.afiliado_ajuste); // afiliado cobrado após o repasse
+  const extrasCarteira = acelera + estornos + difal + ajustes + afilAjuste - compens;
+  const resultado = liquida + reembTiktok - ads - reemb - imposto - extrasCarteira;
   const margem = receita > 0 ? (resultado / receita) * 100 : 0;
 
   // CMV: custo da mercadoria vendida no período. Cobertura = % de itens com custo.
@@ -209,7 +220,8 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
 
   // Comparação com o período anterior (mesma duração).
   const receitaPrev = n(rp.receita_bruta);
-  const resultadoPrev = n(rp.receita_liquida) + n(rp.reembolsos_tiktok) - n(rp.ads) - n(rp.reembolsos) - n(rp.imposto);
+  const resultadoPrev = n(rp.receita_liquida) + n(rp.reembolsos_tiktok) - n(rp.ads) - n(rp.reembolsos) - n(rp.imposto)
+    - (n(rp.acelera_taxa) + n(rp.estornos) + n(rp.difal) + n(rp.ajustes) + n(rp.afiliado_ajuste) - n(rp.compensacoes));
   const deltaReceita = receitaPrev > 0 ? ((receita - receitaPrev) / receitaPrev) * 100 : null;
   const deltaResultado = Math.abs(resultadoPrev) > 0 ? ((resultado - resultadoPrev) / Math.abs(resultadoPrev)) * 100 : null;
   const maxEvoR = Math.max(1, ...evo.map((e) => n(e.receita)));
@@ -224,7 +236,13 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
     { l: "= Receita líquida (escrow / extrato)", v: liquida, tot: true },
     ...(reembTiktok !== 0 ? [{ l: "(+) Reembolsos do TikTok (logística / plataforma)", v: reembTiktok, tot: false }] : []),
     { l: "(−) Ads (saída da carteira)", v: -ads, tot: false },
-    { l: "(−) Reembolsos / devoluções", v: -reemb, tot: false },
+    { l: "(−) Reembolsos / devoluções após o repasse", v: -reemb, tot: false },
+    ...(estornos !== 0 ? [{ l: "(−) Estornos de venda (renda do pedido negativa)", v: -estornos, tot: false }] : []),
+    ...(acelera !== 0 ? [{ l: "(−) Taxa do Shopee Acelera (antecipação)", v: -acelera, tot: false }] : []),
+    ...(afilAjuste !== 0 ? [{ l: "(−) Afiliado cobrado após o repasse", v: -afilAjuste, tot: false }] : []),
+    ...(difal !== 0 ? [{ l: "(−) DIFAL cobrado pela Shopee", v: -difal, tot: false }] : []),
+    ...(ajustes !== 0 ? [{ l: "(−) Ajustes da Shopee (volumoso, peso, Full, crédito a maior)", v: -ajustes, tot: false }] : []),
+    ...(compens !== 0 ? [{ l: "(+) Compensações da Shopee (perda, devolução, Full)", v: compens, tot: false }] : []),
     { l: "(−) Imposto lançado", v: -imposto, tot: false },
     { l: "= Resultado (antes do custo)", v: resultado, tot: true },
     { l: `(−) Custo da mercadoria (CMV${cobertura < 100 ? ` · ${cobertura.toFixed(0)}% dos itens` : ""})`, v: -cmv, tot: false },

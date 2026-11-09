@@ -123,6 +123,10 @@
     {
       "path": "/api/tiktok/chat/responder",
       "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/shopee/escrow/backfill?limite=400",
+      "schedule": "1,11,21,31,41,51 * * * *"
     }
   ]
 }

@@ -21,22 +21,55 @@ async function obterToken(lojaId: string): Promise<TokenLoja | null> {
   return { accessToken: data.access_token, shopId: String(data.shop_id) };
 }
 
-// Classifica o tipo de transação da carteira numa categoria de negócio.
-function categoria(tipo: string, descricao: string): string {
-  const t = (tipo || "").toUpperCase();
+// Classificação pelo TIPO da transação (o texto muda, o tipo não). Espelho da
+// tabela carteira_categorias + classificar_carteira() do banco (fonte da
+// verdade): depois do upsert o sync chama reclassificar_carteira(loja), então
+// um tipo novo cadastrado na tabela vale sem redeploy.
+const MAPA_TIPO: Record<string, string> = {
+  ESCROW_VERIFIED_ADD: "renda",
+  ESCROW_VERIFIED_MINUS: "estorno",
+  FAST_ESCROW_DISBURSE: "antecipacao",
+  FAST_ESCROW_DISBURSE_REMAINING: "antecipacao",
+  FAST_ESCROW_DEDUCT: "acelera_taxa",
+  ESCROW_DEDUCT: "acelera_taxa",
+  SPM_DEDUCT: "ads",
+  SPM_DEDUCT_DIRECT: "emprestimo",
+  SPM_DISBURSE_ADD: "emprestimo_entrada",
+  PAID_BY_WALLET: "pagamento_carteira",
+  APM_DEDUCT: "pagamento_carteira",
+  ADJUSTMENT_FOR_RR_AFTER_ESCROW_VERIFIED: "reembolso",
+  ADJUSTMENT_CENTER_DEDUCT: "ajuste_debito",
+  ADJUSTMENT_CENTER_ADD: "compensacao",
+  FULFILMENT_COMPENSATE_ADD: "compensacao",
+  RETURN_COMPENSATION_SERVICE_ADD: "compensacao",
+  LOST_PARCEL_SELLER_ADD: "compensacao",
+  SELLER_COMPENSATE_ADD: "compensacao",
+  AMS_COMMISSION_FEE_DEDUCT: "afiliado_ajuste",
+  AFFILIATE_FEE_DEDUCT: "afiliado_ajuste",
+  AFFILIATE_SAMPLE_SHIPPING_FEE_DEDUCT: "afiliado_ajuste",
+  BR_DIFAL_FEE_CHARGE: "difal",
+  FBS_ADJUSTMENT_MINUS: "logistica_full",
+  FBS_FEE_CHARGE_MINUS: "logistica_full",
+  WITHDRAWAL_CREATED: "saque",
+  WITHDRAWAL_COMPLETED: "saque",
+  PIX_TRANSFER_SEND_CREATED: "saque",
+  PIX_TRANSFER_SEND_COMPLETED: "saque",
+};
+
+export function categoriaCarteira(tipo: string | null | undefined, descricao: string): string {
   const d = (descricao || "").toLowerCase();
-  if (t.includes("ESCROW_VERIFIED_ADD")) return "renda";
-  if (t.includes("FAST_ESCROW") || d.includes("acelera")) return "antecipacao";
-  if (t.includes("ADJUSTMENT_FOR_RR") || d.includes("reembolso") || d.includes("devolu"))
-    return "reembolso";
-  // Parcela do "Empréstimo para Vendedores" da Shopee vem como SPM_DEDUCT_DIRECT
-  // (mesmo prefixo dos Ads) — caía na linha de Ads do DRE e inflava o custo.
-  // Empréstimo não é despesa: fica fora do resultado, só aparece na carteira.
-  if (d.includes("empr") && d.includes("stimo")) return "emprestimo";
-  if (d.includes("loan")) return "emprestimo";
-  if (t.includes("SPM_DEDUCT") || d.includes("ads")) return "ads";
-  if (t.includes("WITHDRAW") || d.includes("saque")) return "saque";
-  return "outro";
+  if (!tipo) return d.includes("reembolso por objeto perdido") ? "compensacao" : "desconhecido";
+  if (tipo === "ADJUSTMENT_CENTER_DEDUCT") {
+    if (d.includes("difal") || d.includes("diferencial de al")) return "difal";
+    if (d.includes("volumoso")) return "logistica_volumoso";
+    if (d.includes("cubad")) return "logistica_peso";
+    if (d.includes("creditado a maior")) return "estorno_credito";
+    return "ajuste_debito";
+  }
+  // Parcela do "Empréstimo para Vendedores" vem como SPM_DEDUCT_DIRECT (mesmo
+  // prefixo dos Ads). Empréstimo não é despesa: fica fora do resultado.
+  if (tipo === "SPM_DEDUCT_DIRECT" && !(d.includes("empr") && d.includes("stimo")) && !d.includes("loan")) return "ads";
+  return MAPA_TIPO[tipo] ?? "desconhecido";
 }
 
 type WalletTx = {
@@ -122,7 +155,7 @@ export async function sincronizarCarteiraLoja({
           loja_id: lojaId,
           transaction_id: String(tx.transaction_id),
           tipo: tx.transaction_type || null,
-          categoria: categoria(tx.transaction_type || "", desc),
+          categoria: categoriaCarteira(tx.transaction_type, desc),
           order_sn: tx.order_sn || null,
           valor: typeof tx.amount === "number" ? tx.amount : Number(tx.amount || 0),
           saldo:
@@ -152,7 +185,9 @@ export async function sincronizarCarteiraLoja({
     if (erro) break;
   }
 
-  // Casa a carteira com os pedidos (marca recebido_em/valor_recebido).
+  // Classificação definitiva pela tabela do banco (fonte da verdade) e
+  // casamento carteira x pedidos (recebido_em/valor_recebido).
+  await supabase.rpc("reclassificar_carteira", { p_loja: lojaId });
   await supabase.rpc("casar_carteira_pedidos", { p_loja: lojaId });
 
   return { lojaId, importadas, erro };
