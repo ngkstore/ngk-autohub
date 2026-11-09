@@ -43,7 +43,10 @@ function Status({ ok, texto }: { ok: boolean | null; texto: string }) {
 // Categorias da Camada 1 na visão mensal (ordem e rótulo).
 const CATS_PEDIDO: { k: string; r: string }[] = [
   { k: "receita", r: "Receita (preço de venda)" },
-  { k: "cupom_shopee", r: "Cupom / promo pagos pela Shopee" },
+  { k: "desconto_pix", r: "Desconto Pix ao comprador" },
+  { k: "cupom_vendedor", r: "Cupom do vendedor" },
+  { k: "cupom_shopee", r: "Desconto da plataforma ressarcido / promos Shopee" },
+  { k: "acao_comercial", r: "Participação em ação comercial (cupom/Pix do vendedor)" },
   { k: "frete", r: "Frete (líquido p/ vendedor)" },
   { k: "comissao", r: "Comissão bruta" },
   { k: "comissao_rebate", r: "Abatimento de comissão" },
