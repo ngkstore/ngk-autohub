@@ -10,7 +10,8 @@ export type LinhaEscrow = { campo: string; categoria: string; valor: number; som
 export function linhasEscrow(income: J, buyer: J | null | undefined): LinhaEscrow[] {
   const selling = num(income, "order_selling_price");
   const merchant = num(buyer, "merchant_subtotal");
-  const venda = selling > 0 && merchant > 0 ? merchant : selling;
+  // devolução parcial: o que ficou com o comprador é order_selling_price
+  const venda = num(income, "seller_return_refund") !== 0 ? selling : selling > 0 && merchant > 0 ? merchant : selling;
   const rebate = (income.seller_product_rebate as J | undefined) ?? {};
   const linhas: LinhaEscrow[] = [
     { campo: "venda", categoria: "receita", valor: venda, soma: true },
