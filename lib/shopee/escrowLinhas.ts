@@ -16,7 +16,8 @@ export function linhasEscrow(income: J, buyer: J | null | undefined): LinhaEscro
     { campo: "venda", categoria: "receita", valor: venda, soma: true },
     { campo: "desc_pix", categoria: "desconto_pix", valor: -num(income, "pix_discount"), soma: true },
     { campo: "cupom_vendedor", categoria: "cupom_vendedor", valor: -num(income, "voucher_from_seller"), soma: true },
-    { campo: "desc_plataforma_ressarcido", categoria: "cupom_shopee", valor: num(income, "original_shopee_discount"), soma: true },
+    // devolução total (selling 0): a Shopee não ressarce o desconto da plataforma
+    { campo: "desc_plataforma_ressarcido", categoria: "cupom_shopee", valor: selling > 0 ? num(income, "original_shopee_discount") : 0, soma: true },
     { campo: "acao_comercial", categoria: "acao_comercial", valor: -num(rebate, "amount"), soma: true },
     { campo: "frete_comprador", categoria: "frete", valor: num(income, "buyer_paid_shipping_fee"), soma: true },
     { campo: "frete_real", categoria: "frete", valor: -num(income, "actual_shipping_fee"), soma: true },
