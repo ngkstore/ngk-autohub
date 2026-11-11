@@ -98,16 +98,16 @@ export default async function ProdutosPage({
   const { data: produtos } = await produtosQuery;
 
   return (
-    <div className="p-8 text-white">
-      <h1 className="text-4xl font-bold">Produtos</h1>
+    <div className="mx-auto max-w-[1400px] p-6">
+      <h1 className="text-[22px] font-bold tracking-[-0.01em] text-texto">Produtos</h1>
 
-      <p className="mt-2 text-slate-400">
+      <p className="mt-0.5 text-[13px] text-texto-2">
         Cadastro, estoque, margem e performance dos produtos.
       </p>
 
-      <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">
+      <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+          <p className="text-sm text-texto-2">
             Produtos Cadastrados
           </p>
 
@@ -116,8 +116,8 @@ export default async function ProdutosPage({
           </p>
         </div>
 
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">
+        <div className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+          <p className="text-sm text-texto-2">
             Produtos Ativos
           </p>
 
@@ -126,25 +126,24 @@ export default async function ProdutosPage({
           </p>
         </div>
 
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">
+        <div className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+          <p className="text-sm text-texto-2">
             Controle de Estoque
           </p>
 
-          <p className="mt-2 text-2xl font-bold text-blue-300">
+          <p className="mt-2 text-2xl font-bold text-primaria">
             Preparado
           </p>
         </div>
       </div>
 
-      <section className="mt-10 rounded-2xl bg-slate-900 p-6">
-        <h2 className="text-2xl font-bold">
-          Lista de Produtos
+      <section className="mt-6 rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+        <h2 className="text-[15px] font-semibold text-texto">Lista de Produtos
         </h2>
 
-        <div className="mt-6 overflow-hidden rounded-xl border border-slate-800">
+        <div className="mt-6 overflow-hidden rounded-xl border border-borda">
           <table className="w-full text-left">
-            <thead className="bg-slate-800 text-sm text-slate-300">
+            <thead className="bg-superficie-2 text-xs font-semibold text-texto-2">
               <tr>
                 <th className="p-4">Produto</th>
                 <th className="p-4">SKU</th>
@@ -161,17 +160,17 @@ export default async function ProdutosPage({
                 produtos.map((produto) => (
                   <tr
                     key={produto.id}
-                    className="border-t border-slate-800"
+                    className="border-t border-borda"
                   >
                     <td className="p-4 font-semibold">
                       {produto.nome}
                     </td>
 
-                    <td className="p-4 text-slate-300">
+                    <td className="p-4 text-texto">
                       {produto.sku || "-"}
                     </td>
 
-                    <td className="p-4 text-orange-300">
+                    <td className="p-4 text-alerta">
                       {produto.lojas?.apelido || "Sem loja"}
                     </td>
 
@@ -192,7 +191,7 @@ export default async function ProdutosPage({
                     </td>
 
                     <td className="p-4">
-                      <span className="rounded-full bg-green-900 px-3 py-1 text-xs font-semibold text-green-300">
+                      <span className="rounded-full bg-chip-verde-fundo px-3 py-1 text-xs font-semibold text-sucesso">
                         {produto.status}
                       </span>
                     </td>
@@ -201,7 +200,7 @@ export default async function ProdutosPage({
               ) : (
                 <tr>
                   <td
-                    className="p-4 text-slate-400"
+                    className="p-4 text-texto-2"
                     colSpan={7}
                   >
                     Nenhum produto encontrado para o filtro
