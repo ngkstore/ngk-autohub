@@ -126,7 +126,7 @@ export default async function AdsPage({ searchParams }: Props) {
                 <span className="w-24 shrink-0 text-xs text-texto-2">{diaLabel(d.dia)}</span>
                 <div className="h-5 flex-1 overflow-hidden rounded-md bg-superficie-2">
                   <div
-                    className={`h-full rounded-md ${diaPico && d.dia === diaPico.dia ? "bg-orange-500" : "bg-orange-500/60"}`}
+                    className={`h-full rounded-md ${diaPico && d.dia === diaPico.dia ? "bg-alerta" : "bg-alerta/60"}`}
                     style={{ width: `${Math.max(2, (d.gasto / maxGasto) * 100)}%` }}
                   />
                 </div>
