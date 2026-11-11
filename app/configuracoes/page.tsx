@@ -1,5 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import ConfiguracoesForm from "../components/ConfiguracoesForm";
+import DevolucoesConfigForm from "../components/DevolucoesConfigForm";
+import DevolucoesConfigForm from "../components/DevolucoesConfigForm";
 
 export default async function ConfiguracoesPage() {
   const { data: lojas } = await supabase
@@ -16,6 +18,8 @@ export default async function ConfiguracoesPage() {
       </p>
 
       <ConfiguracoesForm />
+
+      <DevolucoesConfigForm />
 
       <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
         <section className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
