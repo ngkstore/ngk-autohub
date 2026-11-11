@@ -19,12 +19,18 @@ export async function GET(request: NextRequest) {
   const dias = Math.min(90, Number(sp.get("dias")) || 7);
   const canal = sp.get("canal");
   const saida: Record<string, unknown>[] = [];
+  const inicio = Date.now();
+  const estourou = () => Date.now() - inicio > 240_000; // Vercel devolve 504 perto de 300 s
 
   if (!canal || canal === "tiktok") {
     const lojas = (await lojasTikTokAtivas()).filter((l) => !lojaId || l.lojaId === lojaId);
     for (const l of lojas) {
-      const [lives, videos, produtos, afiliados] = [await coletarLivesTikTok(l, dias), await coletarVideosTikTok(l, dias), await coletarProdutosCanalTikTok(l, dias), await coletarPedidosAfiliadosTikTok(l, Math.floor(Date.now() / 1000) - dias * 86400)];
+      const lives = await coletarLivesTikTok(l, dias);
+      const videos = estourou() ? { videos: 0, erro: "tempo esgotado" } : await coletarVideosTikTok(l, dias);
+      const produtos = estourou() ? { produtos: 0, erro: "tempo esgotado" } : await coletarProdutosCanalTikTok(l, dias);
+      const afiliados = estourou() ? { pedidos: 0, linhas: 0, erro: "tempo esgotado" } : await coletarPedidosAfiliadosTikTok(l, Math.floor(Date.now() / 1000) - dias * 86400);
       saida.push({ canal: "tiktok", loja_id: l.lojaId, lives, videos, produtos, afiliados });
+      if (estourou()) break;
     }
   }
   if (!canal || canal === "shopee") {
@@ -32,9 +38,10 @@ export async function GET(request: NextRequest) {
     if (lojaId) q = q.eq("loja_id", lojaId);
     const { data } = await q;
     for (const t of data || []) {
+      if (estourou()) break;
       const r = await coletarConversoesAms(String(t.loja_id), dias);
       saida.push({ canal: "shopee", loja_id: t.loja_id, conversoes: r });
     }
   }
-  return NextResponse.json({ sucesso: true, dias, lojas: saida });
+  return NextResponse.json({ sucesso: true, dias, segundos: Math.round((Date.now() - inicio) / 1000), lojas: saida });
 }

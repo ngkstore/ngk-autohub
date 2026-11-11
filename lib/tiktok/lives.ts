@@ -164,7 +164,7 @@ export async function coletarVideosTikTok(loja: LojaTikTok, dias = 7): Promise<{
   const ini = new Date(fim.getTime() - dias * 86400000);
   const janela = { ini: ymd(ini), fim: ymd(fim) };
   try {
-    const videos = await paginar(loja, "/analytics/202605/shop_videos/performance", { start_date_ge: janela.ini, end_date_lt: ymd(new Date(fim.getTime() + 86400000)), sort_field: "attributed_gmv", sort_order: "DESC" }, "videos", 10);
+    const videos = await paginar(loja, "/analytics/202605/shop_videos/performance", { start_date_ge: janela.ini, end_date_lt: ymd(new Date(fim.getTime() + 86400000)), sort_field: "attributed_gmv", sort_order: "DESC" }, "videos", 3);
     const linhas = videos.map((v) => mapearVideo(v, loja.lojaId, janela));
     for (let i = 0; i < linhas.length; i += 500) await supabase.from("videos_desempenho").upsert(linhas.slice(i, i + 500), { onConflict: "canal,video_id" });
     return { videos: linhas.length };
@@ -178,7 +178,7 @@ export async function coletarProdutosCanalTikTok(loja: LojaTikTok, dias = 7): Pr
   const ini = new Date(fim.getTime() - dias * 86400000);
   const janela = { ini: ymd(ini), fim: ymd(fim) };
   try {
-    const produtos = await paginar(loja, "/analytics/202605/shop_products/performance", { start_date_ge: janela.ini, end_date_lt: ymd(new Date(fim.getTime() + 86400000)) }, "products", 10);
+    const produtos = await paginar(loja, "/analytics/202605/shop_products/performance", { start_date_ge: janela.ini, end_date_lt: ymd(new Date(fim.getTime() + 86400000)) }, "products", 3);
     const linhas = produtos.map((p) => mapearProdutoCanal(p, loja.lojaId, janela));
     for (let i = 0; i < linhas.length; i += 500) await supabase.from("produtos_canal_dia").upsert(linhas.slice(i, i + 500), { onConflict: "loja_id,janela_ini,janela_fim,produto_id" });
     return { produtos: linhas.length };

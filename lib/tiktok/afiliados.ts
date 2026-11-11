@@ -39,7 +39,7 @@ export async function coletarPedidosAfiliadosTikTok(loja: LojaTikTok, desdeUnix:
   let pedidos = 0;
   let linhas = 0;
   try {
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 10; i++) {
       const r = await chamarTikTok("/affiliate_seller/202410/orders/search", {
         method: "POST",
         accessToken: loja.accessToken,

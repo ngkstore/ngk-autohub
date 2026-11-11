@@ -22,10 +22,16 @@ export async function GET(request: NextRequest) {
     let q = supabase.from("marketplace_tokens").select("loja_id").eq("marketplace", "shopee").eq("status", "ativo");
     if (lojaId) q = q.eq("loja_id", lojaId);
     const { data } = await q;
-    for (const t of data || []) if (t.loja_id) saida.push({ canal: "shopee", loja_id: t.loja_id, ...(await coletarPromocoesShopee(String(t.loja_id))) });
+    for (const t of data || []) {
+      if (!t.loja_id || Date.now() - inicio > 200_000) break;
+      saida.push({ canal: "shopee", loja_id: t.loja_id, ...(await coletarPromocoesShopee(String(t.loja_id))) });
+    }
   }
   if (!canal || canal === "tiktok") {
-    for (const l of (await lojasTikTokAtivas()).filter((l) => !lojaId || l.lojaId === lojaId)) saida.push({ canal: "tiktok", loja_id: l.lojaId, ...(await coletarAtividadesTikTok(l)) });
+    for (const l of (await lojasTikTokAtivas()).filter((l) => !lojaId || l.lojaId === lojaId)) {
+      if (Date.now() - inicio > 200_000) break;
+      saida.push({ canal: "tiktok", loja_id: l.lojaId, ...(await coletarAtividadesTikTok(l)) });
+    }
   }
   let margens = 0;
   if (sp.get("margem") !== "0") {
@@ -36,5 +42,5 @@ export async function GET(request: NextRequest) {
       margens++;
     }
   }
-  return NextResponse.json({ sucesso: true, lojas: saida, campanhas_com_margem: margens });
+  return NextResponse.json({ sucesso: true, segundos: Math.round((Date.now() - inicio) / 1000), lojas: saida, campanhas_com_margem: margens });
 }
