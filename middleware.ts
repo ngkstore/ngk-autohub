@@ -31,6 +31,7 @@ const ROTAS_CRON = [
   "/api/shopee/escrow/debug",
   "/api/shopee/escrow/backfill",
   "/api/shopee/ams/sondar",
+  "/api/shopee/devolucoes/sondar",
   "/api/shopee/ams/token-refresh",
   "/api/shopee/ams/debug",
   "/api/shopee/ams/coletar",
