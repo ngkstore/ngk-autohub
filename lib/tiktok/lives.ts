@@ -33,7 +33,7 @@ export function mapearLive(s: J, lojaId: string, tipoConta: string) {
     loja_id: lojaId,
     live_id: String(s.id),
     origem: "api" as const,
-    tipo_conta: tipoConta,
+    tipo_conta: String(c.author_type || "").toUpperCase() === "OFFICIAL" ? "OFFICIAL_ACCOUNTS" : tipoConta, // o que distingue a loja: creator.author_type
     criador_nome: str(c.nick_name),
     criador_usuario: str(c.user_name),
     criador_id: str(c.open_id) || str(c.creator_id),
@@ -44,7 +44,7 @@ export function mapearLive(s: J, lojaId: string, tipoConta: string) {
     pedidos: n(sp.live_attributed_sku_orders) ?? n(sp.created_sku_orders) ?? 0,
     itens: n(sp.live_attributed_items_sold) ?? 0,
     espectadores: n(ep.viewers) ?? n(ep.unique_viewers) ?? n(s.viewers),
-    pico: n(ep.peak_viewers) ?? n(ep.max_viewers) ?? n(s.peak_viewers), // a API de analytics não traz pico: fica null
+    pico: n(ep.pcu) ?? n(ep.peak_viewers) ?? n(ep.max_viewers) ?? n(s.peak_viewers), // pcu = pico de espectadores simultâneos
     tempo_medio_s: n(ep.avg_viewing_duration) ?? n(ep.avg_watch_duration),
     ctr: n(ep.live_ctr) ?? n(ep.product_click_rate) ?? n(ep.ctr) ?? n(sp.ctr),
     likes: n(ip.likes),
