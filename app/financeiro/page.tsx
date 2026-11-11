@@ -128,42 +128,42 @@ export default async function FinanceiroPage({ searchParams }: FinanceiroPagePro
   const semDados = !resumoRpc;
 
   return (
-    <div className="p-8 text-white">
-      <h1 className="text-4xl font-bold">Financeiro</h1>
-      <p className="mt-2 text-slate-400">
+    <div className="mx-auto max-w-[1400px] p-6">
+      <h1 className="text-[22px] font-bold tracking-[-0.01em] text-texto">Financeiro</h1>
+      <p className="mt-0.5 text-[13px] text-texto-2">
         Conciliação real da Shopee: vendas, cupons, frete, taxas e o valor
         líquido a receber (dados do repasse/escrow).
       </p>
 
       {semDados && (
-        <div className="mt-4 rounded-xl bg-yellow-900/40 px-4 py-3 text-sm text-yellow-200">
+        <div className="mt-4 rounded-xl bg-chip-amarelo-fundo px-4 py-3 text-sm text-alerta">
           A função SQL <code>resumo_financeiro</code> ainda não foi criada — rode
           o arquivo <code>supabase/resumo_financeiro.sql</code> no Supabase.
         </div>
       )}
 
       {/* Destaque */}
-      <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
-        <div className="rounded-2xl border border-emerald-700 bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Valor Líquido a Receber</p>
-          <p className="mt-2 text-4xl font-bold text-emerald-300">
+      <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="rounded-2xl border border-chip-verde-fundo bg-superficie p-6">
+          <p className="text-sm text-texto-2">Valor Líquido a Receber</p>
+          <p className="mt-2 text-4xl font-bold text-sucesso">
             {moeda(num(r.valor_liquido))}
           </p>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-texto-2">
             {r.pedidos} pedido(s) conciliado(s)
           </p>
         </div>
 
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Vendas (mercadoria)</p>
-          <p className="mt-2 text-4xl font-bold text-green-300">
+        <div className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+          <p className="text-sm text-texto-2">Vendas (mercadoria)</p>
+          <p className="mt-2 text-4xl font-bold text-sucesso">
             {moeda(num(r.vendas))}
           </p>
         </div>
 
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Valor Pago pelos Clientes</p>
-          <p className="mt-2 text-4xl font-bold text-blue-300">
+        <div className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+          <p className="text-sm text-texto-2">Valor Pago pelos Clientes</p>
+          <p className="mt-2 text-4xl font-bold text-primaria">
             {moeda(num(r.valor_pago))}
           </p>
         </div>
@@ -171,51 +171,51 @@ export default async function FinanceiroPage({ searchParams }: FinanceiroPagePro
 
       {/* Composição */}
       <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Taxas (comissão + serviço)</p>
-          <p className="mt-2 text-3xl font-bold text-red-300">
+        <div className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+          <p className="text-sm text-texto-2">Taxas (comissão + serviço)</p>
+          <p className="mt-2 text-3xl font-bold text-perigo">
             {moeda(taxasTotais)}
           </p>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-texto-2">
             comissão {moeda(num(r.taxa_comissao))} • serviço{" "}
             {moeda(num(r.taxa_servico))}
           </p>
         </div>
 
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Cupons (loja + Shopee)</p>
-          <p className="mt-2 text-3xl font-bold text-orange-300">
+        <div className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+          <p className="text-sm text-texto-2">Cupons (loja + Shopee)</p>
+          <p className="mt-2 text-3xl font-bold text-alerta">
             {moeda(cuponsTotais)}
           </p>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-texto-2">
             loja {moeda(num(r.cupom_loja))} • shopee {moeda(num(r.cupom_shopee))}
           </p>
         </div>
 
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Frete</p>
-          <p className="mt-2 text-3xl font-bold text-slate-200">
+        <div className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+          <p className="text-sm text-texto-2">Frete</p>
+          <p className="mt-2 text-3xl font-bold text-texto">
             {moeda(num(r.frete))}
           </p>
         </div>
 
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Pendentes de conciliação</p>
-          <p className="mt-2 text-3xl font-bold text-yellow-300">
+        <div className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+          <p className="text-sm text-texto-2">Pendentes de conciliação</p>
+          <p className="mt-2 text-3xl font-bold text-alerta">
             {r.pendentes_conciliacao}
           </p>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-texto-2">
             pedidos pagos ainda sem escrow
           </p>
         </div>
       </div>
 
       {/* Tabela */}
-      <section className="mt-10 rounded-2xl bg-slate-900 p-6">
-        <h2 className="text-2xl font-bold">Pedidos Conciliados Recentes</h2>
-        <div className="mt-6 overflow-x-auto rounded-xl border border-slate-800">
+      <section className="mt-6 rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+        <h2 className="text-[15px] font-semibold text-texto">Pedidos Conciliados Recentes</h2>
+        <div className="mt-6 overflow-x-auto rounded-xl border border-borda">
           <table className="w-full text-left">
-            <thead className="bg-slate-800 text-sm text-slate-300">
+            <thead className="bg-superficie-2 text-xs font-semibold text-texto-2">
               <tr>
                 <th className="p-4">Pedido</th>
                 <th className="p-4">Cliente</th>
@@ -228,24 +228,24 @@ export default async function FinanceiroPage({ searchParams }: FinanceiroPagePro
             <tbody>
               {recentes && recentes.length > 0 ? (
                 recentes.map((p, i) => (
-                  <tr key={`${p.pedido_externo_id}-${i}`} className="border-t border-slate-800">
+                  <tr key={`${p.pedido_externo_id}-${i}`} className="border-t border-borda">
                     <td className="p-4 font-semibold">{p.pedido_externo_id}</td>
-                    <td className="p-4 text-slate-300">{p.cliente_nome || "-"}</td>
-                    <td className="p-4 text-green-300">{moeda(num(p.valor_total))}</td>
-                    <td className="p-4 text-red-300">
+                    <td className="p-4 text-texto">{p.cliente_nome || "-"}</td>
+                    <td className="p-4 text-sucesso">{moeda(num(p.valor_total))}</td>
+                    <td className="p-4 text-perigo">
                       {moeda(num(p.taxa_comissao) + num(p.taxa_servico))}
                     </td>
-                    <td className="p-4 font-semibold text-emerald-300">
+                    <td className="p-4 font-semibold text-sucesso">
                       {moeda(num(p.valor_liquido))}
                     </td>
-                    <td className="p-4 text-slate-400">
+                    <td className="p-4 text-texto-2">
                       {p.data_pagamento ? dataHora(p.data_pagamento) : "-"}
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td className="p-4 text-slate-400" colSpan={6}>
+                  <td className="p-4 text-texto-2" colSpan={6}>
                     Nenhum pedido conciliado no período. Rode &quot;Conciliar
                     Financeiro&quot; na tela de Sincronização.
                   </td>
