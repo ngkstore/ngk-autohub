@@ -97,12 +97,12 @@ export default async function AvaliacoesPage({
   );
 
   return (
-    <div className="p-8 text-white">
+    <div className="mx-auto max-w-[1400px] p-6">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-4xl font-bold">Avaliações</h1>
+          <h1 className="text-[22px] font-bold tracking-[-0.01em] text-texto">Avaliações</h1>
 
-          <p className="mt-2 text-slate-400">
+          <p className="mt-0.5 text-[13px] text-texto-2">
             Filtre pela loja no seletor do topo.
           </p>
         </div>
@@ -118,13 +118,13 @@ export default async function AvaliacoesPage({
             return (
               <div
                 key={avaliacao.id}
-                className="rounded-xl bg-slate-900 p-5"
+                className="rounded-xl bg-superficie p-5"
               >
                 <p className="text-xl font-bold">
                   {avaliacao.nome_produto}
                 </p>
 
-                <p className="mt-1 text-sm text-orange-300">
+                <p className="mt-1 text-sm text-alerta">
                   Loja: {avaliacao.lojas?.apelido || "Sem loja vinculada"}
                 </p>
 
@@ -134,21 +134,21 @@ export default async function AvaliacoesPage({
                   Nota: {"⭐".repeat(avaliacao.avaliacao)}
                 </p>
 
-                <p className="mt-3 text-slate-300">
+                <p className="mt-3 text-texto">
                   {avaliacao.comentario}
                 </p>
 
                 {avaliacao.resposta_shopee ? (
-                  <div className="mt-4 rounded-lg bg-green-900/40 p-4">
-                    <p className="text-sm font-semibold text-green-300">
+                  <div className="mt-4 rounded-lg bg-chip-verde-fundo/40 p-4">
+                    <p className="text-sm font-semibold text-sucesso">
                       Resposta publicada na Shopee:
                     </p>
 
                     <p className="mt-2">{avaliacao.resposta_shopee}</p>
                   </div>
                 ) : resposta ? (
-                  <div className="mt-4 rounded-lg bg-green-900/40 p-4">
-                    <p className="text-sm font-semibold text-green-300">
+                  <div className="mt-4 rounded-lg bg-chip-verde-fundo/40 p-4">
+                    <p className="text-sm font-semibold text-sucesso">
                       Resposta IA:
                     </p>
 
@@ -156,7 +156,7 @@ export default async function AvaliacoesPage({
                   </div>
                 ) : (
                   <div className="mt-4 flex items-center gap-3">
-                    <span className="rounded-full bg-yellow-900 px-3 py-1 text-xs font-semibold text-yellow-300">
+                    <span className="rounded-full bg-chip-amarelo-fundo px-3 py-1 text-xs font-semibold text-alerta">
                       Pendente
                     </span>
                     <GerarRespostaButton avaliacao={avaliacao} />
@@ -166,7 +166,7 @@ export default async function AvaliacoesPage({
             );
           })
         ) : (
-          <div className="rounded-xl bg-slate-900 p-6 text-slate-400">
+          <div className="rounded-xl bg-superficie p-6 text-texto-2">
             Nenhuma avaliação encontrada para os filtros selecionados.
           </div>
         )}
