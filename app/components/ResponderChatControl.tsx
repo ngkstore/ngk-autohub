@@ -104,20 +104,20 @@ export default function ResponderChatControl() {
   }
 
   return (
-    <div className="rounded-2xl border border-cyan-800 bg-slate-900 p-6">
+    <div className="rounded-2xl border border-primaria bg-superficie p-6">
       <h2 className="text-2xl font-bold">Atendimento do Chat (robô)</h2>
 
-      <p className="mt-2 text-sm text-slate-400">
+      <p className="mt-2 text-sm text-texto-2">
         Responde dúvidas de produto com base na descrição + suas respostas
         anteriores. Defeito/reclamação e casos sem certeza são escalados pra
         você. Comece em &quot;Gerar sem enviar&quot; para revisar o tom.
       </p>
 
       <div className="mt-5 flex flex-wrap items-center gap-3">
-        <span className="text-sm text-slate-300">Robô automático:</span>
+        <span className="text-sm text-texto">Robô automático:</span>
         <span
           className={`rounded-full px-3 py-1 text-xs font-semibold ${
-            ativo ? "bg-green-900 text-green-300" : "bg-slate-700 text-slate-300"
+            ativo ? "bg-chip-verde-fundo text-sucesso" : "bg-chip-cinza-fundo text-texto"
           }`}
         >
           {ativo === null ? "..." : ativo ? "LIGADO" : "DESLIGADO"}
@@ -126,8 +126,8 @@ export default function ResponderChatControl() {
         <button
           onClick={alternar}
           disabled={salvando || ativo === null}
-          className={`rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${
-            ativo ? "bg-red-700 hover:bg-red-600" : "bg-green-700 hover:bg-green-600"
+          className={`rounded-xl px-4 py-2 text-sm font-semibold text-texto disabled:opacity-50 ${
+            ativo ? "bg-perigo hover:bg-perigo" : "bg-sucesso hover:bg-sucesso"
           }`}
         >
           {salvando ? "Salvando..." : ativo ? "Desligar" : "Ligar"}
@@ -136,7 +136,7 @@ export default function ResponderChatControl() {
         <button
           onClick={() => rodar(false)}
           disabled={rodando}
-          className="rounded-xl bg-slate-600 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-500 disabled:opacity-50"
+          className="rounded-xl bg-chip-cinza-fundo px-4 py-2 text-sm font-semibold text-texto hover:bg-superficie-2 disabled:opacity-50"
         >
           {rodando ? "..." : "Gerar sem enviar (revisar 5)"}
         </button>
@@ -144,17 +144,17 @@ export default function ResponderChatControl() {
         <button
           onClick={() => rodar(true)}
           disabled={rodando}
-          className="rounded-xl bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-500 disabled:opacity-50"
+          className="rounded-xl bg-primaria px-4 py-2 text-sm font-semibold text-texto hover:bg-primaria-hover disabled:opacity-50"
         >
           {rodando ? "..." : "Responder de verdade (5)"}
         </button>
       </div>
 
-      <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-slate-800 pt-5">
-        <span className="text-sm text-slate-300">Modo 100% autônomo:</span>
+      <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-borda pt-5">
+        <span className="text-sm text-texto">Modo 100% autônomo:</span>
         <span
           className={`rounded-full px-3 py-1 text-xs font-semibold ${
-            autonomo ? "bg-amber-900 text-amber-300" : "bg-slate-700 text-slate-300"
+            autonomo ? "bg-chip-amarelo-fundo text-alerta" : "bg-chip-cinza-fundo text-texto"
           }`}
         >
           {autonomo === null ? "..." : autonomo ? "LIGADO" : "DESLIGADO"}
@@ -163,16 +163,16 @@ export default function ResponderChatControl() {
         <button
           onClick={alternarAutonomo}
           disabled={salvandoAuto || autonomo === null}
-          className={`rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${
+          className={`rounded-xl px-4 py-2 text-sm font-semibold text-texto disabled:opacity-50 ${
             autonomo
-              ? "bg-red-700 hover:bg-red-600"
-              : "bg-amber-700 hover:bg-amber-600"
+              ? "bg-perigo hover:bg-perigo"
+              : "bg-alerta hover:bg-alerta"
           }`}
         >
           {salvandoAuto ? "Salvando..." : autonomo ? "Desligar autônomo" : "Ligar autônomo"}
         </button>
 
-        <p className="w-full text-xs text-slate-500">
+        <p className="w-full text-xs text-texto-2">
           Quando ligado, o robô responde <strong>todas</strong> as conversas
           (nunca escala): se não houver uma dúvida clara, manda uma saudação
           curta só para manter a taxa de resposta da Shopee. Os botões de teste
@@ -183,12 +183,12 @@ export default function ResponderChatControl() {
       {resultado && (
         <div className="mt-5">
           {resultado.erro ? (
-            <div className="rounded-xl bg-red-900 px-4 py-3 text-sm text-red-200">
+            <div className="rounded-xl bg-chip-vermelho-fundo px-4 py-3 text-sm text-perigo">
               {resultado.erro}
             </div>
           ) : (
             <>
-              <p className="text-sm text-slate-300">
+              <p className="text-sm text-texto">
                 {resultado.enviar
                   ? `Enviadas: ${resultado.enviados ?? 0} • Escaladas: ${
                       resultado.escalados ?? 0
@@ -200,33 +200,33 @@ export default function ResponderChatControl() {
                 {(resultado.propostas || []).map((p) => (
                   <div
                     key={p.conversation_id}
-                    className="rounded-xl bg-slate-800 p-4"
+                    className="rounded-xl bg-superficie-2 p-4"
                   >
                     <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <span className="text-slate-400">
+                      <span className="text-texto-2">
                         {p.cliente || "cliente"}
                       </span>
-                      <span className="rounded-full bg-slate-700 px-2 py-0.5 text-slate-200">
+                      <span className="rounded-full bg-chip-cinza-fundo px-2 py-0.5 text-texto">
                         {p.categoria}
                       </span>
                       <span
                         className={`rounded-full px-2 py-0.5 ${
                           p.acao === "escalar"
-                            ? "bg-yellow-900 text-yellow-300"
-                            : "bg-green-900 text-green-300"
+                            ? "bg-chip-amarelo-fundo text-alerta"
+                            : "bg-chip-verde-fundo text-sucesso"
                         }`}
                       >
                         {p.acao === "escalar" ? "escalar p/ humano" : "responder"}
                       </span>
-                      <span className="text-slate-500">
+                      <span className="text-texto-2">
                         confiança: {p.confianca}
                       </span>
                     </div>
 
-                    <p className="mt-2 text-sm text-slate-400">
+                    <p className="mt-2 text-sm text-texto-2">
                       <strong>Cliente:</strong> {p.pergunta}
                     </p>
-                    <p className="mt-1 text-sm text-slate-100">
+                    <p className="mt-1 text-sm text-texto">
                       <strong>Resposta:</strong> {p.resposta || "—"}
                     </p>
                   </div>

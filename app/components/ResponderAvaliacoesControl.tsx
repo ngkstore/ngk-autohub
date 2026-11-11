@@ -86,22 +86,22 @@ export default function ResponderAvaliacoesControl() {
   }
 
   return (
-    <div className="rounded-2xl border border-pink-800 bg-slate-900 p-6">
+    <div className="rounded-2xl border border-primaria bg-superficie p-6">
       <h2 className="text-2xl font-bold">Responder Avaliações (robô)</h2>
 
-      <p className="mt-2 text-sm text-slate-400">
+      <p className="mt-2 text-sm text-texto-2">
         Gera e publica respostas na Shopee: 5★ usam modelo pronto, 1–4★ usam IA
         (Haiku). Quando ligado, roda em sprints de 30 min (20/min) e pausa 30
         min, automaticamente.
       </p>
 
       <div className="mt-5 flex flex-wrap items-center gap-3">
-        <span className="text-sm text-slate-300">Robô automático:</span>
+        <span className="text-sm text-texto">Robô automático:</span>
         <span
           className={`rounded-full px-3 py-1 text-xs font-semibold ${
             ativo
-              ? "bg-green-900 text-green-300"
-              : "bg-slate-700 text-slate-300"
+              ? "bg-chip-verde-fundo text-sucesso"
+              : "bg-chip-cinza-fundo text-texto"
           }`}
         >
           {ativo === null ? "..." : ativo ? "LIGADO" : "DESLIGADO"}
@@ -110,8 +110,8 @@ export default function ResponderAvaliacoesControl() {
         <button
           onClick={alternar}
           disabled={salvando || ativo === null}
-          className={`rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${
-            ativo ? "bg-red-700 hover:bg-red-600" : "bg-green-700 hover:bg-green-600"
+          className={`rounded-xl px-4 py-2 text-sm font-semibold text-texto disabled:opacity-50 ${
+            ativo ? "bg-perigo hover:bg-perigo" : "bg-sucesso hover:bg-sucesso"
           }`}
         >
           {salvando ? "Salvando..." : ativo ? "Desligar" : "Ligar"}
@@ -120,7 +120,7 @@ export default function ResponderAvaliacoesControl() {
         <button
           onClick={() => testar()}
           disabled={testando}
-          className="rounded-xl bg-pink-600 px-4 py-2 text-sm font-semibold text-white hover:bg-pink-500 disabled:opacity-50"
+          className="rounded-xl bg-primaria px-4 py-2 text-sm font-semibold text-texto hover:bg-primaria-hover disabled:opacity-50"
         >
           {testando ? "Testando..." : "Testar agora (5)"}
         </button>
@@ -128,21 +128,21 @@ export default function ResponderAvaliacoesControl() {
         <button
           onClick={() => testar(2)}
           disabled={testando}
-          className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+          className="rounded-xl bg-perigo px-4 py-2 text-sm font-semibold text-texto hover:bg-perigo disabled:opacity-50"
         >
           {testando ? "Testando..." : "Testar ruins 1-2★ (5)"}
         </button>
       </div>
 
       {status && (
-        <div className="mt-5 rounded-xl bg-slate-800 p-4">
+        <div className="mt-5 rounded-xl bg-superficie-2 p-4">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-slate-200">
+            <p className="text-sm font-semibold text-texto">
               Status das avaliações
             </p>
             <button
               onClick={carregarStatus}
-              className="text-xs text-slate-400 underline hover:text-slate-200"
+              className="text-xs text-texto-2 underline hover:text-texto"
             >
               Atualizar
             </button>
@@ -150,30 +150,30 @@ export default function ResponderAvaliacoesControl() {
 
           <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-5">
             <div>
-              <p className="text-xs text-slate-400">Sincronizadas</p>
+              <p className="text-xs text-texto-2">Sincronizadas</p>
               <p className="text-xl font-bold">{status.total ?? 0}</p>
             </div>
             <div>
-              <p className="text-xs text-slate-400">Respondidas</p>
-              <p className="text-xl font-bold text-green-300">
+              <p className="text-xs text-texto-2">Respondidas</p>
+              <p className="text-xl font-bold text-sucesso">
                 {status.respondidas ?? 0}
               </p>
             </div>
             <div>
-              <p className="text-xs text-slate-400">Pendentes</p>
-              <p className="text-xl font-bold text-yellow-300">
+              <p className="text-xs text-texto-2">Pendentes</p>
+              <p className="text-xl font-bold text-alerta">
                 {status.pendentes ?? 0}
               </p>
             </div>
             <div>
-              <p className="text-xs text-slate-400">Última hora</p>
-              <p className="text-xl font-bold text-sky-300">
+              <p className="text-xs text-texto-2">Última hora</p>
+              <p className="text-xl font-bold text-chip-ceu-texto">
                 {status.respondidasUltimaHora ?? 0}
               </p>
             </div>
             <div>
-              <p className="text-xs text-slate-400">Últimas 24h</p>
-              <p className="text-xl font-bold text-sky-300">
+              <p className="text-xs text-texto-2">Últimas 24h</p>
+              <p className="text-xl font-bold text-chip-ceu-texto">
                 {status.respondidasUltimoDia ?? 0}
               </p>
             </div>
@@ -185,8 +185,8 @@ export default function ResponderAvaliacoesControl() {
         <div
           className={`mt-4 rounded-xl px-4 py-3 text-sm ${
             resultado.sucesso
-              ? "bg-green-900 text-green-200"
-              : "bg-red-900 text-red-200"
+              ? "bg-chip-verde-fundo text-sucesso"
+              : "bg-chip-vermelho-fundo text-perigo"
           }`}
         >
           {resultado.sucesso ? (

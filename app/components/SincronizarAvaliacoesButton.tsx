@@ -65,10 +65,10 @@ export default function SincronizarAvaliacoesButton() {
   }
 
   return (
-    <div className="rounded-2xl border border-amber-800 bg-slate-900 p-6">
+    <div className="rounded-2xl border border-chip-amarelo-fundo bg-superficie p-6">
       <h2 className="text-2xl font-bold">Sincronizar Avaliações (histórico)</h2>
 
-      <p className="mt-2 text-sm text-slate-400">
+      <p className="mt-2 text-sm text-texto-2">
         Importa todas as avaliações da Shopee (incluindo as antigas), marcando
         quais já têm resposta. Roda em ciclos automáticos até concluir.
       </p>
@@ -76,15 +76,15 @@ export default function SincronizarAvaliacoesButton() {
       <button
         onClick={sincronizar}
         disabled={loading}
-        className="mt-4 rounded-xl bg-amber-600 px-5 py-3 text-sm font-semibold text-white hover:bg-amber-500 disabled:opacity-50"
+        className="mt-4 rounded-xl bg-alerta px-5 py-3 text-sm font-semibold text-texto hover:bg-primaria-hover disabled:opacity-50"
       >
         {loading ? "Sincronizando..." : "Sincronizar Avaliações"}
       </button>
 
-      {progresso && <p className="mt-4 text-sm text-slate-200">{progresso}</p>}
+      {progresso && <p className="mt-4 text-sm text-texto">{progresso}</p>}
 
       {erro && (
-        <div className="mt-3 rounded-xl bg-red-900 px-4 py-3 text-sm text-red-200">
+        <div className="mt-3 rounded-xl bg-chip-vermelho-fundo px-4 py-3 text-sm text-perigo">
           {erro}
         </div>
       )}

@@ -67,9 +67,9 @@ export default function SincronizarTodosProdutosButton({
   }
 
   return (
-    <div className="rounded-2xl border border-indigo-800 bg-slate-900 p-6">
+    <div className="rounded-2xl border border-primaria bg-superficie p-6">
       <h2 className="text-2xl font-bold">Sincronizar TODOS os Produtos</h2>
-      <p className="mt-2 text-sm text-slate-400">
+      <p className="mt-2 text-sm text-texto-2">
         Puxa produtos de todos os status (ativos, desativados, esgotados, etc.) —
         necessário para alcançar as avaliações antigas que estão em produtos
         inativos. Roda em ciclos até concluir.
@@ -78,14 +78,14 @@ export default function SincronizarTodosProdutosButton({
       <button
         onClick={sincronizar}
         disabled={loading}
-        className="mt-4 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
+        className="mt-4 rounded-xl bg-primaria px-5 py-3 text-sm font-semibold text-texto hover:bg-primaria-hover disabled:opacity-50"
       >
         {loading ? "Sincronizando..." : "Sincronizar todos os produtos"}
       </button>
 
-      {progresso && <p className="mt-4 text-sm text-slate-200">{progresso}</p>}
+      {progresso && <p className="mt-4 text-sm text-texto">{progresso}</p>}
       {erro && (
-        <div className="mt-3 rounded-xl bg-red-900 px-4 py-3 text-sm text-red-200">
+        <div className="mt-3 rounded-xl bg-chip-vermelho-fundo px-4 py-3 text-sm text-perigo">
           {erro}
         </div>
       )}

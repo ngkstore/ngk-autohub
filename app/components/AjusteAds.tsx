@@ -75,47 +75,47 @@ export default function AjusteAds({
     }
   }
 
-  const cls = "w-32 rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-right text-white focus:border-emerald-500 focus:outline-none";
+  const cls = "w-32 rounded-lg border border-borda bg-superficie-2 px-2 py-1.5 text-right text-texto focus:border-primaria focus:outline-none";
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+    <div className="rounded-2xl border border-borda bg-superficie p-5">
       <h3 className="text-lg font-bold">⚙️ Ajustar na Shopee</h3>
-      <p className="mt-1 text-xs text-slate-500">
+      <p className="mt-1 text-xs text-texto-2">
         Execução assistida: você confirma cada alteração. O sistema registra a mudança e inicia o relógio de estabilização.
       </p>
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label className="text-xs text-slate-400">Orçamento diário (R$)</label>
+          <label className="text-xs text-texto-2">Orçamento diário (R$)</label>
           <div className="mt-1 flex items-center gap-2">
             <input value={orc} onChange={(e) => setOrc(e.target.value)} inputMode="decimal" className={cls} placeholder="—" />
             {orcamentoSugerido != null && (
-              <button type="button" onClick={() => setOrc(fmt(Math.round(orcamentoSugerido)))} className="rounded-lg border border-amber-700/60 px-2 py-1 text-xs text-amber-300 hover:bg-amber-900/30">
+              <button type="button" onClick={() => setOrc(fmt(Math.round(orcamentoSugerido)))} className="rounded-lg border border-chip-amarelo-fundo/60 px-2 py-1 text-xs text-alerta hover:bg-chip-amarelo-fundo/30">
                 usar ideal R$ {Math.round(orcamentoSugerido)}
               </button>
             )}
           </div>
-          <p className="mt-1 text-[11px] text-slate-500">atual: {orcamentoAtual != null ? `R$ ${fmt(orcamentoAtual)}` : "—"} (mín. R$ 10 · 0 = sem limite na Shopee)</p>
+          <p className="mt-1 text-[11px] text-texto-2">atual: {orcamentoAtual != null ? `R$ ${fmt(orcamentoAtual)}` : "—"} (mín. R$ 10 · 0 = sem limite na Shopee)</p>
           {reforcoBase != null && (
-            <p className="mt-1 text-[11px] text-amber-300">⚡ reforço automático ativo hoje: base R$ {fmt(reforcoBase)}. O valor atual inclui o reforço; à meia-noite volta pra base. Se você salvar outro valor, ele vira a nova base.</p>
+            <p className="mt-1 text-[11px] text-alerta">⚡ reforço automático ativo hoje: base R$ {fmt(reforcoBase)}. O valor atual inclui o reforço; à meia-noite volta pra base. Se você salvar outro valor, ele vira a nova base.</p>
           )}
         </div>
         <div>
-          <label className="text-xs text-slate-400">Meta ROAS (×)</label>
+          <label className="text-xs text-texto-2">Meta ROAS (×)</label>
           <div className="mt-1 flex items-center gap-2">
             <input value={meta} onChange={(e) => setMeta(e.target.value)} inputMode="decimal" className={cls} placeholder="—" />
             {metaSugerida != null && (
-              <button type="button" onClick={() => setMeta(fmt(metaSugerida))} className={`rounded-lg border px-2 py-1 text-xs ${metaAtual != null && metaSugerida < metaAtual ? "border-orange-700/60 text-orange-300 hover:bg-orange-900/30" : "border-emerald-700/60 text-emerald-300 hover:bg-emerald-900/30"}`}>
+              <button type="button" onClick={() => setMeta(fmt(metaSugerida))} className={`rounded-lg border px-2 py-1 text-xs ${metaAtual != null && metaSugerida < metaAtual ? "border-chip-laranja-fundo/60 text-alerta hover:bg-chip-laranja-fundo/30" : "border-chip-verde-fundo/60 text-sucesso hover:bg-chip-verde-fundo"}`}>
                 {metaAtual != null && metaSugerida < metaAtual ? "baixar p/" : "subir p/"} {fmt(metaSugerida)}×
               </button>
             )}
             {metaAnterior != null && (
-              <button type="button" onClick={() => setMeta(fmt(metaAnterior))} className="rounded-lg border border-red-700/60 px-2 py-1 text-xs text-red-300 hover:bg-red-900/30">
+              <button type="button" onClick={() => setMeta(fmt(metaAnterior))} className="rounded-lg border border-chip-vermelho-fundo/60 px-2 py-1 text-xs text-perigo hover:bg-chip-vermelho-fundo">
                 voltar p/ {fmt(metaAnterior)}×
               </button>
             )}
           </div>
-          <p className="mt-1 text-[11px] text-slate-500">
+          <p className="mt-1 text-[11px] text-texto-2">
             atual: {metaAtual != null ? `${fmt(metaAtual)}×` : "—"}
-            {emJanela && <span className="text-blue-300"> · em {janela} (faltam {diasRestantes ?? 0}d) — evite mexer na meta agora</span>}
+            {emJanela && <span className="text-primaria"> · em {janela} (faltam {diasRestantes ?? 0}d) — evite mexer na meta agora</span>}
           </p>
         </div>
       </div>
@@ -124,11 +124,11 @@ export default function AjusteAds({
           type="button"
           onClick={aplicar}
           disabled={estado === "enviando" || (!mudouOrc && !mudouMeta)}
-          className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-xl bg-primaria px-4 py-2 text-sm font-semibold text-texto hover:bg-primaria-hover disabled:cursor-not-allowed disabled:opacity-40"
         >
           {estado === "enviando" ? "Aplicando…" : "Aplicar na Shopee"}
         </button>
-        {msg && <span className={`text-sm ${estado === "ok" ? "text-emerald-300" : estado === "erro" ? "text-red-300" : "text-slate-400"}`}>{msg}</span>}
+        {msg && <span className={`text-sm ${estado === "ok" ? "text-sucesso" : estado === "erro" ? "text-perigo" : "text-texto-2"}`}>{msg}</span>}
       </div>
     </div>
   );

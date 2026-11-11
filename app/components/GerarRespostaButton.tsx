@@ -23,7 +23,7 @@ export default function GerarRespostaButton({ avaliacao }: { avaliacao: any }) {
     <button
       onClick={gerarResposta}
       disabled={carregando}
-      className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg font-semibold"
+      className="bg-primaria hover:bg-primaria-hover px-4 py-2 rounded-lg font-semibold"
     >
       {carregando ? "Gerando..." : "Gerar IA"}
     </button>

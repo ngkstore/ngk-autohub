@@ -19,7 +19,7 @@ export default function GerarTodasButton() {
     <button
       onClick={gerarTodas}
       disabled={carregando}
-      className="rounded-lg bg-orange-600 px-4 py-2 font-semibold hover:bg-orange-500 disabled:opacity-50"
+      className="rounded-lg bg-alerta px-4 py-2 font-semibold hover:bg-primaria-hover disabled:opacity-50"
     >
       {carregando ? "Gerando todas..." : "Gerar todas pendentes"}
     </button>

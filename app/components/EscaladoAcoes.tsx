@@ -52,14 +52,14 @@ export default function EscaladoAcoes({
         onChange={(e) => setTexto(e.target.value)}
         rows={3}
         placeholder="Resposta a enviar ao cliente..."
-        className="w-full rounded-lg border border-slate-700 bg-slate-950 p-3 text-sm text-white"
+        className="w-full rounded-lg border border-borda bg-fundo p-3 text-sm text-texto"
       />
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <button
           onClick={() => agir("enviar")}
           disabled={loading !== null || !texto.trim()}
-          className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-500 disabled:opacity-50"
+          className="rounded-lg bg-primaria px-4 py-2 text-sm font-semibold text-texto hover:bg-primaria-hover disabled:opacity-50"
         >
           {loading === "enviar" ? "Enviando..." : "Enviar resposta"}
         </button>
@@ -67,12 +67,12 @@ export default function EscaladoAcoes({
         <button
           onClick={() => agir("resolver")}
           disabled={loading !== null}
-          className="rounded-lg bg-slate-700 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-600 disabled:opacity-50"
+          className="rounded-lg bg-chip-cinza-fundo px-4 py-2 text-sm font-semibold text-texto hover:bg-chip-cinza-fundo disabled:opacity-50"
         >
           {loading === "resolver" ? "..." : "Marcar como resolvido"}
         </button>
 
-        {msg && <span className="text-sm text-slate-300">{msg}</span>}
+        {msg && <span className="text-sm text-texto">{msg}</span>}
       </div>
     </div>
   );

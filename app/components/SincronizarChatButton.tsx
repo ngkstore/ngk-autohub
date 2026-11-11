@@ -37,10 +37,10 @@ export default function SincronizarChatButton() {
   }
 
   return (
-    <div className="rounded-2xl border border-teal-800 bg-slate-900 p-6">
+    <div className="rounded-2xl border border-primaria bg-superficie p-6">
       <h2 className="text-2xl font-bold">Sincronizar Chat</h2>
 
-      <p className="mt-2 text-sm text-slate-400">
+      <p className="mt-2 text-sm text-texto-2">
         Puxa agora as conversas mais recentes do chat (mensagens novas dos
         clientes). O histórico antigo é puxado em segundo plano pelo cron.
       </p>
@@ -48,14 +48,14 @@ export default function SincronizarChatButton() {
       <button
         onClick={sincronizar}
         disabled={loading}
-        className="mt-4 rounded-xl bg-teal-600 px-5 py-3 text-sm font-semibold text-white hover:bg-teal-500 disabled:opacity-50"
+        className="mt-4 rounded-xl bg-primaria px-5 py-3 text-sm font-semibold text-texto hover:bg-primaria-hover disabled:opacity-50"
       >
         {loading ? "Sincronizando..." : "Sincronizar Chat agora"}
       </button>
 
-      {resultado && <p className="mt-4 text-sm text-slate-200">{resultado}</p>}
+      {resultado && <p className="mt-4 text-sm text-texto">{resultado}</p>}
       {erro && (
-        <div className="mt-3 rounded-xl bg-red-900 px-4 py-3 text-sm text-red-200">
+        <div className="mt-3 rounded-xl bg-chip-vermelho-fundo px-4 py-3 text-sm text-perigo">
           {erro}
         </div>
       )}

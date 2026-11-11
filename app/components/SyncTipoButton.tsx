@@ -58,7 +58,7 @@ export default function SyncTipoButton({ tipo, label, lojaId }: Props) {
     <button
       onClick={sincronizar}
       disabled={loading}
-      className="rounded-xl bg-blue-600 px-5 py-4 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
+      className="rounded-xl bg-primaria px-5 py-4 text-sm font-semibold text-texto hover:bg-primaria-hover disabled:opacity-50"
     >
       {loading ? "Sincronizando..." : label}
     </button>

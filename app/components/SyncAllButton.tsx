@@ -76,7 +76,7 @@ export default function SyncAllButton({ lojas }: Props) {
     <button
       onClick={sincronizarTudo}
       disabled={loading || lojas.length === 0}
-      className="rounded-lg bg-green-600 px-5 py-3 text-sm font-semibold text-white hover:bg-green-500 disabled:cursor-not-allowed disabled:opacity-50"
+      className="rounded-lg bg-sucesso px-5 py-3 text-sm font-semibold text-texto hover:bg-sucesso disabled:cursor-not-allowed disabled:opacity-50"
     >
       {loading ? "Sincronizando tudo..." : "Sincronizar Tudo"}
     </button>

@@ -33,7 +33,7 @@ export default function GerarAlertasButton() {
     <button
       onClick={gerarAlertas}
       disabled={loading}
-      className="rounded-lg bg-red-600 px-5 py-3 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+      className="rounded-lg bg-perigo px-5 py-3 text-sm font-semibold text-texto hover:bg-perigo disabled:opacity-50"
     >
       {loading ? "Gerando..." : "Gerar Alertas"}
     </button>
