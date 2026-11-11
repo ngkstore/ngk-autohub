@@ -59,10 +59,10 @@ export default async function IntegracoesPage() {
   );
 
   return (
-    <div className="p-8 text-white">
-      <h1 className="text-4xl font-bold">Integrações</h1>
+    <div className="mx-auto max-w-[1400px] p-6">
+      <h1 className="text-[22px] font-bold tracking-[-0.01em] text-texto">Integrações</h1>
 
-      <p className="mt-2 text-slate-400">
+      <p className="mt-0.5 text-[13px] text-texto-2">
         Conexões com marketplaces, tokens e histórico de sincronizações.
       </p>
 
@@ -71,22 +71,22 @@ export default async function IntegracoesPage() {
 
         <Link
           href="/api/shopee/auth"
-          className="rounded-lg bg-orange-600 px-5 py-3 text-sm font-semibold text-white hover:bg-orange-500"
+          className="rounded-lg bg-alerta px-5 py-3 text-sm font-semibold text-texto hover:bg-primaria-hover"
         >
           + Conectar nova loja Shopee
         </Link>
       </div>
 
-      <p className="mt-3 text-sm text-slate-400">
+      <p className="mt-3 text-sm text-texto-2">
         Para adicionar uma loja Shopee, esteja logado na conta Shopee dela e
-        clique em <span className="font-semibold text-orange-300">+ Conectar
+        clique em <span className="font-semibold text-alerta">+ Conectar
         nova loja</span>. Para reconectar uma já existente, use o botão{" "}
-        <span className="font-semibold text-orange-300">Reconectar</span> no card.
+        <span className="font-semibold text-alerta">Reconectar</span> no card.
       </p>
 
-      <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <section className="rounded-2xl bg-slate-900 p-6">
-          <h2 className="text-2xl font-bold">Marketplaces</h2>
+      <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <section className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+          <h2 className="text-[15px] font-semibold text-texto">Marketplaces</h2>
 
           <div className="mt-6 space-y-4">
             {lojas && lojas.length > 0 ? (
@@ -114,19 +114,19 @@ export default async function IntegracoesPage() {
                 return (
                   <div
                     key={loja.id}
-                    className="rounded-xl bg-slate-800 p-5"
+                    className="rounded-[10px] border border-linha bg-superficie-2 p-5"
                   >
                     <p className="font-bold">
                       {loja.apelido}
                     </p>
 
-                    <p className="mt-1 text-sm text-slate-400">
+                    <p className="mt-1 text-sm text-texto-2">
                       Marketplace: {loja.marketplace}
                     </p>
 
-                    <p className="mt-1 text-sm text-slate-400">
+                    <p className="mt-1 text-sm text-texto-2">
                       Token:
-                      <span className="ml-2 text-white">
+                      <span className="ml-2 text-texto">
                         {conectado
                           ? "Configurado"
                           : "Não conectado"}
@@ -136,8 +136,8 @@ export default async function IntegracoesPage() {
                     <span
                       className={`mt-4 inline-block rounded-full px-3 py-1 text-xs font-semibold ${
                         conectado
-                          ? "bg-green-900 text-green-300"
-                          : "bg-yellow-900 text-yellow-300"
+                          ? "bg-chip-verde-fundo text-sucesso"
+                          : "bg-chip-amarelo-fundo text-alerta"
                       }`}
                     >
                       {conectado
@@ -157,7 +157,7 @@ export default async function IntegracoesPage() {
                         "shopee" && (
                         <Link
                           href={`/api/shopee/auth?loja=${loja.id}`}
-                          className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-500"
+                          className="rounded-lg bg-alerta px-4 py-2 text-sm font-semibold text-texto hover:bg-primaria-hover"
                         >
                           {conectado
                             ? "Reconectar"
@@ -171,10 +171,10 @@ export default async function IntegracoesPage() {
                           title="Autoriza o 2º app da Shopee (módulo Programa de Afiliados)"
                           className={`rounded-lg px-4 py-2 text-sm font-semibold ring-1 ${
                             afiliados === "ativo"
-                              ? "bg-slate-900 text-green-300 ring-green-800 hover:bg-slate-800"
+                              ? "bg-superficie text-sucesso ring-green-800 hover:bg-superficie-2"
                               : afiliados
-                                ? "bg-slate-900 text-red-300 ring-red-800 hover:bg-slate-800"
-                                : "bg-slate-900 text-white ring-slate-600 hover:bg-slate-800"
+                                ? "bg-superficie text-perigo ring-red-800 hover:bg-superficie-2"
+                                : "bg-superficie text-texto ring-slate-600 hover:bg-superficie-2"
                           }`}
                         >
                           {afiliados === "ativo"
@@ -189,7 +189,7 @@ export default async function IntegracoesPage() {
                         "tiktok" && (
                         <Link
                           href={`/api/tiktok/auth?loja=${loja.id}`}
-                          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white ring-1 ring-slate-600 hover:bg-slate-800"
+                          className="rounded-lg bg-superficie px-4 py-2 text-sm font-semibold text-texto ring-1 ring-slate-600 hover:bg-superficie-2"
                         >
                           {conectado
                             ? "Reconectar TikTok"
@@ -201,16 +201,15 @@ export default async function IntegracoesPage() {
                 );
               })
             ) : (
-              <p className="text-slate-400">
+              <p className="text-texto-2">
                 Nenhuma loja cadastrada.
               </p>
             )}
           </div>
         </section>
 
-        <section className="rounded-2xl bg-slate-900 p-6">
-          <h2 className="text-2xl font-bold">
-            Últimas Sincronizações
+        <section className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+          <h2 className="text-[15px] font-semibold text-texto">Últimas Sincronizações
           </h2>
 
           <div className="mt-6 space-y-4">
@@ -219,7 +218,7 @@ export default async function IntegracoesPage() {
               sincronizacoes.map((sync) => (
                 <div
                   key={sync.id}
-                  className="rounded-xl bg-slate-800 p-5"
+                  className="rounded-[10px] border border-linha bg-superficie-2 p-5"
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -227,7 +226,7 @@ export default async function IntegracoesPage() {
                         {sync.marketplace} / {sync.tipo}
                       </p>
 
-                      <p className="mt-1 text-sm text-orange-300">
+                      <p className="mt-1 text-sm text-alerta">
                         {sync.lojas?.apelido ||
                           "Sem loja"}
                       </p>
@@ -236,25 +235,25 @@ export default async function IntegracoesPage() {
                     <span
                       className={`rounded-full px-3 py-1 text-xs font-semibold ${
                         sync.status === "sucesso"
-                          ? "bg-green-900 text-green-300"
-                          : "bg-red-900 text-red-300"
+                          ? "bg-chip-verde-fundo text-sucesso"
+                          : "bg-chip-vermelho-fundo text-perigo"
                       }`}
                     >
                       {sync.status}
                     </span>
                   </div>
 
-                  <p className="mt-3 text-sm text-slate-400">
+                  <p className="mt-3 text-sm text-texto-2">
                     Registros importados:
-                    <span className="ml-2 text-white">
+                    <span className="ml-2 text-texto">
                       {sync.registros_importados ??
                         0}
                     </span>
                   </p>
 
-                  <p className="mt-1 text-sm text-slate-400">
+                  <p className="mt-1 text-sm text-texto-2">
                     Data:
-                    <span className="ml-2 text-white">
+                    <span className="ml-2 text-texto">
                       {sync.iniciado_em
                         ? new Date(
                             sync.iniciado_em
@@ -266,14 +265,14 @@ export default async function IntegracoesPage() {
                   </p>
 
                   {sync.mensagem && (
-                    <p className="mt-3 text-sm text-slate-300">
+                    <p className="mt-3 text-sm text-texto">
                       {sync.mensagem}
                     </p>
                   )}
                 </div>
               ))
             ) : (
-              <p className="text-slate-400">
+              <p className="text-texto-2">
                 Nenhuma sincronização realizada
                 ainda.
               </p>
