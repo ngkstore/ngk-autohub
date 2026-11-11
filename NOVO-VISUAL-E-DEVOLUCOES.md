@@ -112,7 +112,8 @@ Todos), busca, "Sincronizado hh:mm" com bolinha verde, **botão sol/lua do tema*
 (grava o cookie e troca a classe na hora), sino de alertas e avatar. Mantenha a lógica
 atual de filtros por `searchParams`.
 
-### [ ] A3. Kit de componentes
+### [x] A3. Kit de componentes
+> **Feito 11/11/2026:** `app/components/ui/` (import `@/app/components/ui`): `Card`/`CardHeader`; `Kpi` (ícone 34 px em 7 cores, rótulo, valor, etiqueta de variação verde/vermelha/neutra com `variacaoInvertida` para custos, `MiniGrafico` SVG); `Chip` + `ChipCanal` (Shopee laranja / TikTok preto), `ChipPrazo` (vermelho ≤ 4 h ou vencido, laranja hoje, amarelo amanhã, cinza depois), `ChipStatus` (verde/azul/cinza); `Tabs` com contador (link por `href` ou `onChange`); `Tabela`/`Th`/`Tr`/`Td` (cabeçalho cinza, selecionada índigo suave, `numerica` à direita), `Produto` (miniatura + nome + SKU), `Barra`; `Botao`/`BotaoLink` (principal, secundário, destrutivo, pequeno), `Segmentado`, `Switch`; `Dica`, `Aviso`, `Erro`, `Vazio`, `PainelDetalhe` + `SecaoDetalhe` + `LinhaDetalhe`. `lib/formato.ts`: `brl`, `pct`, `numero`, `compacto`, `data`, `prazoRelativo` ("em 1h 20", "vencida 2h") e `urgenciaDoPrazo`, com `tests/formato.test.ts` (9 testes). `DashboardCharts.tsx`: grade, eixos, tooltip e cartões pelos tokens (`var(--linha)`, `var(--texto-2)`, `bg-superficie`); cores das séries continuam fixas (valem nos dois temas).
 
 **Onde:** `app/components/ui/` (novo) e `lib/formato.ts` (novo).
 

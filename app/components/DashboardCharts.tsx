@@ -23,6 +23,9 @@ type Props = {
   pedidosPorStatus?: { status: string; quantidade: number }[];
 };
 
+// Cores das séries (dados) ficam fixas: funcionam nos dois temas. Grade, eixos e
+// cartões leem os tokens (var(--linha), var(--texto-2), bg-superficie) — A3.
+const ESTILO_TOOLTIP = { background: "var(--superficie)", border: "1px solid var(--borda)", borderRadius: 10, color: "var(--texto)", fontSize: 13 };
 const coresFinanceiro = ["#22c55e", "#ef4444", "#3b82f6"];
 const coresAvaliacoes = ["#ef4444", "#f97316", "#facc15", "#84cc16", "#22c55e"];
 const coresMarketplace = ["#3b82f6", "#f97316", "#22c55e", "#8b5cf6"];
@@ -43,7 +46,7 @@ function temDados(lista?: unknown[]) {
 
 function EmptyChart() {
   return (
-    <div className="flex h-80 items-center justify-center rounded-2xl border border-dashed border-slate-700 text-slate-500">
+    <div className="flex h-80 items-center justify-center rounded-[14px] border border-dashed border-borda text-texto-2">
       Sem dados para o período selecionado.
     </div>
   );
@@ -58,8 +61,8 @@ export default function DashboardCharts({
 }: Props) {
   return (
     <div className="mt-10 grid grid-cols-1 gap-6 xl:grid-cols-2">
-      <div className="rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-lg">
-        <h2 className="mb-6 text-2xl font-bold text-white">
+      <div className="rounded-[14px] border border-borda bg-superficie p-[18px] shadow-cartao">
+        <h2 className="mb-4 text-[15px] font-semibold text-texto">
           📈 Vendas por Período
         </h2>
 
@@ -74,10 +77,10 @@ export default function DashboardCharts({
                   </linearGradient>
                 </defs>
 
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis dataKey="data" stroke="#94a3b8" />
-                <YAxis stroke="#94a3b8" />
-                <Tooltip />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--linha)" />
+                <XAxis dataKey="data" stroke="var(--texto-2)" />
+                <YAxis stroke="var(--texto-2)" />
+                <Tooltip contentStyle={ESTILO_TOOLTIP} />
                 <Area
                   type="monotone"
                   dataKey="faturamento"
@@ -93,8 +96,8 @@ export default function DashboardCharts({
         )}
       </div>
 
-      <div className="rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-lg">
-        <h2 className="mb-6 text-2xl font-bold text-white">
+      <div className="rounded-[14px] border border-borda bg-superficie p-[18px] shadow-cartao">
+        <h2 className="mb-4 text-[15px] font-semibold text-texto">
           💰 Financeiro
         </h2>
 
@@ -102,10 +105,10 @@ export default function DashboardCharts({
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={financeiroResumo}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis dataKey="nome" stroke="#94a3b8" />
-                <YAxis stroke="#94a3b8" />
-                <Tooltip />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--linha)" />
+                <XAxis dataKey="nome" stroke="var(--texto-2)" />
+                <YAxis stroke="var(--texto-2)" />
+                <Tooltip contentStyle={ESTILO_TOOLTIP} />
 
                 <Bar dataKey="valor" radius={[10, 10, 0, 0]}>
                   {financeiroResumo.map((_, index) => (
@@ -123,8 +126,8 @@ export default function DashboardCharts({
         )}
       </div>
 
-      <div className="rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-lg">
-        <h2 className="mb-6 text-2xl font-bold text-white">
+      <div className="rounded-[14px] border border-borda bg-superficie p-[18px] shadow-cartao">
+        <h2 className="mb-4 text-[15px] font-semibold text-texto">
           ⭐ Avaliações por Nota
         </h2>
 
@@ -132,10 +135,10 @@ export default function DashboardCharts({
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={avaliacoesPorNota}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis dataKey="nota" stroke="#94a3b8" />
-                <YAxis stroke="#94a3b8" />
-                <Tooltip />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--linha)" />
+                <XAxis dataKey="nota" stroke="var(--texto-2)" />
+                <YAxis stroke="var(--texto-2)" />
+                <Tooltip contentStyle={ESTILO_TOOLTIP} />
 
                 <Bar dataKey="quantidade" radius={[10, 10, 0, 0]}>
                   {avaliacoesPorNota.map((_, index) => (
@@ -153,8 +156,8 @@ export default function DashboardCharts({
         )}
       </div>
 
-      <div className="rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-lg">
-        <h2 className="mb-6 text-2xl font-bold text-white">
+      <div className="rounded-[14px] border border-borda bg-superficie p-[18px] shadow-cartao">
+        <h2 className="mb-4 text-[15px] font-semibold text-texto">
           📦 Pedidos por Status
         </h2>
 
@@ -162,10 +165,10 @@ export default function DashboardCharts({
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={pedidosPorStatus}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis dataKey="status" stroke="#94a3b8" />
-                <YAxis stroke="#94a3b8" />
-                <Tooltip />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--linha)" />
+                <XAxis dataKey="status" stroke="var(--texto-2)" />
+                <YAxis stroke="var(--texto-2)" />
+                <Tooltip contentStyle={ESTILO_TOOLTIP} />
 
                 <Bar dataKey="quantidade" radius={[10, 10, 0, 0]}>
                   {pedidosPorStatus.map((_, index) => (
@@ -183,8 +186,8 @@ export default function DashboardCharts({
         )}
       </div>
 
-      <div className="rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-lg">
-        <h2 className="mb-6 text-2xl font-bold text-white">
+      <div className="rounded-[14px] border border-borda bg-superficie p-[18px] shadow-cartao">
+        <h2 className="mb-4 text-[15px] font-semibold text-texto">
           🛒 Faturamento por Loja
         </h2>
 
@@ -209,7 +212,7 @@ export default function DashboardCharts({
                   ))}
                 </Pie>
 
-                <Tooltip />
+                <Tooltip contentStyle={ESTILO_TOOLTIP} />
               </PieChart>
             </ResponsiveContainer>
           </div>
