@@ -74,22 +74,22 @@ export default function SincronizarPedidosButton({ lojaId }: Props) {
   }
 
   return (
-    <div className="rounded-2xl border border-emerald-800 bg-slate-900 p-6">
+    <div className="rounded-2xl border border-chip-verde-fundo bg-superficie p-6">
       <h2 className="text-2xl font-bold">Sincronizar Pedidos Agora</h2>
 
-      <p className="mt-2 text-sm text-slate-400">
+      <p className="mt-2 text-sm text-texto-2">
         Dispara o ciclo manualmente (sem esperar o cron) e mostra exatamente o
         que a Shopee respondeu. Útil para testar a integração.
       </p>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
-        <label className="text-sm text-slate-300">
+        <label className="text-sm text-texto">
           Últimos
           <select
             value={dias}
             onChange={(e) => setDias(Number(e.target.value))}
             disabled={loading}
-            className="mx-2 rounded-lg bg-slate-800 px-3 py-2 text-white"
+            className="mx-2 rounded-lg bg-superficie-2 px-3 py-2 text-texto"
           >
             <option value={1}>1 dia</option>
             <option value={3}>3 dias</option>
@@ -101,7 +101,7 @@ export default function SincronizarPedidosButton({ lojaId }: Props) {
         <button
           onClick={sincronizar}
           disabled={loading || !lojaId}
-          className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+          className="rounded-xl bg-primaria px-5 py-3 text-sm font-semibold text-texto hover:bg-primaria-hover disabled:opacity-50"
         >
           {loading ? "Sincronizando..." : "Sincronizar Pedidos Agora"}
         </button>
@@ -112,35 +112,35 @@ export default function SincronizarPedidosButton({ lojaId }: Props) {
           <div
             className={`rounded-xl px-4 py-3 text-sm font-semibold ${
               resultado.sucesso
-                ? "bg-green-900 text-green-200"
-                : "bg-red-900 text-red-200"
+                ? "bg-chip-verde-fundo text-green-200"
+                : "bg-chip-vermelho-fundo text-perigo"
             }`}
           >
             {resultado.mensagem || resultado.erro || "Sem mensagem."}
           </div>
 
           {typeof resultado.totalPedidos === "number" && (
-            <p className="text-sm text-slate-300">
+            <p className="text-sm text-texto">
               Lotes processados: {resultado.lotesProcessados ?? 0} • Pedidos
               gravados: {resultado.totalPedidos}
             </p>
           )}
 
           {resultado.resultados && resultado.resultados.length > 0 && (
-            <details className="rounded-xl bg-slate-800 p-4">
-              <summary className="cursor-pointer text-sm font-semibold text-slate-200">
+            <details className="rounded-xl bg-superficie-2 p-4">
+              <summary className="cursor-pointer text-sm font-semibold text-texto">
                 Detalhes técnicos (retorno da Shopee)
               </summary>
 
               <div className="mt-3 space-y-3">
                 {resultado.resultados.map((r) => (
-                  <div key={r.jobId} className="rounded-lg bg-slate-900 p-3">
-                    <p className="text-xs text-slate-400">
+                  <div key={r.jobId} className="rounded-lg bg-superficie p-3">
+                    <p className="text-xs text-texto-2">
                       Lote {r.jobId} — {r.status} — {r.total} pedidos
                     </p>
-                    <p className="mt-1 text-sm text-slate-200">{r.mensagem}</p>
+                    <p className="mt-1 text-sm text-texto">{r.mensagem}</p>
                     {r.debugPrimeiroRetorno != null && (
-                      <pre className="mt-2 max-h-64 overflow-auto rounded bg-black/40 p-2 text-xs text-slate-300">
+                      <pre className="mt-2 max-h-64 overflow-auto rounded bg-black/40 p-2 text-xs text-texto">
                         {JSON.stringify(r.debugPrimeiroRetorno, null, 2)}
                       </pre>
                     )}

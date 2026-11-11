@@ -87,10 +87,10 @@ export default function EnriquecerPedidosButton() {
   }
 
   return (
-    <div className="rounded-2xl border border-sky-800 bg-slate-900 p-6">
+    <div className="rounded-2xl border border-sky-800 bg-superficie p-6">
       <h2 className="text-2xl font-bold">Enriquecer Pedidos</h2>
 
-      <p className="mt-2 text-sm text-slate-400">
+      <p className="mt-2 text-sm text-texto-2">
         Busca os detalhes (valor, cliente, itens e data) dos pedidos já
         importados. Roda em ciclos automáticos até concluir.
       </p>
@@ -98,17 +98,17 @@ export default function EnriquecerPedidosButton() {
       <button
         onClick={enriquecer}
         disabled={loading}
-        className="mt-4 rounded-xl bg-sky-600 px-5 py-3 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
+        className="mt-4 rounded-xl bg-sky-600 px-5 py-3 text-sm font-semibold text-texto hover:bg-sky-500 disabled:opacity-50"
       >
         {loading ? "Enriquecendo..." : "Enriquecer Pedidos"}
       </button>
 
       {progresso && (
-        <p className="mt-4 text-sm text-slate-200">{progresso}</p>
+        <p className="mt-4 text-sm text-texto">{progresso}</p>
       )}
 
       {erro && (
-        <div className="mt-3 rounded-xl bg-red-900 px-4 py-3 text-sm text-red-200">
+        <div className="mt-3 rounded-xl bg-chip-vermelho-fundo px-4 py-3 text-sm text-perigo">
           {erro}
         </div>
       )}

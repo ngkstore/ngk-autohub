@@ -85,10 +85,10 @@ export default function EnriquecerFinanceiroButton() {
   }
 
   return (
-    <div className="rounded-2xl border border-violet-800 bg-slate-900 p-6">
+    <div className="rounded-2xl border border-violet-800 bg-superficie p-6">
       <h2 className="text-2xl font-bold">Conciliar Financeiro (Shopee)</h2>
 
-      <p className="mt-2 text-sm text-slate-400">
+      <p className="mt-2 text-sm text-texto-2">
         Busca o detalhamento financeiro (escrow) de cada pedido: valor pago,
         cupons, taxas e o valor líquido a receber. Ajusta as Vendas para bater
         com o &quot;Pedidos Pagos&quot; do Shopee. Roda em ciclos até concluir.
@@ -97,15 +97,15 @@ export default function EnriquecerFinanceiroButton() {
       <button
         onClick={conciliar}
         disabled={loading}
-        className="mt-4 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white hover:bg-violet-500 disabled:opacity-50"
+        className="mt-4 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-texto hover:bg-violet-500 disabled:opacity-50"
       >
         {loading ? "Conciliando..." : "Conciliar Financeiro"}
       </button>
 
-      {progresso && <p className="mt-4 text-sm text-slate-200">{progresso}</p>}
+      {progresso && <p className="mt-4 text-sm text-texto">{progresso}</p>}
 
       {erro && (
-        <div className="mt-3 rounded-xl bg-red-900 px-4 py-3 text-sm text-red-200">
+        <div className="mt-3 rounded-xl bg-chip-vermelho-fundo px-4 py-3 text-sm text-perigo">
           {erro}
         </div>
       )}

@@ -48,11 +48,12 @@ function obterIntervaloPeriodo(periodo?: string) {
 export default async function PedidosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ loja?: string; periodo?: string }>;
+  searchParams: Promise<{ loja?: string; periodo?: string; q?: string }>;
 }) {
   const params = await searchParams;
 
   const periodo = params.periodo;
+  const busca = (params.q || "").trim();
   const escopo = await escopoDoUsuario();
   const lojas = filtroLojas(escopo, params.loja);
 
@@ -67,6 +68,10 @@ export default async function PedidosPage({
 
   if (lojas) {
     pedidosQuery = pedidosQuery.in("loja_id", lojas);
+  }
+  if (busca) {
+    // Busca da barra superior (A2): número do pedido ou nome do cliente.
+    pedidosQuery = pedidosQuery.or(`pedido_externo_id.ilike.%${busca}%,cliente_nome.ilike.%${busca}%`);
   }
   if (intervalo) {
     pedidosQuery = pedidosQuery
@@ -101,38 +106,39 @@ export default async function PedidosPage({
   }>;
 
   return (
-    <div className="p-8 text-white">
-      <h1 className="text-4xl font-bold">Pedidos</h1>
+    <div className="mx-auto max-w-[1400px] p-6">
+      <h1 className="text-[22px] font-bold tracking-[-0.01em] text-texto">Pedidos</h1>
 
-      <p className="mt-2 text-slate-400">
+      <p className="mt-0.5 text-[13px] text-texto-2">
         Acompanhe pedidos, status, clientes e valores. Filtre pela loja no topo.
+        {busca && <> Mostrando resultados para <b className="text-texto">“{busca}”</b>. <a href="/pedidos" className="text-primaria underline">Limpar</a></>}
       </p>
 
-      <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Pedidos no Período</p>
+      <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+          <p className="text-sm text-texto-2">Pedidos no Período</p>
           <p className="mt-2 text-4xl font-bold">{totalPedidos}</p>
         </div>
 
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Pedidos Efetivados</p>
-          <p className="mt-2 text-4xl font-bold text-emerald-300">{pedidosEfetivados}</p>
+        <div className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+          <p className="text-sm text-texto-2">Pedidos Efetivados</p>
+          <p className="mt-2 text-4xl font-bold text-sucesso">{pedidosEfetivados}</p>
         </div>
 
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Valor Efetivado (período)</p>
+        <div className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+          <p className="text-sm text-texto-2">Valor Efetivado (período)</p>
           <p className="mt-2 text-4xl font-bold">
             R$ {Number(faturamento || 0).toFixed(2)}
           </p>
         </div>
       </div>
 
-      <section className="mt-10 rounded-2xl bg-slate-900 p-6">
-        <h2 className="text-2xl font-bold">Últimos Pedidos</h2>
+      <section className="mt-6 rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+        <h2 className="text-[15px] font-semibold text-texto">Últimos Pedidos</h2>
 
-        <div className="mt-6 overflow-hidden rounded-xl border border-slate-800">
+        <div className="mt-6 overflow-hidden rounded-xl border border-borda">
           <table className="w-full text-left">
-            <thead className="bg-slate-800 text-sm text-slate-300">
+            <thead className="bg-superficie-2 text-xs font-semibold text-texto-2">
               <tr>
                 <th className="p-4">Pedido</th>
                 <th className="p-4">Cliente</th>
@@ -146,20 +152,20 @@ export default async function PedidosPage({
             <tbody>
               {pedidos && pedidos.length > 0 ? (
                 pedidos.map((pedido) => (
-                  <tr key={pedido.id} className="border-t border-slate-800">
+                  <tr key={pedido.id} className="border-t border-borda">
                     <td className="p-4 font-semibold">
                       {pedido.pedido_externo_id || pedido.id}
                     </td>
 
-                    <td className="p-4 text-slate-300">
+                    <td className="p-4 text-texto">
                       {pedido.cliente_nome || "-"}
                     </td>
 
-                    <td className="p-4 text-orange-300">
+                    <td className="p-4 text-alerta">
                       {pedido.lojas?.apelido || "Sem loja"}
                     </td>
 
-                    <td className="p-4 text-slate-300">
+                    <td className="p-4 text-texto">
                       {pedido.marketplace}
                     </td>
 
@@ -168,7 +174,7 @@ export default async function PedidosPage({
                     </td>
 
                     <td className="p-4">
-                      <span className="rounded-full bg-yellow-900 px-3 py-1 text-xs font-semibold text-yellow-300">
+                      <span className="rounded-full bg-chip-amarelo-fundo px-3 py-1 text-xs font-semibold text-alerta">
                         {pedido.status || "sem status"}
                       </span>
                     </td>
@@ -176,7 +182,7 @@ export default async function PedidosPage({
                 ))
               ) : (
                 <tr>
-                  <td className="p-4 text-slate-400" colSpan={6}>
+                  <td className="p-4 text-texto-2" colSpan={6}>
                     Nenhum pedido encontrado para os filtros selecionados.
                   </td>
                 </tr>
