@@ -10,6 +10,7 @@ export type Pendencia = {
   detalhe: string;
   link: string;
   acao: string;
+  grupo?: "conferir"; // prazo vencido há mais de 7 dias: provavelmente status desatualizado
 };
 
 export function urgencia(prazo: string | null, agora = new Date()): Pendencia["urgencia"] {

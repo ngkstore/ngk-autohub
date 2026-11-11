@@ -43,6 +43,7 @@ const ROTAS_CRON = [
   "/api/shopee/saude/coletar",
   "/api/shopee/produtos/sincronizar-todos",
   "/api/tiktok/pedidos/sincronizar",
+  "/api/tiktok/pedidos/resync-status",
   "/api/tiktok/token/refresh",
   "/api/tiktok/sondar",
   "/api/tiktok/financeiro/sincronizar",

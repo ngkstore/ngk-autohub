@@ -68,16 +68,18 @@ async function pendenciasPostagem(lojaIds: string[] | null, lojas: Map<string, {
     if (g.exemplos.length < 3) g.exemplos.push(p.pedido_externo_id);
     grupos.set(k, g);
   }
+  const limiteConferir = Date.now() - 7 * 86400000;
   return [...grupos.values()].map((g) => ({
     prazo: g.prazo,
     urgencia: urgencia(g.prazo),
+    grupo: g.prazo && new Date(g.prazo).getTime() < limiteConferir ? ("conferir" as const) : undefined,
     canal: g.canal,
     loja_id: g.loja_id,
     titulo: `${g.n} pedido(s) ${g.tipo === "Coleta" ? "aguardando coleta" : "a postar"} · ${lojas.get(g.loja_id)?.nome ?? ""}`,
     detalhe: `${g.tipo === "Coleta" ? "janela de coleta" : "prazo de postagem"} ${fmtHora(g.prazo)} · ex.: ${g.exemplos.join(", ")}`,
     link: `/pedidos?loja=${g.loja_id}`,
     acao: g.tipo === "Coleta" ? "Resolver" : "Ver pedidos",
-  }));
+  })).map((p) => (p.grupo === "conferir" ? { ...p, titulo: p.titulo.replace(/^(\d+) pedido\(s\)/, "$1 pedido(s) com prazo vencido há mais de 7 dias"), detalhe: `${p.detalhe} · provavelmente já entregues: status no banco desatualizado`, acao: "Conferir status" } : p));
 }
 
 async function pendenciasAtrasados(lojaIds: string[] | null, lojas: Map<string, { nome: string; canal: string }>): Promise<Pendencia[]> {
@@ -256,7 +258,7 @@ export async function montarPainel(lojaIds: string[] | null, extras: { estoque?:
   const ordem: Record<Urgencia, number> = { agora: 0, hoje: 1, amanha: 2, depois: 3 };
   const pendencias = [...atrasados, ...postagem, ...chats, ...avaliacoes, ...tokens.pend, ...saude.pend, ...devolucoes, ...estoque, ...campanhas].sort((a, b) => ordem[a.urgencia] - ordem[b.urgencia] || (a.prazo && b.prazo ? a.prazo.localeCompare(b.prazo) : a.prazo ? -1 : 1));
   const contagem: Record<Urgencia, number> = { agora: 0, hoje: 0, amanha: 0, depois: 0 };
-  for (const p of pendencias) contagem[p.urgencia]++;
+  for (const p of pendencias) if (p.grupo !== "conferir") contagem[p.urgencia]++;
   confs.push({ nome: "Devoluções vencendo em 24 h", ok: devolucoes.filter((d) => d.urgencia === "agora" || d.urgencia === "hoje").length === 0, texto: `${devolucoes.length} pendente(s)` });
   return { geradoEm: new Date().toISOString(), pendencias, contagem, resolvidosHoje, resolvidosOntem, saude: saude.saude, conferencias: confs, integracoes: tokens.integracoes };
 }

@@ -62,7 +62,7 @@ export default async function PainelPage({ searchParams }: { searchParams: Promi
         <div className="space-y-6 xl:col-span-2">
           {p.pendencias.length === 0 && <Vazio titulo="Nada pendente" texto="Nenhum prazo em aberto nas lojas selecionadas." />}
           {GRUPOS.map((g) => {
-            const itens = p.pendencias.filter((x) => x.urgencia === g.id);
+            const itens = p.pendencias.filter((x) => x.urgencia === g.id && x.grupo !== "conferir");
             if (itens.length === 0) return null;
             return (
               <Card key={g.id}>
@@ -75,6 +75,16 @@ export default async function PainelPage({ searchParams }: { searchParams: Promi
               </Card>
             );
           })}
+          {p.pendencias.some((x) => x.grupo === "conferir") && (
+            <Card>
+              <CardHeader titulo="Conferir status" descricao="prazo vencido há mais de 7 dias: quase sempre o pedido já foi entregue e o status no banco está velho; a ressincronização de status corrige" acoes={<Chip cor="cinza">{p.pendencias.filter((x) => x.grupo === "conferir").length} grupo(s)</Chip>} />
+              <ul>
+                {p.pendencias.filter((x) => x.grupo === "conferir").map((x, i) => (
+                  <Linha key={`c-${i}`} p={x} />
+                ))}
+              </ul>
+            </Card>
+          )}
         </div>
 
         <div className="space-y-6">
