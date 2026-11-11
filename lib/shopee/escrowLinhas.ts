@@ -7,11 +7,23 @@ const num = (j: J | undefined | null, k: string) => (j && typeof j[k] === "numbe
 
 export type LinhaEscrow = { campo: string; categoria: string; valor: number; soma: boolean };
 
+// Espelho da tabela escrow_regras_servico (a Shopee troca o rule_id a cada período;
+// transação ≈ 1,4–2 % da venda, por item ≈ 11–15 %). Regra desconhecida -> serv_outros.
+export const REGRAS_SERVICO: Record<number, string> = {
+  100623: "serv_transacao", 100640: "serv_item", 100642: "serv_item", 100644: "serv_item", // jul–set/2026
+  1000062: "serv_transacao", 1000064: "serv_item", // set–out/2026
+  1000074: "serv_transacao", 1000075: "serv_item", // desde out/2026
+};
+
 export function linhasEscrow(income: J, buyer: J | null | undefined): LinhaEscrow[] {
-  const selling = num(income, "order_selling_price");
+  const sellingApi = num(income, "order_selling_price");
   const merchant = num(buyer, "merchant_subtotal");
+  const retorno = num(income, "seller_return_refund");
+  // jul–nov/2026: a API manda order_selling_price = 0 em pedidos normais (repasse > 0, sem
+  // devolução). Não é devolução total: o selling efetivo é merchant_subtotal (migration 0009).
+  const selling = sellingApi === 0 && retorno === 0 && num(income, "escrow_amount") > 0 && merchant > 0 ? merchant : sellingApi;
   // devolução parcial: o que ficou com o comprador é order_selling_price
-  const venda = num(income, "seller_return_refund") !== 0 ? selling : selling > 0 && merchant > 0 ? merchant : selling;
+  const venda = retorno !== 0 ? selling : selling > 0 && merchant > 0 ? merchant : selling;
   const rebate = (income.seller_product_rebate as J | undefined) ?? {};
   const linhas: LinhaEscrow[] = [
     { campo: "venda", categoria: "receita", valor: venda, soma: true },
@@ -51,7 +63,7 @@ export function linhasEscrow(income: J, buyer: J | null | undefined): LinhaEscro
   for (const s of servicos) {
     const nome = String(s.rule_display_name || "");
     const rule = Number(s.rule_id || 0);
-    const categoria = /afili/i.test(nome) ? "serv_afiliado" : rule === 1000074 ? "serv_transacao" : rule === 1000075 ? "serv_item" : "serv_outros";
+    const categoria = /afili/i.test(nome) ? "serv_afiliado" : REGRAS_SERVICO[rule] ?? "serv_outros";
     linhas.push({ campo: `serv_${rule}`, categoria, valor: -num(s, "fee_amount"), soma: true });
   }
   return linhas.filter((l) => l.valor !== 0 || l.campo === "venda");

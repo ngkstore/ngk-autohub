@@ -3,13 +3,14 @@ import { linhasEscrow, somaLinhas } from "@/lib/shopee/escrowLinhas";
 import pix from "./fixtures/escrow-pix.json";
 import afiliado from "./fixtures/escrow-afiliado.json";
 import devolucao from "./fixtures/escrow-frete.json";
+import sellingZero from "./fixtures/escrow-selling-zero.json";
 
 type Fx = { pedido: string; order_income: Record<string, unknown>; buyer_payment_info: Record<string, unknown> };
 
-// Fixtures reais do get_escrow_detail (NGK, out–nov/2026). Regra de ouro da Camada 1:
+// Fixtures reais do get_escrow_detail (NGK, jul–nov/2026). Regra de ouro da Camada 1:
 // soma das linhas com soma=true == escrow_amount (Renda do pedido).
 describe("linhas do escrow fecham com a renda do pedido", () => {
-  for (const fx of [pix, afiliado, devolucao] as Fx[]) {
+  for (const fx of [pix, afiliado, devolucao, sellingZero] as Fx[]) {
     it(`pedido ${fx.pedido}`, () => {
       const linhas = linhasEscrow(fx.order_income, fx.buyer_payment_info);
       expect(somaLinhas(linhas)).toBe(Number(fx.order_income.escrow_amount));
@@ -52,5 +53,17 @@ describe("devolução total (2610070TBMSPBW): só frete sobra", () => {
   it("renda −69,25 = frete real −54,25 + reverso −15,00", () => {
     expect(somaLinhas(linhas)).toBe(-69.25);
     expect(linhas.filter((l) => l.categoria === "frete" && l.soma).reduce((s, l) => s + l.valor, 0)).toBeCloseTo(-69.25, 2);
+  });
+});
+
+describe("pedido jul/2026 (2607219VK9RDNX): order_selling_price = 0 sem devolução", () => {
+  const fx = sellingZero as Fx;
+  const linhas = linhasEscrow(fx.order_income, fx.buyer_payment_info);
+  const v = (campo: string) => linhas.find((l) => l.campo === campo)?.valor ?? 0;
+  it("venda = merchant_subtotal 24,90 (não é devolução total)", () => expect(v("venda")).toBe(24.9));
+  it("renda do pedido 15,92", () => expect(somaLinhas(linhas)).toBe(15.92));
+  it("regras antigas classificadas: 100623 transação, 100640 por item", () => {
+    expect(linhas.find((l) => l.campo === "serv_100623")?.categoria).toBe("serv_transacao");
+    expect(linhas.find((l) => l.campo === "serv_100640")?.categoria).toBe("serv_item");
   });
 });

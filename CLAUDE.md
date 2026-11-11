@@ -8,6 +8,12 @@
   linhas com `soma = true` tem de dar `escrow_amount` (conferência 1, resíduo <= R$ 0,01).
 - Receita do pedido = `buyer_payment_info.merchant_subtotal` (não `order_selling_price`).
   Cupom da Shopee, moedas, promoções de pagamento e seguro do comprador ficam FORA do repasse.
+- `order_selling_price = 0` NÃO significa devolução total quando `escrow_amount > 0` e não há
+  `seller_return_refund` (jul–nov/2026 a API manda 0 em pedidos normais): usar merchant_subtotal.
+  Devolução total = selling 0 E repasse 0 (sem ressarcimento do desconto da plataforma).
+- `rule_id` da taxa de serviço muda a cada período; a tabela `escrow_regras_servico` mapeia
+  (transação ≈ 2 % da venda, por item ≈ 11–15 %). Regra nova aparece em "campos desconhecidos"
+  da conferência 1: identificar pela proporção e inserir na tabela, depois regerar custos_pedido.
 - A carteira NÃO mostra comissão nem afiliado: os dois já vêm dentro da renda do pedido.
 - Afiliado aparece em dois campos: `order_ams_commission_fee` e a linha
   "Taxa de Serviço Afiliados do Vendedor" dentro de `net_service_fee_info_list`
