@@ -304,13 +304,16 @@ export async function enriquecerPedidosPendentes({
     // Revisão de status: pedidos efetivados presos num status NÃO-terminal
     // (ex.: "READY_TO_SHIP" há semanas) — o sistema não re-sincroniza status de
     // pedido antigo, então cancelamento tardio ficava contado como pago. Re-puxa
-    // o status atual; se virou CANCELLED, sai do faturamento. Recentes primeiro.
+    // o status atual; se virou CANCELLED, sai do faturamento. Menos atualizados 1o.
     query = query
       .eq("pedido_efetivado", true)
       .is("origem", null)
       .not("data_pedido", "is", null)
       .not("status", "in", "(COMPLETED,CANCELLED,TO_RETURN)")
-      .order("data_pedido", { ascending: false, nullsFirst: false });
+      // Menos atualizados primeiro (rotação): ordenar por data_pedido desc fazia o cron
+      // re-checar sempre os mesmos ~150 pedidos abertos de hoje e nunca chegar nos
+      // antigos — 100 mil pedidos ficaram presos em READY_TO_SHIP/PROCESSED no banco.
+      .order("atualizado_em", { ascending: true, nullsFirst: true });
   } else if (backfill) {
     // Drenador do backfill histórico: só os pedidos antigos importados
     // (origem='backfill') sem detalhe. Roda por um endpoint próprio, devagar,

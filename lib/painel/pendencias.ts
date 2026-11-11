@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { agoraMs } from "@/lib/formato";
 import { pendenciasDevolucoes, urgencia, type Pendencia } from "@/lib/devolucoes/pendencias";
 
 // Parte C — Painel do dia: junta tudo que tem prazo, do mais urgente ao menos.
@@ -41,6 +42,10 @@ async function pendenciasPostagem(lojaIds: string[] | null, lojas: Map<string, {
     .select("loja_id, marketplace, status, pedido_externo_id, dados_pedido")
     .in("status", ["READY_TO_SHIP", "PROCESSED", "AWAITING_SHIPMENT", "AWAITING_COLLECTION", "UNPAID"])
     .eq("pedido_efetivado", true)
+    // Só pedidos dos últimos 30 dias: os mais antigos presos em "a postar" são status
+    // desatualizado no banco (a revisão de status vai limpando), não pendência real.
+    .gte("data_pedido", new Date(agoraMs() - 30 * 86400000).toISOString())
+    .order("data_pedido", { ascending: false })
     .limit(3000);
   if (lojaIds) q = q.in("loja_id", lojaIds);
   const { data } = await q;
