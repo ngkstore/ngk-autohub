@@ -1,5 +1,6 @@
 import { escopoDoUsuario } from "@/lib/conta";
 import SidebarLinks, { type GrupoMenu } from "./SidebarLinks";
+import { contadorDevolucoes } from "@/lib/devolucoes/pendencias";
 
 // Menu lateral (NOVO-VISUAL, A2). Todas as rotas que existem continuam aqui,
 // reorganizadas por grupo. Rotas futuras (Painel do dia, Devoluções…) entram
@@ -17,7 +18,7 @@ function grupos(admin: boolean, contador?: number): GrupoMenu[] {
       titulo: "Operação",
       itens: [
         { nome: "Pedidos", href: "/pedidos", icone: "pedidos" },
-        // { nome: "Devoluções", href: "/devolucoes", icone: "devolucoes", contador }, // Parte B
+        { nome: "Devoluções", href: "/devolucoes", icone: "devolucoes", contador },
         { nome: "Atendimento", href: "/atendimento", icone: "atendimento" },
         { nome: "Avaliações", href: "/avaliacoes", icone: "avaliacoes" },
       ],
@@ -51,12 +52,18 @@ function grupos(admin: boolean, contador?: number): GrupoMenu[] {
     },
   ];
   if (admin) g.push({ titulo: "Admin", itens: [{ nome: "Consumo", href: "/uso", icone: "consumo" }] });
-  void contador;
   return g;
 }
 
-export default async function Sidebar({ contador }: { contador?: number }) {
+export default async function Sidebar() {
   const escopo = await escopoDoUsuario();
+  // Contador vermelho: devoluções que vencem em 24 h nas lojas do usuário (B8).
+  let contador = 0;
+  try {
+    contador = escopo.lojaIds.length ? await contadorDevolucoes(escopo.lojaIds) : 0;
+  } catch {
+    contador = 0;
+  }
 
   return (
     <aside className="fixed left-0 top-0 flex h-screen w-[232px] flex-col border-r border-borda bg-superficie">

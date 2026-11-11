@@ -21,6 +21,26 @@ async function criarAlerta({
 }
 
 export async function gerarAlertasAutomaticos() {
+  // Devoluções (B8): casos que vencem em 24 h e em 4 h.
+  const em24h = new Date(Date.now() + 24 * 3600000).toISOString();
+  const { data: devolucoes } = await supabase
+    .from("devolucoes")
+    .select("id, loja_id, canal, plataforma_id, prazo_resposta, valor_reembolso_pedido")
+    .in("etapa", ["resposta", "decisao", "recebido"])
+    .lte("prazo_resposta", em24h)
+    .limit(20);
+  for (const d of devolucoes || []) {
+    const horas = (new Date(d.prazo_resposta as string).getTime() - Date.now()) / 3600000;
+    const { data: existe } = await supabase.from("alertas").select("id").eq("tipo", "devolucao").eq("status", "novo").ilike("descricao", `%${d.plataforma_id}%`).limit(1).maybeSingle();
+    if (existe) continue;
+    await criarAlerta({
+      lojaId: d.loja_id,
+      tipo: "devolucao",
+      titulo: horas <= 4 ? "Devolução vence em menos de 4 h" : "Devolução vence em 24 h",
+      descricao: `${d.canal} ${d.plataforma_id}: R$ ${Number(d.valor_reembolso_pedido || 0).toFixed(2)} — responder em /devolucoes/${d.id}`,
+    });
+  }
+
   const { data: produtosSemEstoque } = await supabase
     .from("produtos")
     .select("*")

@@ -7,6 +7,7 @@ import { atualizarRiscoCompradores, riscoDoComprador } from "@/lib/devolucoes/ri
 import { executar } from "@/lib/devolucoes/acoes";
 import { acaoDaSugestao, linkCaso, pedirAprovacaoTelegram } from "@/lib/devolucoes/aprovacao";
 import { prazoCritico, type Acao } from "@/lib/devolucoes/validar";
+import { acompanharCreditos } from "@/lib/devolucoes/credito";
 
 // Orquestrador do assistente (B4), chamado depois da coleta (mesmo cron de 15 min):
 //  1. atualiza o risco dos compradores;
@@ -197,5 +198,15 @@ export async function processarDevolucoes(opts: { lojaId?: string; orcamentoMs?:
       r.ultimo_erro = e instanceof Error ? e.message : String(e);
     }
   }
-  return { ...r, segundos: Math.round((Date.now() - inicio) / 1000) };
+  // B6: disputas ganhas → crédito na conta (ou cobrança)
+  let credito: Awaited<ReturnType<typeof acompanharCreditos>> | null = null;
+  if (!estourou()) {
+    try {
+      credito = await acompanharCreditos({ lojaId: opts.lojaId, creditoDias: cfgPorConta.values().next().value?.limites.credito_dias ?? 3 });
+    } catch (e) {
+      r.erros++;
+      r.ultimo_erro = e instanceof Error ? e.message : String(e);
+    }
+  }
+  return { ...r, credito, segundos: Math.round((Date.now() - inicio) / 1000) };
 }

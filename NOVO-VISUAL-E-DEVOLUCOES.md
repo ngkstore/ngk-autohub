@@ -230,7 +230,8 @@ Tabelas, todas com RLS ligado, acesso só pelo servidor com a service role.
 - **`compradores_risco`**: `canal`, `comprador_id`, `devolucoes_90d`, `suspeito`,
   `motivo`, `atualizado_em`.
 
-### [ ] B2. Coleta — Shopee e TikTok
+### [x] B2. Coleta — Shopee e TikTok
+> **Feito 11/11/2026:** `lib/shopee/devolucoes.ts` + `lib/devolucoes/mapaShopee.ts` (lista por janelas de 15 dias, detalhe, eventos com chave idempotente, mídias), `lib/tiktok/devolucoes.ts` + `mapaTikTok.ts` (returns, cancellations, records; sequencial com nova tentativa no limite de taxa), `lib/devolucoes/sincronizar.ts` (upsert, marca d'água por loja, pula casos sem mudança, `forcar=1`), mídias do comprador copiadas para o bucket (`midias.ts`), rota `/api/devolucoes/sincronizar` no cron a cada 15 min (7,22,37,52) com orçamento de 200 s + assistente no tempo restante, webhook `/api/tiktok/webhook` (HMAC app_key+corpo; eventos 11/12/64/67 ressincronizam só o caso). Carga inicial de 90 dias rodada loja a loja. Testes: 10 (mapeadores, anonimizados). Pendente do Gabriel: cadastrar a URL do webhook no Partner Center do TikTok.
 
 **Onde:** `lib/shopee/devolucoes.ts`, `lib/tiktok/devolucoes.ts`,
 `app/api/devolucoes/sincronizar/route.ts` (na lista `ROTAS_CRON`, com `autorizar()`).
@@ -278,7 +279,8 @@ Tabelas, todas com RLS ligado, acesso só pelo servidor com a service role.
 - **Testes:** fixtures com os exemplos de resposta da documentação, mapeador de cada
   canal → linha de `devolucoes`.
 
-### [ ] B3. Ações na plataforma (atrás de flag)
+### [x] B3. Ações na plataforma (atrás de flag)
+> **Feito 11/11/2026:** `lib/devolucoes/acoes.ts` (`acoesPermitidas` + `executar`): Shopee confirm/dispute/offer/accept_offer/convert_image+upload_proof/cancel_dispute/upload_shipping_proof; TikTok approve/reject (recusa e oferta parcial)/upload de imagem/return_shipping, com `idempotency_key` guardado na aprovação. Flag `devolucoes_acoes_api` por conta (desligada), e-mail da disputa e limites em Configurações → Devoluções. Toda ação grava em `devolucao_aprovacoes` e `devolucao_eventos` e ressincroniza o caso. Regras fixas em `validar.ts` (9 testes). Os caminhos dos endpoints seguem a doc; a primeira execução real deve ser acompanhada (flag desligada até lá).
 
 **Onde:** `lib/devolucoes/acoes.ts`. A interface é única: `executar(devolucao, acao)`.
 Flag por conta `devolucoes_acoes_api` (use `lib/flags.ts`), **desligada** até o
@@ -307,7 +309,8 @@ Regras de toda ação:
 - Toda ação grava em `devolucao_aprovacoes` e em `devolucao_eventos`: quem aprovou, o
   que foi enviado, a resposta e o erro.
 
-### [ ] B4. Assistente e regras
+### [x] B4. Assistente e regras
+> **Feito 11/11/2026:** `assistente.ts` (Claude `MODELO_IA`, esforço baixo, JSON validado; entrada: caso, histórico, fotos/quadros por URL assinada, inspeção, risco do comprador, custos por caminho de `custos.ts`), `regras.ts` (motor puro; 9 regras iniciais desligadas na migration 0013; 10 testes), `processar.ts` (regras → assistente → executar/aprovar/sugerir dentro dos limites; alerta de prazo; tarefa de inspeção; risco; crédito), `aprovacao.ts` + `telegramCallback.ts` (`dev:aprovar|editar|recusar|abrir:<id>`, só remetente autorizado por TELEGRAM_CHAT_ID/TELEGRAM_APROVADORES). Modo do assistente por conta (só sugerir / pedir aprovação). Uso medido em `uso_ia` (tipo `devolucao`).
 
 **Onde:** `lib/devolucoes/assistente.ts`, `lib/devolucoes/regras.ts`.
 
@@ -351,7 +354,8 @@ Regras de toda ação:
   callbacks seguem o padrão `dev:aprovar:<aprovacao_id>`. Só o Gabriel (e quem ele
   autorizar) aprova. Confira o remetente do callback.
 
-### [ ] B5. Recebimento e inspeção
+### [x] B5. Recebimento e inspeção
+> **Feito 11/11/2026:** `/devolucoes/recebimento`: bipe (leitor = Enter) por rastreio/pedido/id, lista de pacotes, peso envio × chegada (≥ 20% abaixo em vermelho), checklist, estado → destino, fotos obrigatórias e vídeo da abertura com upload direto ao Storage (URL assinada) e quadros no navegador (`<video>` + `<canvas>`, manual e 4 automáticos). Rotas: buscar, upload-url, midia, inspecao. Tarefas UpSeller (estoque/NF-e) e garantia viram eventos no caso.
 
 **Onde:** `/devolucoes/recebimento`.
 
@@ -382,7 +386,8 @@ Regras de toda ação:
   estoque. Então registre o destino na inspeção e crie as tarefas "ajustar estoque no
   UpSeller" e "emitir NF-e de devolução no UpSeller", com campos para número e data.
 
-### [ ] B6. Disputas e crédito na conta
+### [x] B6. Disputas e crédito na conta
+> **Feito 11/11/2026:** `credito.ts`: ganhou → `credito_esperado_ate` (+N dias), procura crédito na carteira (Shopee, mesmo order_sn, valor positivo) ou em `tiktok_transacoes`; sem crédito no prazo → `nao_creditado` + alerta + texto de cobrança; `taxaVitoria` por motivo e por prova. Tela `/devolucoes/disputas` com abas, painel lateral, "Cobrar" e "Marcar como creditado" (rota credito registra o tipo encontrado como candidato para `carteira_categorias`).
 
 **Onde:** `lib/devolucoes/credito.ts`, `/devolucoes/disputas`.
 
@@ -404,7 +409,8 @@ Regras de toda ação:
 - **Taxa de vitória** por tipo de prova e por motivo. O assistente usa isso para não
   sugerir disputa onde quase nunca se ganha.
 
-### [ ] B7. Telas
+### [x] B7. Telas
+> **Feito 11/11/2026:** Fila (`/devolucoes`: KPIs, abas por etapa, filtros de motivo e sugestão, seleção em lote → aprovação no Telegram, "Hoje o assistente fez", "Chegando ao armazém"), Caso (`/devolucoes/[id]`: etapas, comprador, provas, histórico, recomendação, custo de cada caminho, crédito, formulário com decisão/motivo oficial/mensagem/provas, "Revisar e enviar" e "Mandar para aprovação no Telegram"), Recebimento, Regras (editor com liga/desliga, modo, JSON de condição/ação; regras padrão viram cópia da conta ao editar), Disputas, Análise (30 dias: motivo, canal/loja, produtos para agir).
 
 Siga as referências em `docs/design/` com os componentes da Parte A.
 - **Fila:**
@@ -426,7 +432,8 @@ Siga as referências em `docs/design/` com os componentes da Parte A.
   - produtos para agir com a sugestão (ex.: "revisar medidas no anúncio");
   - custo líquido = reembolsado − recuperado − produto que voltou ao estoque.
 
-### [ ] B8. Integração com o resto
+### [x] B8. Integração com o resto
+> **Feito 11/11/2026:** `pendencias.ts`: `pendenciasDevolucoes(lojaIds)` e `contadorDevolucoes` (menu: casos que vencem em 24 h); `lib/alertas.ts` cria alertas de 24 h / 4 h. Item Devoluções ativo no menu.
 
 - Contador do menu (A2) e `lib/alertas.ts`: casos que vencem em 24 h e em 4 h.
 - Exportar uma função `pendenciasDevolucoes(lojaIds)` para o futuro Painel do dia.

@@ -29,9 +29,9 @@ export function Tr({ children, selecionada = false, className = "", onClick }: {
   );
 }
 
-export function Td({ children, numerica = false, className = "", colSpan }: { children?: ReactNode; numerica?: boolean; className?: string; colSpan?: number }) {
+export function Td({ children, numerica = false, className = "", colSpan, title }: { children?: ReactNode; numerica?: boolean; className?: string; colSpan?: number; title?: string }) {
   return (
-    <td colSpan={colSpan} className={`border-b border-linha px-3.5 py-[11px] align-middle text-texto ${numerica ? "text-right tabular-nums" : ""} ${className}`}>
+    <td colSpan={colSpan} title={title} className={`border-b border-linha px-3.5 py-[11px] align-middle text-texto ${numerica ? "text-right tabular-nums" : ""} ${className}`}>
       {children}
     </td>
   );

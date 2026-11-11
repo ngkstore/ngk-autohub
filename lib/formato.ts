@@ -63,3 +63,7 @@ export function data(v: Date | string | null | undefined, comHora = false): stri
     ...(comHora ? { hour: "2-digit", minute: "2-digit" } : { year: "numeric" }),
   });
 }
+
+/** Hora atual em ms (fora do corpo dos componentes, para o lint de pureza do React). */
+export const agoraMs = () => Date.now();
+export const agora = () => new Date();
