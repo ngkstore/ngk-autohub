@@ -32,19 +32,29 @@ export default async function CampanhasPage({ searchParams }: { searchParams: Pr
   const itens = ((itensRaw || []) as unknown) as I[];
   const negativos = itens.filter((i) => i.margem !== null && i.margem < 0).length;
 
-  // calendário do mês
-  const dias: { dia: Date; eventos: { nome: string; cor: "laranja" | "tiktok" | "azul" | "roxo" | "vermelho"; id: string }[] }[] = [];
+  // calendário do mês: promoção que cobre o mês inteiro sai da grade (lista "Sempre ativas");
+  // vários dias viram barra contínua com o nome só no primeiro dia de cada semana.
+  const diaIniMes = `${ano}-${String(mes).padStart(2, "0")}-01`;
+  const ultimoDia = new Date(ano, mes, 0).getDate();
+  const diaFimMes = `${ano}-${String(mes).padStart(2, "0")}-${String(ultimoDia).padStart(2, "0")}`;
+  const cobreMes = (c: C) => !!c.inicio && diaBRT(c.inicio) <= diaIniMes && (!c.fim || diaBRT(c.fim) >= diaFimMes);
+  const sempreAtivas = camps.filter(cobreMes);
+  const naGrade = camps.filter((c) => !cobreMes(c));
+  const dias: { dia: Date; eventos: { nome: string; cor: "laranja" | "tiktok" | "azul" | "roxo" | "vermelho"; id: string; mostrarNome: boolean; continua: boolean }[] }[] = [];
   const primeiro = new Date(ano, mes - 1, 1);
   const inicioGrade = new Date(primeiro.getTime() - primeiro.getDay() * 86400000);
   for (let i = 0; i < 42; i++) {
     const d = new Date(inicioGrade.getTime() + i * 86400000);
     const chave = d.toLocaleDateString("en-CA");
     const eventos: (typeof dias)[number]["eventos"] = [];
-    for (const c of camps) {
+    for (const c of naGrade) {
       const ini = c.inicio ? diaBRT(c.inicio) : null;
       const fim = c.fim ? diaBRT(c.fim) : ini;
-      if (ini && fim && chave >= ini && chave <= fim) eventos.push({ nome: c.nome, cor: c.tipo === "live" ? "roxo" : c.tipo === "propria" ? "azul" : c.canal === "tiktok" ? "tiktok" : "laranja", id: c.id });
-      if (c.prazo_inscricao && diaBRT(c.prazo_inscricao) === chave) eventos.push({ nome: `Prazo inscrição ${c.nome}`, cor: "vermelho", id: c.id });
+      if (ini && fim && chave >= ini && chave <= fim) {
+        const multi = ini !== fim;
+        eventos.push({ nome: c.nome, cor: c.tipo === "live" ? "roxo" : c.tipo === "propria" ? "azul" : c.canal === "tiktok" ? "tiktok" : "laranja", id: c.id, mostrarNome: !multi || chave === ini || d.getDay() === 0, continua: multi });
+      }
+      if (c.prazo_inscricao && diaBRT(c.prazo_inscricao) === chave) eventos.push({ nome: `Prazo inscrição ${c.nome}`, cor: "vermelho", id: c.id, mostrarNome: true, continua: false });
     }
     dias.push({ dia: d, eventos });
   }
@@ -82,8 +92,8 @@ export default async function CampanhasPage({ searchParams }: { searchParams: Pr
         <Card className="xl:col-span-2" semPadding>
           <div className="flex items-center justify-between px-[18px] pt-4">
             <Link href={link({ mes: mesAnt })} className="rounded-lg border border-borda px-2 py-1 text-[13px] text-texto hover:bg-superficie-2">‹</Link>
-            <h2 className="text-[15px] font-semibold capitalize text-texto">
-              {MESES[mes - 1]} de {ano}
+            <h2 className="text-[15px] font-semibold text-texto">
+              {MESES[mes - 1].charAt(0).toUpperCase() + MESES[mes - 1].slice(1)} de {ano}
             </h2>
             <Link href={link({ mes: mesProx })} className="rounded-lg border border-borda px-2 py-1 text-[13px] text-texto hover:bg-superficie-2">›</Link>
           </div>
@@ -107,12 +117,12 @@ export default async function CampanhasPage({ searchParams }: { searchParams: Pr
                 return (
                   <div key={i} className={`min-h-[84px] bg-superficie p-1.5 ${foraDoMes ? "opacity-40" : ""}`}>
                     <div className={`mb-1 text-xs ${ehHoje ? "font-bold text-primaria" : "text-texto-2"}`}>{dia.getDate()}</div>
-                    {eventos.slice(0, 3).map((e, j) => (
-                      <Link key={j} href={link({ campanha: e.id })} className="block truncate">
-                        <Chip cor={e.cor} className="mb-0.5 max-w-full truncate !px-1.5 !py-0 text-[10px]">{e.nome}</Chip>
+                    {eventos.slice(0, 4).map((e, j) => (
+                      <Link key={j} href={link({ campanha: e.id })} className="block truncate" title={e.nome}>
+                        <Chip cor={e.cor} className={`mb-0.5 block max-w-full truncate !px-1.5 !py-0 text-[10px] ${e.continua ? "!rounded-none -mx-1.5" : ""}`}>{e.mostrarNome ? e.nome : "\u00a0"}</Chip>
                       </Link>
                     ))}
-                    {eventos.length > 3 && <p className="text-[10px] text-texto-2">+{eventos.length - 3}</p>}
+                    {eventos.length > 4 && <p className="text-[10px] text-texto-2">+{eventos.length - 4}</p>}
                   </div>
                 );
               })}
@@ -160,6 +170,21 @@ export default async function CampanhasPage({ searchParams }: { searchParams: Pr
         </Card>
 
         <div className="space-y-6">
+          {sempreAtivas.length > 0 && (
+            <Card>
+              <CardHeader titulo="Sempre ativas" descricao="promoções que cobrem o mês inteiro (fora da grade)" />
+              <ul className="divide-y divide-linha">
+                {sempreAtivas.map((c) => (
+                  <li key={c.id} className="flex items-center justify-between gap-2 py-2 text-[13px]">
+                    <Link href={link({ campanha: c.id })} className="min-w-0 truncate text-texto hover:underline" title={c.nome}>
+                      {c.nome}
+                    </Link>
+                    <span className="shrink-0 text-xs text-texto-2">{c.canal === "ambos" ? "ambos" : c.canal} · até {c.fim ? fmtData(c.fim) : "—"}</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
           <Card>
             <CardHeader titulo="Próximos prazos" />
             {prazos.length === 0 ? (
