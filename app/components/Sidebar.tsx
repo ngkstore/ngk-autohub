@@ -11,7 +11,7 @@ function grupos(admin: boolean, contador?: number): GrupoMenu[] {
       titulo: "Visão",
       itens: [
         { nome: "Visão geral", href: "/", icone: "visao" },
-        // { nome: "Painel do dia", href: "/painel", icone: "painel" }, // Parte C
+        { nome: "Painel do dia", href: "/painel", icone: "painel" },
       ],
     },
     {

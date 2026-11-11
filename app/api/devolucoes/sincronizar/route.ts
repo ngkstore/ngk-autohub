@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { autorizar } from "@/lib/autorizacao";
 import { sincronizarDevolucoes } from "@/lib/devolucoes/sincronizar";
 import { processarDevolucoes } from "@/lib/devolucoes/processar";
+import { enviarResumoSeForHora } from "@/lib/painel/resumoTelegram";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -25,5 +26,7 @@ export async function GET(request: NextRequest) {
   const semAssistente = sp.get("assistente") === "0";
   const assistente = semAssistente ? null : await processarDevolucoes({ lojaId, orcamentoMs: Math.max(20_000, 270_000 - (Date.now() - inicio)) });
   const total = resultados.reduce((s, r) => ({ vistos: s.vistos + r.vistos, gravados: s.gravados + r.gravados, erros: s.erros + r.erros }), { vistos: 0, gravados: 0, erros: 0 });
-  return NextResponse.json({ sucesso: true, ...total, lojas: resultados, assistente });
+  // C3: resumo do Painel do dia no Telegram às 8 h e 14 h (uma vez por horário; sem cron novo).
+  const resumo = autz.viaCron ? await enviarResumoSeForHora().catch((e) => ({ enviado: false, motivo: String(e) })) : null;
+  return NextResponse.json({ sucesso: true, ...total, lojas: resultados, assistente, resumo });
 }

@@ -452,7 +452,8 @@ Siga as referências em `docs/design/` com os componentes da Parte A.
 
 Referência: `docs/design/Main.html`. Quase tudo já está no banco.
 
-### [ ] C1. Função que junta as pendências
+### [x] C1. Função que junta as pendências
+> **Feito 11/11/2026:** `lib/painel/pendencias.ts` → `montarPainel(lojaIds)`: pedidos a postar (Shopee `ship_by_date`; TikTok `rts_sla_time` e `collection_due_time`, agrupados por loja e hora do prazo), atrasados (`saude_pedidos_atrasados` do dia), chats sem resposta (`precisa_resposta`, destaque acima de 3 h), avaliações 1–2 sem resposta, tokens vencendo em 3 dias, saúde (`saude_conta_snapshot` + métricas fora da meta), conferências (pedido fecha com o repasse, campo novo no escrow, tipo novo na carteira, devoluções vencendo), devoluções (`pendenciasDevolucoes`), ganchos para estoque (D4) e campanhas (F3). Urgência agora/hoje/amanhã/depois. Resolvidos hoje = chats + avaliações respondidas + ações em devoluções.
 
 **Onde:** `lib/painel/pendencias.ts`, com uma rota de leitura para a tela.
 
@@ -482,7 +483,8 @@ A urgência vale:
 tem API no Brasil. Por isso o tempo de resposta do chat é calculado a partir de
 `chat_conversas`, e o SPS vem da captura (E4) ou de lançamento manual.
 
-### [ ] C2. Tela `/painel`
+### [x] C2. Tela `/painel`
+> **Feito 11/11/2026:** quatro cartões (Agora, Hoje, Amanhã, Resolvidos hoje), listas agrupadas com botão de ação para a tela certa, coluna com saúde das contas, conferências e integrações; botões Atualizar e Enviar resumo (admin). `/api/painel` (GET/POST). Item "Painel do dia" no menu.
 
 Siga o `Main.html`:
 - quatro cartões: Agora, Hoje, Amanhã e Resolvidos hoje;
@@ -491,7 +493,8 @@ Siga o `Main.html`:
 
 Depois, coloque "Painel do dia" no menu (grupo Visão).
 
-### [ ] C3. Resumo no Telegram **[PERGUNTAR antes de mexer no `vercel.json`]**
+### [x] C3. Resumo no Telegram **[PERGUNTAR antes de mexer no `vercel.json`]**
+> **Feito 11/11/2026:** sem cron novo: o cron de 15 min das devoluções chama `enviarResumoSeForHora()` e envia às 8 h e 14 h (America/Sao_Paulo) os números de Agora/Hoje, as 5 pendências mais urgentes e o link; registro em `saude_alertas` (chave `painel_resumo:<dia>:<hora>`) evita duplicidade. Botão manual na tela.
 
 Às 8 h e às 14 h (America/Sao_Paulo), mande pelo `enviarTelegram`:
 - os números de Agora e Hoje;
