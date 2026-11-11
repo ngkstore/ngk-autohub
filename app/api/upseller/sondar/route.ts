@@ -16,7 +16,10 @@ export async function GET(request: NextRequest) {
   try {
     if (request.nextUrl.searchParams.get("tools") === "1") {
       const lista = await mcpListaFerramentas();
-      return NextResponse.json({ sucesso: true, tools: JSON.stringify(lista).slice(0, 12000) });
+      const nome = request.nextUrl.searchParams.get("tool");
+      const tools = (((lista.result as Record<string, unknown>) || {}).tools as Record<string, unknown>[]) || [];
+      if (nome) return NextResponse.json({ sucesso: true, tool: tools.find((t) => t.name === nome) ?? null, nomes: tools.map((t) => t.name) });
+      return NextResponse.json({ sucesso: true, nomes: tools.map((t) => t.name) });
     }
     const armazens = await listarArmazens();
     const sp = request.nextUrl.searchParams;
