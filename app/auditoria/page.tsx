@@ -82,64 +82,63 @@ export default async function AuditoriaPage({ searchParams }: AuditoriaPageProps
   const { data: divergentes } = await q;
 
   return (
-    <div className="p-8 text-white">
-      <h1 className="text-4xl font-bold">Auditoria Financeira</h1>
-      <p className="mt-2 text-slate-400">
+    <div className="mx-auto max-w-[1400px] p-6">
+      <h1 className="text-[22px] font-bold tracking-[-0.01em] text-texto">Auditoria Financeira</h1>
+      <p className="mt-0.5 text-[13px] text-texto-2">
         Compara a taxa que a Shopee <strong>deveria</strong> cobrar (regra de
         comissão) com o que ela <strong>realmente cobrou</strong> (escrow).
       </p>
 
       {!r && (
-        <div className="mt-4 rounded-xl bg-yellow-900/40 px-4 py-3 text-sm text-yellow-200">
+        <div className="mt-4 rounded-xl bg-chip-amarelo-fundo px-4 py-3 text-sm text-alerta">
           Rode <code>supabase/auditoria_taxas.sql</code> no Supabase para ativar a auditoria.
         </div>
       )}
 
       {r && (
         <>
-          <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-2xl bg-slate-900 p-6">
-              <p className="text-sm text-slate-400">Pedidos auditados</p>
+          <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+              <p className="text-sm text-texto-2">Pedidos auditados</p>
               <p className="mt-2 text-4xl font-bold">{r.pedidos}</p>
             </div>
-            <div className="rounded-2xl border border-red-700 bg-slate-900 p-6">
-              <p className="text-sm text-slate-400">Pedidos com divergência</p>
-              <p className="mt-2 text-4xl font-bold text-red-300">{r.divergentes}</p>
+            <div className="rounded-2xl border border-chip-vermelho-fundo bg-superficie p-6">
+              <p className="text-sm text-texto-2">Pedidos com divergência</p>
+              <p className="mt-2 text-4xl font-bold text-perigo">{r.divergentes}</p>
             </div>
-            <div className="rounded-2xl border border-red-700 bg-slate-900 p-6">
-              <p className="text-sm text-slate-400">Cobrado A MAIS</p>
-              <p className="mt-2 text-3xl font-bold text-red-300">
+            <div className="rounded-2xl border border-chip-vermelho-fundo bg-superficie p-6">
+              <p className="text-sm text-texto-2">Cobrado A MAIS</p>
+              <p className="mt-2 text-3xl font-bold text-perigo">
                 {moeda(n(r.cobrado_a_mais))}
               </p>
-              <p className="mt-1 text-xs text-slate-500">taxa acima do esperado</p>
+              <p className="mt-1 text-xs text-texto-2">taxa acima do esperado</p>
             </div>
-            <div className="rounded-2xl bg-slate-900 p-6">
-              <p className="text-sm text-slate-400">Diferença total (líquida)</p>
+            <div className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+              <p className="text-sm text-texto-2">Diferença total (líquida)</p>
               <p
                 className={`mt-2 text-3xl font-bold ${
-                  n(r.diferenca_total) > 0 ? "text-red-300" : "text-emerald-300"
+                  n(r.diferenca_total) > 0 ? "text-perigo" : "text-sucesso"
                 }`}
               >
                 {moeda(n(r.diferenca_total))}
               </p>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-texto-2">
                 esperado {moeda(n(r.taxa_esperada_total))} • real{" "}
                 {moeda(n(r.taxa_real_total))}
               </p>
             </div>
           </div>
 
-          <section className="mt-10 rounded-2xl bg-slate-900 p-6">
-            <h2 className="text-2xl font-bold">
-              Pedidos com cobrança divergente
+          <section className="mt-6 rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+            <h2 className="text-[15px] font-semibold text-texto">Pedidos com cobrança divergente
             </h2>
-            <p className="mt-1 text-sm text-slate-400">
+            <p className="mt-1 text-sm text-texto-2">
               Diferença positiva (vermelha) = Shopee cobrou mais do que a regra.
             </p>
 
-            <div className="mt-6 overflow-x-auto rounded-xl border border-slate-800">
+            <div className="mt-6 overflow-x-auto rounded-xl border border-borda">
               <table className="w-full text-left">
-                <thead className="bg-slate-800 text-sm text-slate-300">
+                <thead className="bg-superficie-2 text-xs font-semibold text-texto-2">
                   <tr>
                     <th className="p-4">Pedido</th>
                     <th className="p-4">Venda</th>
@@ -151,21 +150,21 @@ export default async function AuditoriaPage({ searchParams }: AuditoriaPageProps
                 <tbody>
                   {divergentes && divergentes.length > 0 ? (
                     divergentes.map((p, i) => (
-                      <tr key={`${p.pedido_externo_id}-${i}`} className="border-t border-slate-800">
+                      <tr key={`${p.pedido_externo_id}-${i}`} className="border-t border-borda">
                         <td className="p-4 font-semibold">
                           <Link
                             href={`/auditoria/pedido?order_sn=${p.pedido_externo_id}`}
-                            className="text-cyan-300 underline hover:text-cyan-200"
+                            className="text-chip-ceu-texto underline hover:text-primaria"
                           >
                             {p.pedido_externo_id}
                           </Link>
                         </td>
-                        <td className="p-4 text-green-300">{moeda(n(p.valor_total))}</td>
-                        <td className="p-4 text-slate-300">{moeda(n(p.taxa_esperada))}</td>
-                        <td className="p-4 text-slate-300">{moeda(n(p.taxa_real))}</td>
+                        <td className="p-4 text-sucesso">{moeda(n(p.valor_total))}</td>
+                        <td className="p-4 text-texto">{moeda(n(p.taxa_esperada))}</td>
+                        <td className="p-4 text-texto">{moeda(n(p.taxa_real))}</td>
                         <td
                           className={`p-4 font-bold ${
-                            n(p.taxa_diferenca) > 0 ? "text-red-300" : "text-emerald-300"
+                            n(p.taxa_diferenca) > 0 ? "text-perigo" : "text-sucesso"
                           }`}
                         >
                           {n(p.taxa_diferenca) > 0 ? "+" : ""}
@@ -175,7 +174,7 @@ export default async function AuditoriaPage({ searchParams }: AuditoriaPageProps
                     ))
                   ) : (
                     <tr>
-                      <td className="p-4 text-slate-400" colSpan={5}>
+                      <td className="p-4 text-texto-2" colSpan={5}>
                         Nenhuma divergência no período. As taxas batem com a regra. 🎉
                       </td>
                     </tr>

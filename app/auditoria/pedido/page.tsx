@@ -54,9 +54,9 @@ export default async function DetalhePedidoPage({ searchParams }: Props) {
 
   if (!orderSn) {
     return (
-      <div className="p-8 text-white">
-        <h1 className="text-3xl font-bold">Detalhe do pedido</h1>
-        <p className="mt-2 text-slate-400">Informe um pedido (?order_sn=...).</p>
+      <div className="mx-auto max-w-[1400px] p-6">
+        <h1 className="text-[22px] font-bold tracking-[-0.01em] text-texto">Detalhe do pedido</h1>
+        <p className="mt-0.5 text-[13px] text-texto-2">Informe um pedido (?order_sn=...).</p>
       </div>
     );
   }
@@ -107,29 +107,29 @@ export default async function DetalhePedidoPage({ searchParams }: Props) {
     .map(([k, v]) => ({ chave: k, valor: Number(v) }));
 
   return (
-    <div className="p-8 text-white">
-      <Link href="/auditoria" className="text-sm text-slate-400 hover:text-white">
+    <div className="mx-auto max-w-[1400px] p-6">
+      <Link href="/auditoria" className="text-sm text-texto-2 hover:text-texto">
         ← Voltar para Auditoria
       </Link>
 
       <h1 className="mt-2 text-3xl font-bold">Pedido {orderSn}</h1>
-      <p className="mt-1 text-slate-400">
+      <p className="mt-0.5 text-[13px] text-texto-2">
         Cliente: {pedido?.cliente_nome || "-"} • Venda:{" "}
         {moeda(num(pedido?.valor_total))}
       </p>
 
       {escrow.erro && (
-        <div className="mt-4 rounded-xl bg-yellow-900/40 px-4 py-3 text-sm text-yellow-200">
+        <div className="mt-4 rounded-xl bg-chip-amarelo-fundo px-4 py-3 text-sm text-alerta">
           Não consegui buscar o escrow agora: {escrow.erro}
         </div>
       )}
 
       {/* Itens e comissão esperada */}
-      <section className="mt-8 rounded-2xl bg-slate-900 p-6">
-        <h2 className="text-2xl font-bold">Itens e taxa esperada (sua regra)</h2>
-        <div className="mt-4 overflow-x-auto rounded-xl border border-slate-800">
+      <section className="mt-6 rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+        <h2 className="text-[15px] font-semibold text-texto">Itens e taxa esperada (sua regra)</h2>
+        <div className="mt-4 overflow-x-auto rounded-xl border border-borda">
           <table className="w-full text-left">
-            <thead className="bg-slate-800 text-sm text-slate-300">
+            <thead className="bg-superficie-2 text-xs font-semibold text-texto-2">
               <tr>
                 <th className="p-3">Item</th>
                 <th className="p-3">Preço</th>
@@ -140,11 +140,11 @@ export default async function DetalhePedidoPage({ searchParams }: Props) {
             </thead>
             <tbody>
               {linhasItens.map((l, i) => (
-                <tr key={i} className="border-t border-slate-800">
+                <tr key={i} className="border-t border-borda">
                   <td className="p-3">{l.nome}</td>
                   <td className="p-3">{moeda(l.preco)}</td>
                   <td className="p-3">{l.qtd}</td>
-                  <td className="p-3 text-slate-400">
+                  <td className="p-3 text-texto-2">
                     {(l.pct * 100).toFixed(0)}% + {moeda(l.fixa)}
                   </td>
                   <td className="p-3">{moeda(l.esperado)}</td>
@@ -157,29 +157,29 @@ export default async function DetalhePedidoPage({ searchParams }: Props) {
 
       {/* Comparação */}
       <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-3">
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Taxa esperada (regra)</p>
+        <div className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+          <p className="text-sm text-texto-2">Taxa esperada (regra)</p>
           <p className="mt-2 text-2xl font-bold">{moeda(taxaEsperada)}</p>
         </div>
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Taxa cobrada (Shopee)</p>
+        <div className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+          <p className="text-sm text-texto-2">Taxa cobrada (Shopee)</p>
           <p className="mt-2 text-2xl font-bold">{moeda(taxaReal)}</p>
         </div>
         <div
           className={`rounded-2xl p-6 ${
             Math.abs(diferenca) > 0.5
-              ? "border border-red-700 bg-slate-900"
-              : "bg-slate-900"
+              ? "border border-chip-vermelho-fundo bg-superficie"
+              : "bg-superficie"
           }`}
         >
-          <p className="text-sm text-slate-400">Diferença</p>
+          <p className="text-sm text-texto-2">Diferença</p>
           <p
             className={`mt-2 text-2xl font-bold ${
               diferenca > 0.5
-                ? "text-red-300"
+                ? "text-perigo"
                 : diferenca < -0.5
-                ? "text-emerald-300"
-                : "text-slate-200"
+                ? "text-sucesso"
+                : "text-texto"
             }`}
           >
             {diferenca > 0 ? "+" : ""}
@@ -189,9 +189,9 @@ export default async function DetalhePedidoPage({ searchParams }: Props) {
       </div>
 
       {/* Composição da cobrança (escrow) */}
-      <section className="mt-6 rounded-2xl bg-slate-900 p-6">
-        <h2 className="text-2xl font-bold">Composição da cobrança (Shopee)</h2>
-        <p className="mt-1 text-sm text-slate-400">
+      <section className="mt-6 rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+        <h2 className="text-[15px] font-semibold text-texto">Composição da cobrança (Shopee)</h2>
+        <p className="mt-1 text-sm text-texto-2">
           Cada linha é um valor real do repasse. Use para identificar cupom,
           promoção, frete ou cobrança indevida.
         </p>
@@ -200,9 +200,9 @@ export default async function DetalhePedidoPage({ searchParams }: Props) {
           {conhecidos.map((c) => (
             <div
               key={c.chave}
-              className="flex items-center justify-between rounded-lg bg-slate-800 px-4 py-2"
+              className="flex items-center justify-between rounded-lg bg-superficie-2 px-4 py-2"
             >
-              <span className="text-sm text-slate-300">{c.label}</span>
+              <span className="text-sm text-texto">{c.label}</span>
               <span className="font-semibold">{moeda(c.valor)}</span>
             </div>
           ))}
@@ -210,16 +210,16 @@ export default async function DetalhePedidoPage({ searchParams }: Props) {
 
         {outros.length > 0 && (
           <>
-            <p className="mt-5 text-sm font-semibold text-slate-300">
+            <p className="mt-5 text-sm font-semibold text-texto">
               Outros valores do escrow (≠ 0)
             </p>
             <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
               {outros.map((o) => (
                 <div
                   key={o.chave}
-                  className="flex items-center justify-between rounded-lg bg-slate-950 px-4 py-2"
+                  className="flex items-center justify-between rounded-lg bg-fundo px-4 py-2"
                 >
-                  <span className="text-xs text-slate-500">{o.chave}</span>
+                  <span className="text-xs text-texto-2">{o.chave}</span>
                   <span className="text-sm">{moeda(o.valor)}</span>
                 </div>
               ))}
