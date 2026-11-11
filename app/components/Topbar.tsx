@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, usePathname } from "next/navigation";
 import AuthStatus from "./AuthStatus";
+import TemaBotao from "./TemaBotao";
+import type { Tema } from "@/lib/tema";
 
 type Loja = { id: string; apelido: string };
 
@@ -16,7 +18,7 @@ const periodos = [
   { id: "todos", nome: "Todos (mais lento)" },
 ];
 
-export default function Topbar() {
+export default function Topbar({ tema }: { tema: Tema }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -89,7 +91,10 @@ export default function Topbar() {
           </div>
         </div>
 
-        <AuthStatus />
+        <div className="flex items-center gap-3">
+          <TemaBotao inicial={tema} />
+          <AuthStatus />
+        </div>
       </div>
     </header>
   );

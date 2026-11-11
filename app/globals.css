@@ -1,26 +1,121 @@
 @import "tailwindcss";
 
+/* Tema claro por padrão, escuro por classe `.dark` no <html> (NOVO-VISUAL, A1).
+   Os valores vêm de docs/design/Guia.html (:root e .dark). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --fundo: #f4f6fb;
+  --superficie: #ffffff;
+  --superficie-2: #f8fafc; /* cabeçalho de tabela, hover de linha */
+  --borda: #e5e8ef;
+  --linha: #eef0f5;
+  --texto: #0f172a;
+  --texto-2: #5b6478;
+  --primaria: #4f46e5;
+  --primaria-hover: #4338ca;
+  --primaria-suave: #eef2ff;
+  --primaria-texto: #3730a3; /* texto sobre a primária suave (item ativo do menu) */
+  --sucesso: #16a34a;
+  --alerta: #ea580c;
+  --perigo: #dc2626;
+
+  /* Etiquetas (chips): fundo + texto, por cor. */
+  --chip-vermelho-fundo: #fee2e2; --chip-vermelho-texto: #991b1b;
+  --chip-laranja-fundo: #ffedd5; --chip-laranja-texto: #9a3412;
+  --chip-amarelo-fundo: #fef9c3; --chip-amarelo-texto: #854d0e;
+  --chip-verde-fundo: #dcfce7; --chip-verde-texto: #166534;
+  --chip-azul-fundo: #e0e7ff; --chip-azul-texto: #3730a3;
+  --chip-ceu-fundo: #e0f2fe; --chip-ceu-texto: #075985;
+  --chip-roxo-fundo: #f3e8ff; --chip-roxo-texto: #6b21a8;
+  --chip-cinza-fundo: #f1f5f9; --chip-cinza-texto: #334155;
+  --chip-shopee-fundo: #ffedd5; --chip-shopee-texto: #c2410c;
+  --chip-tiktok-fundo: #0f172a; --chip-tiktok-texto: #ffffff;
+
+  --sombra-cartao: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
 }
 
+.dark {
+  --fundo: #020617;
+  --superficie: #0f172a;
+  --superficie-2: #111a2e;
+  --borda: #1e293b;
+  --linha: #1e293b;
+  --texto: #f1f5f9;
+  --texto-2: #94a3b8;
+  --primaria: #6366f1;
+  --primaria-hover: #818cf8;
+  --primaria-suave: #1e1b4b;
+  --primaria-texto: #c7d2fe;
+  --sucesso: #22c55e;
+  --alerta: #f97316;
+  --perigo: #ef4444;
+
+  --chip-vermelho-fundo: rgba(239, 68, 68, 0.16); --chip-vermelho-texto: #fca5a5;
+  --chip-laranja-fundo: rgba(249, 115, 22, 0.16); --chip-laranja-texto: #fdba74;
+  --chip-amarelo-fundo: rgba(234, 179, 8, 0.16); --chip-amarelo-texto: #fde047;
+  --chip-verde-fundo: rgba(34, 197, 94, 0.16); --chip-verde-texto: #86efac;
+  --chip-azul-fundo: rgba(99, 102, 241, 0.2); --chip-azul-texto: #c7d2fe;
+  --chip-ceu-fundo: rgba(14, 165, 233, 0.16); --chip-ceu-texto: #7dd3fc;
+  --chip-roxo-fundo: rgba(168, 85, 247, 0.18); --chip-roxo-texto: #d8b4fe;
+  --chip-cinza-fundo: #1e293b; --chip-cinza-texto: #cbd5e1;
+  --chip-shopee-fundo: rgba(249, 115, 22, 0.16); --chip-shopee-texto: #fdba74;
+  --chip-tiktok-fundo: #f1f5f9; --chip-tiktok-texto: #0f172a;
+
+  --sombra-cartao: none;
+  color-scheme: dark;
+}
+
+/* Expõe os tokens ao Tailwind: bg-fundo, bg-superficie, border-borda, text-texto,
+   text-texto-2, bg-primaria, text-primaria-texto, text-sucesso, bg-chip-verde-fundo... */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-fundo: var(--fundo);
+  --color-superficie: var(--superficie);
+  --color-superficie-2: var(--superficie-2);
+  --color-borda: var(--borda);
+  --color-linha: var(--linha);
+  --color-texto: var(--texto);
+  --color-texto-2: var(--texto-2);
+  --color-primaria: var(--primaria);
+  --color-primaria-hover: var(--primaria-hover);
+  --color-primaria-suave: var(--primaria-suave);
+  --color-primaria-texto: var(--primaria-texto);
+  --color-sucesso: var(--sucesso);
+  --color-alerta: var(--alerta);
+  --color-perigo: var(--perigo);
+
+  --color-chip-vermelho-fundo: var(--chip-vermelho-fundo);
+  --color-chip-vermelho-texto: var(--chip-vermelho-texto);
+  --color-chip-laranja-fundo: var(--chip-laranja-fundo);
+  --color-chip-laranja-texto: var(--chip-laranja-texto);
+  --color-chip-amarelo-fundo: var(--chip-amarelo-fundo);
+  --color-chip-amarelo-texto: var(--chip-amarelo-texto);
+  --color-chip-verde-fundo: var(--chip-verde-fundo);
+  --color-chip-verde-texto: var(--chip-verde-texto);
+  --color-chip-azul-fundo: var(--chip-azul-fundo);
+  --color-chip-azul-texto: var(--chip-azul-texto);
+  --color-chip-ceu-fundo: var(--chip-ceu-fundo);
+  --color-chip-ceu-texto: var(--chip-ceu-texto);
+  --color-chip-roxo-fundo: var(--chip-roxo-fundo);
+  --color-chip-roxo-texto: var(--chip-roxo-texto);
+  --color-chip-cinza-fundo: var(--chip-cinza-fundo);
+  --color-chip-cinza-texto: var(--chip-cinza-texto);
+  --color-chip-shopee-fundo: var(--chip-shopee-fundo);
+  --color-chip-shopee-texto: var(--chip-shopee-texto);
+  --color-chip-tiktok-fundo: var(--chip-tiktok-fundo);
+  --color-chip-tiktok-texto: var(--chip-tiktok-texto);
+
+  --shadow-cartao: var(--sombra-cartao);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--fundo);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--fundo);
+  color: var(--texto);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
 }
