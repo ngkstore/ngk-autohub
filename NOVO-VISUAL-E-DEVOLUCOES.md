@@ -688,7 +688,8 @@ Siga o `Lives.html`:
 
 Referência: `docs/design/Campanhas.html`.
 
-### [ ] F1. Campanhas das plataformas
+### [x] F1. Campanhas das plataformas
+> **Feito 11/11/2026:** migration 0016: `campanhas` (canal, loja, nome, tipo plataforma/própria/afiliado/live, início, fim, prazo de inscrição, desconto e estoque mínimos, exigências, link, origem manual/api) e `campanha_itens`. Cadastro manual em `/campanhas` (+ Nova campanha, editar, apagar, inscrever item). Captura pela extensão fica como evolução.
 
 Não há API nas duas plataformas. Crie a tabela `campanhas` (canal, nome, tipo
 `plataforma` / `propria` / `afiliado` / `live`, início, fim, prazo de inscrição,
@@ -696,7 +697,8 @@ exigências como desconto mínimo e estoque mínimo, link, observação) com cad
 manual na tela. Opcional, mais tarde: captura da tela de campanhas do Seller Center
 pela extensão.
 
-### [ ] F2. Promoções próprias, só leitura
+### [x] F2. Promoções próprias, só leitura
+> **Feito 11/11/2026:** `lib/campanhas/coleta.ts`: Shopee discount (lista + itens), oferta relâmpago (lista + itens com motivo de recusa), cupom, combo e compre junto; TikTok `activities/search` (page_size no corpo, int — sondado) + detalhe com produtos (encerradas há 180 d ficam sem itens). Cupom do TikTok: manual. Cron diário 03:30 (`/api/campanhas/sincronizar`). **Pendente:** campanhas de parceiros do TikTok (path da doc não respondeu na sondagem: 36009009).
 
 - **Shopee:**
   - desconto: `v2.discount.get_discount_list` (por status) e `get_discount`;
@@ -714,7 +716,8 @@ pela extensão.
   `campanha_itens` (sku, preço normal, preço da promoção, estoque da promoção).
   Criar ou editar promoção pela API fica para depois, com aprovação.
 
-### [ ] F3. Margem no preço da campanha
+### [x] F3. Margem no preço da campanha
+> **Feito 11/11/2026:** `lib/campanhas/margem.ts` (puro, 4 testes): comissão Shopee pela função SQL `shopee_taxa_esperada_item`, TikTok 10%+R$4 (<50) / 6%+R$6; taxa de serviço média, frete médio do vendedor (custos_pedido 60 d) e imposto (último mês de `impostos` ÷ receita, ou chave `campanhas_imposto_pct:<conta>`), afiliado (`afiliados_item_taxa`), custo (catálogo → custos_variacao → produtos). `calcularMargensCampanha` grava margem R$/% por item; “Simular margem” na tela; `pendenciasCampanhas()` no Painel (inscrição em 3 dias, começa amanhã, margem negativa). Aviso de estoque insuficiente usa a Parte D quando houver coleta do UpSeller.
 
 **Onde:** `lib/campanhas/margem.ts`, com testes. Não é a precificação completa (que
 ficou para depois); é só para não entrar em campanha com prejuízo.
@@ -735,7 +738,8 @@ o estoque não cobre a campanha, usando a Parte D com o fator da campanha.
 `pendenciasCampanhas()` para o Painel: prazos de inscrição em 3 dias, campanha
 começando amanhã e itens com margem negativa.
 
-### [ ] F4. Tela `/campanhas`
+### [x] F4. Tela `/campanhas`
+> **Feito 11/11/2026:** mês (grade com barras por tipo e prazos) ou lista, próximos prazos, painel da campanha com itens, margem em % (vermelho negativa) e aviso, botões Simular margem e Abrir no Seller Center. Item “Campanhas” no menu (Vendas).
 
 Siga o `Campanhas.html`:
 - mês com as barras por tipo e a lista de próximos prazos;
@@ -769,6 +773,10 @@ Cada parte só começa com a anterior validada pelo Gabriel.
 
 ---
 
-## Resumo final
+## Resumo final (11/11/2026)
 
-(preencher ao terminar)
+**Feito (tudo no git, uma etapa por commit):** Parte A (visual claro/escuro, menu, kit, 21 telas migradas); Parte B (devoluções Shopee + TikTok: coleta 15 min, webhook, assistente, regras, aprovação no Telegram, recebimento com vídeo e quadros, disputas e crédito, 6 telas); Parte C (Painel do dia + resumo 8 h/14 h); Parte D (catálogo, estoque, cálculo, fornecedores, pedido de compra, tela); Parte E (lives TikTok, afiliados TikTok, lançamentos Shopee/SPS, tela); Parte F (calendário, promoções próprias, margem, tela). Migrações 0011–0016 aplicadas. 108 testes.
+
+**Pendente / para validar:** conferência visual das telas nos dois temas (eu não tenho navegador); primeira execução real das ações pela API de devoluções (flag desligada até lá); nomes do intervalo de tempo do AMS get_conversion_report; campanhas de parceiros do TikTok; captura do SPS e das lives da Shopee pela extensão (opção).
+
+**O Gabriel faz à mão:** cadastrar a URL do webhook do TikTok no Partner Center (https://ngk-autohub.vercel.app/api/tiktok/webhook); gerar o token do UpSeller e criar UPSELLER_MCP_TOKEN (ou UPSELLER_CLIENT_ID + UPSELLER_API_TOKEN) na Vercel e rodar /api/upseller/sondar; baixar as planilhas do UpSeller (CSV) se a API não trouxer; informar fornecedores e prazos em /estoque; combinar com a expedição a gravação da abertura; ligar a flag devolucoes_acoes_api e as regras quando quiser; lançar SPS e lives da Shopee; conferir no API Test Tool da Shopee os parâmetros do get_conversion_report e salvar em configuracoes (ams_conversion_params).

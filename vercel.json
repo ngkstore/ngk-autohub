@@ -127,6 +127,10 @@
     {
       "path": "/api/lives/sincronizar?dias=3",
       "schedule": "10 6 * * *"
+    },
+    {
+      "path": "/api/campanhas/sincronizar",
+      "schedule": "30 6 * * *"
     }
   ]
 }
