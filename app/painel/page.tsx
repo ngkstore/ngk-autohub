@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { escopoDoUsuario, filtroLojas } from "@/lib/conta";
 import { montarPainel, type Pendencia, type Urgencia } from "@/lib/painel/pendencias";
+import { pendenciasEstoque } from "@/lib/estoque/pendencias";
 import { prazoRelativo, data as fmtData } from "@/lib/formato";
 import PainelAcoes from "./PainelAcoes";
 import { Card, CardHeader, Kpi, Chip, ChipCanal, ChipPrazo, BotaoLink, Vazio, LinhaDetalhe } from "../components/ui";
@@ -36,7 +37,7 @@ export default async function PainelPage({ searchParams }: { searchParams: Promi
   const params = await searchParams;
   const escopo = await escopoDoUsuario();
   const lojas = filtroLojas(escopo, params.loja);
-  const p = await montarPainel(lojas);
+  const p = await montarPainel(lojas, { estoque: () => pendenciasEstoque(lojas) });
   const hoje = new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", day: "numeric", month: "long" });
 
   return (

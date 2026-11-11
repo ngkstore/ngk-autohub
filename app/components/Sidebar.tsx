@@ -32,7 +32,7 @@ function grupos(admin: boolean, contador?: number): GrupoMenu[] {
         { nome: "Insights", href: "/insights", icone: "insights" },
       ],
     },
-    { titulo: "Produtos", itens: [{ nome: "Produtos", href: "/produtos", icone: "produtos" }] },
+    { titulo: "Produtos", itens: [{ nome: "Produtos", href: "/produtos", icone: "produtos" }, { nome: "Estoque e ruptura", href: "/estoque", icone: "estoque" }] },
     {
       titulo: "Financeiro",
       itens: [

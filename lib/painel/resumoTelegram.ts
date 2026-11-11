@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { enviarTelegram } from "@/lib/telegram";
 import { montarPainel } from "@/lib/painel/pendencias";
+import { pendenciasEstoque } from "@/lib/estoque/pendencias";
 
 // C3 — resumo do Painel do dia no Telegram às 8 h e 14 h (America/Sao_Paulo),
 // disparado pelo cron de 15 min das devoluções (sem cron novo). Guarda o envio em
@@ -15,7 +16,7 @@ export function horaBRT(agora = new Date()): { dia: string; hora: number } {
 }
 
 export async function textoResumo(lojaIds: string[] | null): Promise<string> {
-  const p = await montarPainel(lojaIds);
+  const p = await montarPainel(lojaIds, { estoque: () => pendenciasEstoque(lojaIds) });
   const top = p.pendencias.slice(0, 5).map((x) => `• [${x.urgencia === "agora" ? "AGORA" : x.urgencia.toUpperCase()}] ${x.titulo}`).join("\n");
   return `📋 Painel do dia\nAgora: ${p.contagem.agora} · Hoje: ${p.contagem.hoje} · Amanhã: ${p.contagem.amanha}\nResolvidos hoje: ${p.resolvidosHoje}\n\n${top || "Nada pendente."}\n\n${BASE_URL}/painel`;
 }

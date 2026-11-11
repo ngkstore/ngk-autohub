@@ -522,7 +522,8 @@ Referência: `docs/design/Estoque.html`. Fatos verificados na conta do UpSeller 
 - Não há fornecedores nem pedidos de compra cadastrados. Mínimo e máximo não estão
   preenchidos.
 
-### [ ] D1. API do UpSeller **[PERGUNTAR]**
+### [x] D1. API do UpSeller **[PERGUNTAR]**
+> **Feito 11/11/2026:** `lib/upseller/cliente.ts` com duas portas: **MCP** (documentada em help-doc-article-3415: `POST https://openapi.upseller.com/mcp`, `Authorization: Bearer <MCP token>`, ferramentas `get_warehouse_list_by_puid` e `page_warehouse_sku_inventory_list`) e **REST** (`getWarehouseList/v1`, `pageWarehouseSku/v1`; nomes dos cabeçalhos ajustáveis por `UPSELLER_HEADER_*`, já que o guia Feishu exige login). Rota de teste `/api/upseller/sondar` (admin/cron) devolve armazéns, 5 SKUs de amostra e os campos crus. Coleta `lib/upseller/estoque.ts` → `estoque_armazem` + foto diária `estoque_historico` + cria SKUs no catálogo; cron diário 02:40 (`/api/estoque/sincronizar`) com alerta de ruptura/crítico no Telegram 1×/dia. **Pendente do Gabriel:** gerar o token em UpSeller → Plataforma Aberta → API/MCP e criar `UPSELLER_MCP_TOKEN` (preferido) ou `UPSELLER_CLIENT_ID` + `UPSELLER_API_TOKEN` na Vercel; depois rodar a sondagem e anotar aqui os campos que vieram (o mapeador aceita vários nomes: availableQty/available, occupiedQty, inTransitQty, totalQty, avgCost/costPrice).
 
 - O Gabriel gera o token em UpSeller > Plataforma Aberta > API/MCP (só a conta
   principal; plano Empresarial, 200 chamadas por minuto). Guarde as variáveis
@@ -540,7 +541,8 @@ Referência: `docs/design/Estoque.html`. Fatos verificados na conta do UpSeller 
   disponível, ocupado, em trânsito, atual, custo médio, coletado_em). Guarde também
   uma foto diária em `estoque_historico`, para ver a evolução e o capital parado.
 
-### [ ] D2. Catálogo unificado e kits
+### [x] D2. Catálogo unificado e kits
+> **Feito 11/11/2026:** migration 0014: `catalogo_sku`, `catalogo_mapeamento` (unique canal+loja+sku do anúncio, flag `anormal`), `kit_componentes`. Importação de CSV (UpSeller → Importar & Exportar) em `/estoque?aba=importar` com colunas reconhecidas pelo nome (`lib/estoque/importar.ts`); kit manual na mesma tela. Aba Mapeamento mostra mapeados, anormais e SKUs de anúncio sem mapeamento. XLSX não é lido (sem biblioteca nova): salvar como CSV.
 
 - Tabela `catalogo_sku` (SKU do armazém, nome, tipo `unico` / `variacao` / `kit`,
   peso, medidas, custo, fornecedor_id) e tabela `catalogo_mapeamento`
@@ -553,7 +555,8 @@ Referência: `docs/design/Estoque.html`. Fatos verificados na conta do UpSeller 
 - Reaproveite a revisão SKU/NCM já feita entre UpSeller, NGK01 e Pitibiribas.
   Mostre os anúncios sem mapeamento e os 12 anormais numa aba "Mapeamento".
 
-### [ ] D3. Cálculo
+### [x] D3. Cálculo
+> **Feito 11/11/2026:** `lib/estoque/calculo.ts` (puro, 9 testes): venda média 50/30/20 com ano anterior ou 60/40 × fator sazonal (tabela `estoque_fator_sazonal`, editável), cobertura, ponto de pedido, compra arredondada para a caixa descontando trânsito, status (ruptura/crítico/atenção/OK/excesso/parado), kit = menor componente ÷ quantidade, venda perdida. Venda por SKU do armazém via função SQL `vendas_por_sku_armazem` (pedido_itens → mapeamento → kits explodidos). Estoque Shopee de `produto_variacoes`; TikTok fica “—” até a coleta por `inventory/search`.
 
 **Onde:** `lib/estoque/calculo.ts`, com testes.
 
@@ -583,7 +586,8 @@ Referência: `docs/design/Estoque.html`. Fatos verificados na conta do UpSeller 
   diferença com o UpSeller e estoque preso em promoção
   (`v2.product.get_item_promotion`).
 
-### [ ] D4. Fornecedores, prazos e pedido de compra
+### [x] D4. Fornecedores, prazos e pedido de compra
+> **Feito 11/11/2026:** tabelas `fornecedores`, `fornecedor_sku_excecao`, `compras_a_caminho`; tela Fornecedores e prazos (cadastro, exceção por SKU, compras a caminho, fator sazonal); “Gerar pedido de compra” baixa CSV por fornecedor (nada é enviado); `pendenciasEstoque()` ligada ao Painel do dia e ao alerta diário. **Pendente do Gabriel:** informar fornecedores e prazos (UP Importação é o principal) e, de preferência, lançar compras no módulo Compras do UpSeller.
 
 - Tabela `fornecedores` (nome, prazo de reposição em dias, dias de segurança, caixa
   padrão) e exceção por SKU. **Pergunte ao Gabriel** os fornecedores e os prazos.
@@ -595,7 +599,8 @@ Referência: `docs/design/Estoque.html`. Fatos verificados na conta do UpSeller 
 - `pendenciasEstoque()` para o Painel e alertas: ruptura e crítico, no Telegram uma
   vez por dia.
 
-### [ ] D5. Tela `/estoque`
+### [x] D5. Tela `/estoque`
+> **Feito 11/11/2026:** KPIs (ruptura, críticos, atenção, capital em excesso, a caminho), abas por status, filtros por fornecedor e busca, ordenação por cobertura/venda/valor parado, tabela e painel com projeção (acaba em, venda média, prazo, segurança, trânsito, venda perdida, compra sugerida em caixas, componentes do kit). Armazém fica como dimensão em `estoque_armazem` (Full da Shopee em 2027). Item “Estoque e ruptura” no menu.
 
 Siga o `Estoque.html`:
 - indicadores: em ruptura, críticos, atenção, capital em excesso, a caminho;
