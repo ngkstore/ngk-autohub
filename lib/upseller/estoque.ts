@@ -16,7 +16,7 @@ export async function coletarEstoqueUpseller(): Promise<{ armazens: number; skus
     const foto = linhas.map((l) => ({ dia, armazem_id: l.armazem_id, sku: l.sku, disponivel: l.disponivel, atual: l.atual, custo_medio: l.custo_medio }));
     for (let i = 0; i < foto.length; i += 500) await supabase.from("estoque_historico").upsert(foto.slice(i, i + 500), { onConflict: "dia,armazem_id,sku" });
     // catálogo: cria o SKU se ainda não existe (nome e custo do UpSeller)
-    const cat = lista.filter((s) => s.sku).map((s) => ({ sku: s.sku, nome: s.nome ?? null, custo: s.custo_medio }));
+    const cat = lista.filter((s) => s.sku).map((s) => ({ sku: s.sku, nome: s.nome ?? null, custo: s.custo_medio, tipo: String(s.bruto.skuType || "").toUpperCase() === "KIT" || s.bruto.isGroup === 1 ? "kit" : "unico" }));
     for (let i = 0; i < cat.length; i += 500) {
       const bloco = cat.slice(i, i + 500);
       const { data: existentes } = await supabase.from("catalogo_sku").select("sku").in("sku", bloco.map((c) => c.sku));
@@ -24,7 +24,7 @@ export async function coletarEstoqueUpseller(): Promise<{ armazens: number; skus
       const novos = bloco.filter((c) => !ja.has(c.sku));
       if (novos.length) await supabase.from("catalogo_sku").insert(novos);
       // custo médio atualiza sempre (fonte: UpSeller)
-      for (const c of bloco.filter((c) => ja.has(c.sku) && c.custo != null)) await supabase.from("catalogo_sku").update({ custo: c.custo, atualizado_em: new Date().toISOString() }).eq("sku", c.sku);
+      for (const c of bloco.filter((c) => ja.has(c.sku) && c.custo != null)) await supabase.from("catalogo_sku").update({ custo: c.custo, tipo: c.tipo, atualizado_em: new Date().toISOString() }).eq("sku", c.sku);
     }
     skus += lista.length;
   }

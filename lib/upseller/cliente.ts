@@ -124,16 +124,23 @@ export function mapearArmazem(a: J): ArmazemUp {
   return { id: String(pick(a, "warehouseId", "id", "warehouse_id") ?? ""), nome: String(pick(a, "warehouseName", "name", "warehouse_name") ?? ""), tipo: pick(a, "warehouseType", "type") as string | undefined, bruto: a };
 }
 export function mapearSku(s: J, armazemId?: string): SkuUp {
-  const custo = pick(s, "avgCost", "averageCost", "costPrice", "cost", "purchasePrice", "avg_cost");
+  // Formato real (12/11/2026): { sku, skuTitle, skuType: "KIT"|"SKU", isGroup, unitCost, subTotal,
+  //   up_info: { onHand, allocated, available, inTransit, inTransitPurchase, inTransitTransfer }, warehouseId }
+  const up = (s.up_info as J) || {};
+  const disponivel = n(pick(up, "available", "availableQty"));
+  const ocupado = n(pick(up, "allocated", "occupiedQty", "lockedQty"));
+  const transito = n(pick(up, "inTransit")) || n(pick(up, "inTransitPurchase")) + n(pick(up, "inTransitTransfer"));
+  const atual = n(pick(up, "onHand", "totalQty", "quantity"));
+  const custo = pick(s, "unitCost", "avgCost", "averageCost", "costPrice", "cost");
   return {
     armazem_id: String(pick(s, "warehouseId", "warehouse_id") ?? armazemId ?? ""),
-    sku: String(pick(s, "sku", "skuCode", "sku_code", "skuId") ?? ""),
-    disponivel: n(pick(s, "availableQty", "availableQuantity", "available", "availableStock", "available_qty")),
-    ocupado: n(pick(s, "occupiedQty", "lockedQty", "occupied", "reservedQty", "occupied_qty")),
-    em_transito: n(pick(s, "inTransitQty", "transitQty", "inTransit", "in_transit_qty", "purchasingQty")),
-    atual: n(pick(s, "totalQty", "stockQty", "quantity", "total", "currentQty", "total_qty")),
-    custo_medio: custo === undefined ? null : Number(custo) || null,
-    nome: (pick(s, "skuName", "productName", "name") as string | undefined) ?? null,
+    sku: String(pick(s, "sku", "skuCode", "sku_code") ?? ""),
+    disponivel,
+    ocupado,
+    em_transito: transito,
+    atual: atual || disponivel + ocupado,
+    custo_medio: custo === undefined || custo === null ? null : Number(custo) || null,
+    nome: (pick(s, "skuTitle", "skuName", "productName", "name") as string | undefined) ?? null,
     bruto: s,
   };
 }
@@ -160,45 +167,31 @@ export async function listarArmazens(): Promise<ArmazemUp[]> {
 }
 
 
-// 4001 "parâmetros inválidos" com os campos soltos: a doc fala num objeto PageWarehouseSkuQuery.
-// Tenta as formas abaixo até uma responder sem 4001; a que funcionar fica em cache no processo.
-let formaSku: number | null = null;
-function variantesArgsSku(armazemId: string, pageNo: number, pageSize: number, skus?: string[]): J[] {
-  // Schema real (tools/list, 12/11/2026): { request: { warehouseIdList: string[], pageNo: STRING, pageSize: int, skuList?, updateTime? } }
-  const base: J = { warehouseIdList: [armazemId], pageNo: String(pageNo), pageSize, ...(skus?.length ? { skuList: skus.slice(0, 300) } : {}) };
-  return [{ request: base }, { query: base }, base];
-}
-async function chamarSkus(armazemId: string, pageNo: number, pageSize: number, skus?: string[]): Promise<{ resp: J; forma: number }> {
+// Schema real da ferramenta (tools/list): { request: { warehouseIdList: string[], pageNo?: string (CURSOR
+// devolvido em data.nextPageNo; a 1ª página vai sem), pageSize: 1..100, skuList?, updateTime? } }.
+// Resposta: { code, message, data: { skuList, nextPageNo, hasMore, totalCount } }.
+async function chamarSkus(armazemId: string, cursor: string | null, pageSize: number, skus?: string[]): Promise<J> {
   const cfg = upsellerConfigurado();
-  const variantes = variantesArgsSku(armazemId, pageNo, pageSize, skus);
-  const ordem = formaSku !== null ? [formaSku, ...variantes.map((_, i) => i).filter((i) => i !== formaSku)] : variantes.map((_, i) => i);
-  let ultimo: J = {};
-  for (const i of ordem) {
-    const resp = cfg.mcp ? await mcpTool<J>("page_warehouse_sku_inventory_list", variantes[i]) : await restUpseller<J>("pageWarehouseSku/v1", variantes[i]);
-    ultimo = resp;
-    if (Number(resp.code) === 4001) continue;
-    formaSku = i;
-    return { resp, forma: i };
-  }
-  return { resp: ultimo, forma: -1 };
+  const request: J = { warehouseIdList: [armazemId], pageSize, ...(cursor ? { pageNo: cursor } : {}), ...(skus?.length ? { skuList: skus.slice(0, 300) } : {}) };
+  return cfg.mcp ? mcpTool<J>("page_warehouse_sku_inventory_list", { request }) : restUpseller<J>("pageWarehouseSku/v1", request);
 }
-
 export async function paginaSkusBruta(armazemId: string): Promise<J> {
-  const { resp, forma } = await chamarSkus(armazemId, 1, 5);
-  return { forma_que_funcionou: forma, ...resp };
+  return chamarSkus(armazemId, null, 5);
 }
 
 export async function listarSkusArmazem(armazemId: string, opts: { skus?: string[]; maxPaginas?: number } = {}): Promise<SkuUp[]> {
   const saida: SkuUp[] = [];
-  for (let pageNo = 1; pageNo <= (opts.maxPaginas ?? 100); pageNo++) {
-    const { resp } = await chamarSkus(armazemId, pageNo, 100, opts.skus);
-    const itens = lista(resp, "skuList", "inventoryList", "list", "records", "data");
-    for (const it of itens) {
+  let cursor: string | null = null;
+  for (let i = 0; i < (opts.maxPaginas ?? 100); i++) {
+    const resp = await chamarSkus(armazemId, cursor, 100, opts.skus);
+    if (Number(resp.code) !== 0) throw new Error(`page_warehouse_sku_inventory_list: ${resp.code} ${resp.message}`);
+    const data = (resp.data as J) || {};
+    for (const it of (data.skuList as J[]) || []) {
       const s = mapearSku(it, armazemId);
       if (s.sku) saida.push(s);
     }
-    const total = Number(pick((resp.data as J) || resp, "total", "totalCount", "totalRecords") ?? NaN);
-    if (itens.length < 100 || (Number.isFinite(total) && saida.length >= total)) break;
+    cursor = data.hasMore && data.nextPageNo ? String(data.nextPageNo) : null;
+    if (!cursor) break;
   }
   return saida;
 }
