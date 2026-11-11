@@ -113,9 +113,9 @@ export default function ImportarInsights() {
   const previa = linhas.slice(0, 15);
 
   return (
-    <div className="rounded-2xl border border-cyan-800 bg-slate-900 p-6">
+    <div className="rounded-2xl border border-primaria bg-superficie p-6">
       <h2 className="text-2xl font-bold">Importar planilha do Business Insights</h2>
-      <p className="mt-2 text-sm text-slate-400">
+      <p className="mt-2 text-sm text-texto-2">
         Exporte o relatório no Seller Center (Excel/CSV) e suba aqui. O sistema
         detecta as colunas automaticamente — é assim que vamos ver o que os dados
         realmente trazem antes de montar a análise.
@@ -125,7 +125,7 @@ export default function ImportarInsights() {
         <select
           value={lojaId}
           onChange={(e) => setLojaId(e.target.value)}
-          className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-sm text-white"
+          className="rounded-lg border border-borda bg-superficie-2 px-4 py-2 text-sm text-texto"
         >
           <option value="">Loja (opcional)</option>
           {lojas.map((l) => (
@@ -135,20 +135,20 @@ export default function ImportarInsights() {
           ))}
         </select>
 
-        <label className="flex items-center gap-2 text-xs text-slate-400">
+        <label className="flex items-center gap-2 text-xs text-texto-2">
           Período de
           <input
             type="date"
             value={periodoInicio}
             onChange={(e) => setPeriodoInicio(e.target.value)}
-            className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white"
+            className="rounded-lg border border-borda bg-superficie-2 px-3 py-2 text-texto"
           />
           até
           <input
             type="date"
             value={periodoFim}
             onChange={(e) => setPeriodoFim(e.target.value)}
-            className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white"
+            className="rounded-lg border border-borda bg-superficie-2 px-3 py-2 text-texto"
           />
         </label>
 
@@ -156,32 +156,32 @@ export default function ImportarInsights() {
           type="file"
           accept=".xlsx,.xls,.csv"
           onChange={aoEscolherArquivo}
-          className="text-sm text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-700 file:px-4 file:py-2 file:text-white"
+          className="text-sm text-texto file:mr-3 file:rounded-lg file:border-0 file:bg-chip-cinza-fundo file:px-4 file:py-2 file:text-texto"
         />
 
         <button
           onClick={importar}
           disabled={importando || linhas.length === 0}
-          className="rounded-xl bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-500 disabled:opacity-50"
+          className="rounded-xl bg-primaria px-4 py-2 text-sm font-semibold text-texto hover:bg-primaria-hover disabled:opacity-50"
         >
           {importando ? "Importando..." : "Importar"}
         </button>
       </div>
 
       {erro && (
-        <div className="mt-4 rounded-lg bg-red-900/60 px-3 py-2 text-sm text-red-200">
+        <div className="mt-4 rounded-lg bg-chip-vermelho-fundo/60 px-3 py-2 text-sm text-perigo">
           {erro}
         </div>
       )}
       {ok && (
-        <div className="mt-4 rounded-lg bg-green-900/60 px-3 py-2 text-sm text-green-200">
+        <div className="mt-4 rounded-lg bg-chip-verde-fundo/60 px-3 py-2 text-sm text-sucesso">
           {ok}
         </div>
       )}
 
       {colunas.length > 0 && (
         <div className="mt-6">
-          <p className="text-sm text-slate-300">
+          <p className="text-sm text-texto">
             <strong>{colunas.length} coluna(s)</strong> detectada(s) •{" "}
             {linhas.length} linha(s) • cabeçalho achado na linha{" "}
             <strong>{cabecalhoLinha}</strong> do arquivo:
@@ -190,16 +190,16 @@ export default function ImportarInsights() {
             {colunas.map((c) => (
               <span
                 key={c}
-                className="rounded-full bg-slate-700 px-3 py-1 text-xs text-slate-200"
+                className="rounded-full bg-chip-cinza-fundo px-3 py-1 text-xs text-texto"
               >
                 {c}
               </span>
             ))}
           </div>
 
-          <div className="mt-4 overflow-x-auto rounded-xl border border-slate-800">
+          <div className="mt-4 overflow-x-auto rounded-xl border border-borda">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-800 text-slate-300">
+              <thead className="bg-superficie-2 text-texto">
                 <tr>
                   {colunas.map((c) => (
                     <th key={c} className="whitespace-nowrap p-2">
@@ -210,9 +210,9 @@ export default function ImportarInsights() {
               </thead>
               <tbody>
                 {previa.map((linha, i) => (
-                  <tr key={i} className="border-t border-slate-800">
+                  <tr key={i} className="border-t border-borda">
                     {colunas.map((c) => (
-                      <td key={c} className="whitespace-nowrap p-2 text-slate-300">
+                      <td key={c} className="whitespace-nowrap p-2 text-texto">
                         {String(linha[c] ?? "")}
                       </td>
                     ))}
@@ -221,7 +221,7 @@ export default function ImportarInsights() {
               </tbody>
             </table>
           </div>
-          <p className="mt-2 text-xs text-slate-500">
+          <p className="mt-2 text-xs text-texto-2">
             Prévia das primeiras {previa.length} linhas. Se o cabeçalho parecer
             errado, o export pode ter linhas de título no topo — me avise que eu
             ajusto a leitura.

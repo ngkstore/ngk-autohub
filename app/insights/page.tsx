@@ -18,9 +18,9 @@ export default async function InsightsPage() {
   const { data: importacoes } = await query;
 
   return (
-    <div className="p-8 text-white">
-      <h1 className="text-4xl font-bold">Insights (planilhas)</h1>
-      <p className="mt-2 text-slate-400">
+    <div className="mx-auto max-w-[1400px] p-6">
+      <h1 className="text-[22px] font-bold tracking-[-0.01em] text-texto">Insights (planilhas)</h1>
+      <p className="mt-0.5 text-[13px] text-texto-2">
         Traga os dados que a API da Shopee não expõe (add-ao-carrinho, conversão,
         impressões orgânicas) exportando o Business Insights e subindo aqui.
       </p>
@@ -29,11 +29,11 @@ export default async function InsightsPage() {
         <ImportarInsights />
       </div>
 
-      <section className="mt-10 rounded-2xl bg-slate-900 p-6">
-        <h2 className="text-2xl font-bold">Importações recentes</h2>
-        <div className="mt-6 overflow-x-auto rounded-xl border border-slate-800">
+      <section className="mt-6 rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+        <h2 className="text-[15px] font-semibold text-texto">Importações recentes</h2>
+        <div className="mt-6 overflow-x-auto rounded-xl border border-borda">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-800 text-slate-300">
+            <thead className="bg-superficie-2 text-texto">
               <tr>
                 <th className="p-3">Arquivo</th>
                 <th className="p-3">Loja</th>
@@ -64,15 +64,15 @@ export default async function InsightsPage() {
                         ? `${imp.periodo_inicio || "?"} a ${imp.periodo_fim || "?"}`
                         : "-";
                     return (
-                    <tr key={imp.id} className="border-t border-slate-800 align-top">
+                    <tr key={imp.id} className="border-t border-borda align-top">
                       <td className="p-3 font-semibold">{imp.arquivo || "-"}</td>
-                      <td className="p-3 text-orange-300">{apelido || "-"}</td>
-                      <td className="p-3 text-slate-400">{periodo}</td>
+                      <td className="p-3 text-alerta">{apelido || "-"}</td>
+                      <td className="p-3 text-texto-2">{periodo}</td>
                       <td className="p-3">{imp.total_linhas ?? 0}</td>
-                      <td className="p-3 text-slate-400">
+                      <td className="p-3 text-texto-2">
                         {(imp.colunas || []).join(" • ") || "-"}
                       </td>
-                      <td className="p-3 text-slate-400">
+                      <td className="p-3 text-texto-2">
                         {imp.importado_em
                           ? new Date(imp.importado_em).toLocaleString("pt-BR")
                           : "-"}
@@ -83,7 +83,7 @@ export default async function InsightsPage() {
                 )
               ) : (
                 <tr>
-                  <td className="p-3 text-slate-400" colSpan={6}>
+                  <td className="p-3 text-texto-2" colSpan={6}>
                     Nenhuma planilha importada ainda.
                   </td>
                 </tr>
