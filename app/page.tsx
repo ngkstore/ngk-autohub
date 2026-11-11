@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import DashboardCharts from "./components/DashboardCharts";
 import GerarRankingButton from "./components/GerarRankingButton";
+import { Card, CardHeader, Kpi, Chip, ChipCanal, ChipStatus, Tabela, Th, Tr, Td, Produto, BotaoLink, Vazio } from "./components/ui";
 import { escopoDoUsuario, filtroLojas } from "@/lib/conta";
 
 export const dynamic = "force-dynamic";
@@ -421,109 +422,33 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
   }));
 
   return (
-    <div className="p-8 text-white">
-      <h1 className="text-4xl font-bold">Dashboard</h1>
-
-      <p className="mt-2 text-slate-400">
-        Visão geral das operações. Use o seletor de loja no topo para filtrar.
-      </p>
-
-      {/* Destaque: faturamento */}
-      <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
-        <div className="rounded-2xl border border-emerald-700 bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">
-            Faturamento Efetivado (vendas reais)
-          </p>
-          <p className="mt-2 text-4xl font-bold text-emerald-300">
-            {formatarMoeda(resumo.faturamentoEfetivado)}
-          </p>
-          <p className="mt-1 text-xs text-slate-500">
-            {resumo.efetivadosCount} pedido(s) efetivado(s)
-          </p>
+    <div className="mx-auto max-w-[1400px] p-6">
+      {/* Título e ações */}
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-[22px] font-bold tracking-[-0.01em] text-texto">Visão geral</h1>
+          <p className="mt-0.5 text-[13px] text-texto-2">Resumo das operações. Use o seletor de loja e o período no topo para filtrar.</p>
         </div>
-
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Faturamento Geral (todos)</p>
-          <p className="mt-2 text-4xl font-bold text-green-300">
-            {formatarMoeda(resumo.faturamentoGeral)}
-          </p>
-          <p className="mt-1 text-xs text-slate-500">
-            inclui pendentes e cancelados
-          </p>
-        </div>
-
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Faturamento Concluído</p>
-          <p className="mt-2 text-4xl font-bold text-teal-300">
-            {formatarMoeda(resumo.faturamentoConcluido)}
-          </p>
-          <p className="mt-1 text-xs text-slate-500">
-            {resumo.faturadosCount} pedido(s) concluído(s)/a confirmar
-          </p>
-        </div>
+        <GerarRankingButton />
       </div>
 
-      {/* KPIs */}
-      <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Total de Pedidos</p>
-          <p className="mt-2 text-4xl font-bold">{resumo.totalPedidos}</p>
-        </div>
+      {/* Indicadores principais */}
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-5">
+        <Kpi icone="financas" cor="indigo" rotulo="Faturamento efetivado" valor={formatarMoeda(resumo.faturamentoEfetivado)} detalhe={`${resumo.efetivadosCount} pedido(s) efetivado(s)`} />
+        <Kpi icone="pedidos" cor="ceu" rotulo="Pedidos" valor={resumo.totalPedidos.toLocaleString("pt-BR")} detalhe={`${taxaEfetivacao}% efetivados`} />
+        <Kpi icone="alvo" cor="roxo" rotulo="Ticket médio (efetivado)" valor={formatarMoeda(ticketMedio)} />
+        <Kpi icone="insights" cor="verde" rotulo="Lucro estimado" valor={formatarMoeda(lucroEstimado)} detalhe="receitas − despesas lançadas" />
+        <Kpi icone="avaliacoes" cor="amarelo" rotulo="Nota média" valor={notaMedia} detalhe={`${taxaAutomacao}% das avaliações respondidas`} />
+      </div>
 
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Pedidos Efetivados</p>
-          <p className="mt-2 text-4xl font-bold text-emerald-300">
-            {resumo.efetivadosCount}
-          </p>
-          <p className="mt-1 text-xs text-slate-500">
-            {taxaEfetivacao}% do total
-          </p>
-        </div>
-
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Cancelados / Não Efetivados</p>
-          <p className="mt-2 text-4xl font-bold text-red-300">
-            {resumo.canceladosCount}
-          </p>
-        </div>
-
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Ticket Médio (efetivado)</p>
-          <p className="mt-2 text-3xl font-bold text-blue-300">
-            {formatarMoeda(ticketMedio)}
-          </p>
-        </div>
-
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Lucro Estimado</p>
-          <p className="mt-2 text-3xl font-bold text-emerald-300">
-            {formatarMoeda(lucroEstimado)}
-          </p>
-        </div>
-
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Nota Média</p>
-          <p className="mt-2 text-4xl font-bold text-yellow-300">{notaMedia}</p>
-        </div>
-
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Produtos sem Estoque</p>
-          <p className="mt-2 text-4xl font-bold text-red-300">
-            {produtosSemEstoque ?? 0}
-          </p>
-        </div>
-
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Lojas Ativas</p>
-          <p className="mt-2 text-4xl font-bold">
-            {lojasAtivas ?? 0}/{totalLojas ?? 0}
-          </p>
-        </div>
-
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Taxa de Automação</p>
-          <p className="mt-2 text-4xl font-bold">{taxaAutomacao}%</p>
-        </div>
+      {/* Indicadores secundários */}
+      <div className="mt-3.5 grid grid-cols-2 gap-3.5 md:grid-cols-3 xl:grid-cols-6">
+        <Kpi rotulo="Faturamento geral" valor={formatarMoeda(resumo.faturamentoGeral)} detalhe="inclui pendentes e cancelados" />
+        <Kpi rotulo="Faturamento concluído" valor={formatarMoeda(resumo.faturamentoConcluido)} detalhe={`${resumo.faturadosCount} concluído(s) / a confirmar`} />
+        <Kpi rotulo="Cancelados / não efetivados" valor={resumo.canceladosCount.toLocaleString("pt-BR")} />
+        <Kpi rotulo="Produtos sem estoque" valor={(produtosSemEstoque ?? 0).toLocaleString("pt-BR")} />
+        <Kpi rotulo="Lojas ativas" valor={`${lojasAtivas ?? 0}/${totalLojas ?? 0}`} />
+        <Kpi rotulo="Taxa de automação" valor={`${taxaAutomacao}%`} detalhe="avaliações respondidas pelo robô" />
       </div>
 
       <DashboardCharts
@@ -535,174 +460,106 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
       />
 
       {/* Pedidos efetivados recentes */}
-      <section className="mt-10 rounded-2xl bg-slate-900 p-6">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-2xl font-bold">✅ Pedidos Efetivados Recentes</h2>
-          <p className="text-sm text-slate-400">
-            Vendas reais (não canceladas) com valor, cliente, status e data.
-          </p>
-        </div>
+      <Card className="mt-6" semPadding>
+        <CardHeader className="px-[18px] pt-4" titulo="Pedidos efetivados recentes" descricao="Vendas reais (não canceladas) com valor, cliente, status e data." acoes={<BotaoLink href="/pedidos" pequeno>Ver pedidos</BotaoLink>} />
+        <Tabela>
+          <thead>
+            <tr>
+              <Th>Pedido</Th>
+              <Th>Cliente</Th>
+              <Th>Canal</Th>
+              <Th numerica>Valor</Th>
+              <Th>Status</Th>
+              <Th>Data</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {efetivadosRecentes.length > 0 ? (
+              efetivadosRecentes.map((pedido, index) => (
+                <Tr key={`${pedido.pedido_externo_id}-${index}`}>
+                  <Td className="font-semibold">{pedido.pedido_externo_id || "-"}</Td>
+                  <Td>{pedido.cliente_nome || "-"}</Td>
+                  <Td>{pedido.marketplace ? <ChipCanal canal={pedido.marketplace} /> : "-"}</Td>
+                  <Td numerica className="font-semibold">{formatarMoeda(num(pedido.valor_total))}</Td>
+                  <Td>
+                    <ChipStatus tipo={pedido.status === "COMPLETED" ? "ok" : pedido.status === "CANCELLED" ? "parado" : "andamento"}>{rotuloStatus(pedido.status)}</ChipStatus>
+                  </Td>
+                  <Td className="text-texto-2">{pedido.data_pedido ? formatarDataHora(pedido.data_pedido) : "-"}</Td>
+                </Tr>
+              ))
+            ) : (
+              <Tr>
+                <Td colSpan={6} className="text-texto-2">Nenhum pedido efetivado encontrado para o filtro selecionado.</Td>
+              </Tr>
+            )}
+          </tbody>
+        </Tabela>
+      </Card>
 
-        <div className="mt-6 overflow-x-auto rounded-xl border border-slate-800">
-          <table className="w-full text-left">
-            <thead className="bg-slate-800 text-sm text-slate-300">
+      <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-3">
+        {/* Top 10 produtos */}
+        <Card className="xl:col-span-2" semPadding>
+          <CardHeader className="px-[18px] pt-4" titulo="Top 10 produtos" descricao="Ranking baseado nos dados importados no AutoHub." />
+          <Tabela>
+            <thead>
               <tr>
-                <th className="p-4">Pedido</th>
-                <th className="p-4">Cliente</th>
-                <th className="p-4">Marketplace</th>
-                <th className="p-4">Valor</th>
-                <th className="p-4">Status</th>
-                <th className="p-4">Data</th>
+                <Th>#</Th>
+                <Th>Produto</Th>
+                <Th>Loja</Th>
+                <Th numerica>Pedidos</Th>
+                <Th numerica>Faturamento</Th>
+                <Th numerica>Lucro</Th>
               </tr>
             </thead>
-
-            <tbody>
-              {efetivadosRecentes.length > 0 ? (
-                efetivadosRecentes.map((pedido, index) => (
-                  <tr
-                    key={`${pedido.pedido_externo_id}-${index}`}
-                    className="border-t border-slate-800"
-                  >
-                    <td className="p-4 font-semibold">
-                      {pedido.pedido_externo_id || "-"}
-                    </td>
-                    <td className="p-4 text-slate-300">
-                      {pedido.cliente_nome || "-"}
-                    </td>
-                    <td className="p-4 text-slate-300">
-                      {pedido.marketplace || "-"}
-                    </td>
-                    <td className="p-4 text-green-300">
-                      {formatarMoeda(num(pedido.valor_total))}
-                    </td>
-                    <td className="p-4">
-                      <span className="rounded-full bg-emerald-900 px-3 py-1 text-xs font-semibold text-emerald-300">
-                        {rotuloStatus(pedido.status)}
-                      </span>
-                    </td>
-                    <td className="p-4 text-slate-400">
-                      {pedido.data_pedido
-                        ? formatarDataHora(pedido.data_pedido)
-                        : "-"}
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td className="p-4 text-slate-400" colSpan={6}>
-                    Nenhum pedido efetivado encontrado para o filtro
-                    selecionado.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="mt-10 rounded-2xl bg-slate-900 p-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-2xl font-bold">🏆 Top 10 Produtos</h2>
-            <p className="mt-1 text-sm text-slate-400">
-              Ranking baseado nos dados importados no AutoHub.
-            </p>
-          </div>
-
-          <GerarRankingButton />
-        </div>
-
-        <div className="mt-6 overflow-hidden rounded-xl border border-slate-800">
-          <table className="w-full text-left">
-            <thead className="bg-slate-800 text-sm text-slate-300">
-              <tr>
-                <th className="p-4">#</th>
-                <th className="p-4">Produto</th>
-                <th className="p-4">Loja</th>
-                <th className="p-4">Pedidos</th>
-                <th className="p-4">Faturamento</th>
-                <th className="p-4">Lucro</th>
-              </tr>
-            </thead>
-
             <tbody>
               {rankingProdutos && rankingProdutos.length > 0 ? (
                 rankingProdutos.map((item, index) => (
-                  <tr key={item.id} className="border-t border-slate-800">
-                    <td className="p-4 font-bold text-yellow-300">
-                      {index + 1}
-                    </td>
-
-                    <td className="p-4">
-                      <p className="font-semibold">
-                        {item.produtos?.nome || "Produto sem nome"}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {item.produtos?.sku || "Sem SKU"}
-                      </p>
-                    </td>
-
-                    <td className="p-4 text-orange-300">
-                      {item.lojas?.apelido || "Sem loja"}
-                    </td>
-
-                    <td className="p-4">{item.pedidos ?? 0}</td>
-
-                    <td className="p-4 text-green-300">
-                      {formatarMoeda(Number(item.faturamento || 0))}
-                    </td>
-
-                    <td className="p-4 text-blue-300">
-                      {formatarMoeda(Number(item.lucro || 0))}
-                    </td>
-                  </tr>
+                  <Tr key={item.id}>
+                    <Td className="font-bold text-texto-2">{index + 1}</Td>
+                    <Td>
+                      <Produto nome={item.produtos?.nome || "Produto sem nome"} sku={item.produtos?.sku || "Sem SKU"} />
+                    </Td>
+                    <Td className="text-texto-2">{item.lojas?.apelido || "Sem loja"}</Td>
+                    <Td numerica>{item.pedidos ?? 0}</Td>
+                    <Td numerica className="font-semibold">{formatarMoeda(Number(item.faturamento || 0))}</Td>
+                    <Td numerica className={Number(item.lucro || 0) < 0 ? "text-perigo" : "text-sucesso"}>{formatarMoeda(Number(item.lucro || 0))}</Td>
+                  </Tr>
                 ))
               ) : (
-                <tr>
-                  <td className="p-4 text-slate-400" colSpan={6}>
-                    Nenhum ranking gerado ainda. Clique em “Gerar Ranking”.
-                  </td>
-                </tr>
+                <Tr>
+                  <Td colSpan={6} className="text-texto-2">Nenhum ranking gerado ainda. Clique em “Gerar Ranking”.</Td>
+                </Tr>
               )}
             </tbody>
-          </table>
-        </div>
-      </section>
+          </Tabela>
+        </Card>
 
-      <section className="mt-10 rounded-2xl bg-slate-900 p-6">
-        <h2 className="text-2xl font-bold">Últimas Avaliações</h2>
-
-        <div className="mt-6 space-y-4">
-          {ultimasAvaliacoes && ultimasAvaliacoes.length > 0 ? (
-            ultimasAvaliacoes.map((item) => (
-              <div key={item.id} className="rounded-xl bg-slate-800 p-5">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-bold">{item.nome_produto}</p>
-                    <p className="text-sm text-slate-400">
-                      Cliente: {item.nome_cliente}
-                    </p>
+        {/* Últimas avaliações */}
+        <Card>
+          <CardHeader titulo="Últimas avaliações" acoes={<BotaoLink href="/avaliacoes" pequeno>Ver todas</BotaoLink>} />
+          <div className="space-y-2.5">
+            {ultimasAvaliacoes && ultimasAvaliacoes.length > 0 ? (
+              ultimasAvaliacoes.map((item) => (
+                <div key={item.id} className="rounded-[10px] border border-linha bg-superficie-2 p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-[13px] font-semibold text-texto">{item.nome_produto}</p>
+                      <p className="truncate text-xs text-texto-2">{item.nome_cliente}</p>
+                    </div>
+                    <Chip cor={Number(item.avaliacao || 0) >= 4 ? "verde" : Number(item.avaliacao || 0) === 3 ? "amarelo" : "vermelho"}>
+                      {"★".repeat(Number(item.avaliacao || 0))}
+                    </Chip>
                   </div>
-
-                  <span className="rounded-full bg-green-900 px-3 py-1 text-xs font-semibold text-green-300">
-                    {item.status || "recebida"}
-                  </span>
+                  {item.comentario && <p className="mt-2 line-clamp-3 text-[12.5px] leading-relaxed text-texto">{item.comentario}</p>}
+                  <p className="mt-1.5 text-[11px] text-texto-2">{item.status || "recebida"}</p>
                 </div>
-
-                <p className="mt-3">
-                  {"⭐".repeat(Number(item.avaliacao || 0))}
-                </p>
-
-                <p className="mt-3 text-slate-300">{item.comentario}</p>
-              </div>
-            ))
-          ) : (
-            <p className="text-slate-400">
-              Nenhuma avaliação encontrada para o filtro selecionado.
-            </p>
-          )}
-        </div>
-      </section>
+              ))
+            ) : (
+              <Vazio titulo="Nenhuma avaliação" texto="Nada encontrado para o filtro selecionado." />
+            )}
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }

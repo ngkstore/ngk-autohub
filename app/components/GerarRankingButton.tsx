@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { classesBotao } from "./ui/Botao";
 
 export default function GerarRankingButton() {
   const [loading, setLoading] = useState(false);
@@ -33,7 +34,7 @@ export default function GerarRankingButton() {
     <button
       onClick={gerarRanking}
       disabled={loading}
-      className="rounded-lg bg-yellow-600 px-5 py-3 text-sm font-semibold text-white hover:bg-yellow-500 disabled:opacity-50"
+      className={classesBotao("secundario")}
     >
       {loading ? "Gerando ranking..." : "Gerar Ranking"}
     </button>
