@@ -28,7 +28,7 @@ export default async function RootLayout({
       <body className="bg-fundo text-texto">
         <Sidebar />
 
-        <div className="ml-64 min-h-screen bg-fundo">
+        <div className="ml-[232px] min-h-screen bg-fundo">
           <Suspense fallback={null}>
             <Topbar tema={tema} />
           </Suspense>

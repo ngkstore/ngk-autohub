@@ -1,94 +1,71 @@
-import Link from "next/link";
 import { escopoDoUsuario } from "@/lib/conta";
+import SidebarLinks, { type GrupoMenu } from "./SidebarLinks";
 
-type Item = { name: string; href: string };
-type Grupo = { titulo: string | null; itens: Item[] };
+// Menu lateral (NOVO-VISUAL, A2). Todas as rotas que existem continuam aqui,
+// reorganizadas por grupo. Rotas futuras (Painel do dia, Devoluções…) entram
+// quando a tela existir. `contador` = devoluções que vencem em 24 h (Parte B).
+function grupos(admin: boolean, contador?: number): GrupoMenu[] {
+  const g: GrupoMenu[] = [
+    {
+      titulo: "Visão",
+      itens: [
+        { nome: "Visão geral", href: "/", icone: "visao" },
+        // { nome: "Painel do dia", href: "/painel", icone: "painel" }, // Parte C
+      ],
+    },
+    {
+      titulo: "Operação",
+      itens: [
+        { nome: "Pedidos", href: "/pedidos", icone: "pedidos" },
+        // { nome: "Devoluções", href: "/devolucoes", icone: "devolucoes", contador }, // Parte B
+        { nome: "Atendimento", href: "/atendimento", icone: "atendimento" },
+        { nome: "Avaliações", href: "/avaliacoes", icone: "avaliacoes" },
+      ],
+    },
+    {
+      titulo: "Vendas",
+      itens: [
+        { nome: "Ads", href: "/ads", icone: "ads" },
+        { nome: "Controle GMV Max", href: "/ads-controle", icone: "alvo" },
+        { nome: "Raio-X do Anúncio", href: "/raio-x", icone: "raiox" },
+        { nome: "Insights", href: "/insights", icone: "insights" },
+      ],
+    },
+    { titulo: "Produtos", itens: [{ nome: "Produtos", href: "/produtos", icone: "produtos" }] },
+    {
+      titulo: "Financeiro",
+      itens: [
+        { nome: "Finanças", href: "/financas", icone: "financas" },
+        { nome: "Auditoria de taxas", href: "/auditoria", icone: "auditoria" },
+      ],
+    },
+    {
+      titulo: "Conta",
+      itens: [
+        { nome: "Saúde da conta", href: "/saude", icone: "saude" },
+        { nome: "Integrações & Lojas", href: "/integracoes", icone: "integracoes" },
+        { nome: "Sincronização", href: "/sincronizacao", icone: "sincronizacao" },
+        { nome: "Alertas", href: "/alertas", icone: "alertas" },
+        { nome: "Configurações", href: "/configuracoes", icone: "configuracoes" },
+      ],
+    },
+  ];
+  if (admin) g.push({ titulo: "Admin", itens: [{ nome: "Consumo", href: "/uso", icone: "consumo" }] });
+  void contador;
+  return g;
+}
 
-// Navegação agrupada. Removidos: /financeiro (legado, duplicava /financas),
-// /analytics (placeholder) e /lojas (o Integrações já lista as lojas).
-const grupos: Grupo[] = [
-  { titulo: null, itens: [{ name: "Dashboard", href: "/" }] },
-  {
-    titulo: "Operação",
-    itens: [
-      { name: "Pedidos", href: "/pedidos" },
-      { name: "Produtos", href: "/produtos" },
-      { name: "Avaliações", href: "/avaliacoes" },
-      { name: "Atendimento", href: "/atendimento" },
-      { name: "🩺 Saúde da conta", href: "/saude" },
-    ],
-  },
-  {
-    titulo: "Financeiro",
-    itens: [
-      { name: "💰 Finanças", href: "/financas" },
-      { name: "Auditoria de taxas", href: "/auditoria" },
-    ],
-  },
-  {
-    titulo: "Marketing",
-    itens: [
-      { name: "📊 Ads", href: "/ads" },
-      { name: "🎯 Controle GMV Max", href: "/ads-controle" },
-      { name: "🔬 Raio-X do Anúncio", href: "/raio-x" },
-      { name: "Insights (planilhas)", href: "/insights" },
-    ],
-  },
-  {
-    titulo: "Sistema",
-    itens: [
-      { name: "Integrações & Lojas", href: "/integracoes" },
-      { name: "Sincronização", href: "/sincronizacao" },
-      { name: "Alertas", href: "/alertas" },
-      { name: "Configurações", href: "/configuracoes" },
-    ],
-  },
-];
-
-// Só admin vê a cobrança por conta.
-const grupoAdmin: Grupo = {
-  titulo: "Admin",
-  itens: [{ name: "💸 Consumo (cobrança)", href: "/uso" }],
-};
-
-export default async function Sidebar() {
+export default async function Sidebar({ contador }: { contador?: number }) {
   const escopo = await escopoDoUsuario();
-  const secoes = escopo.admin ? [...grupos, grupoAdmin] : grupos;
 
   return (
-    <aside className="fixed left-0 top-0 flex h-screen w-64 flex-col border-r border-slate-800 bg-slate-900 text-white">
-      <div className="p-6 pb-3">
-        <h1 className="text-2xl font-bold">NGK AutoHub</h1>
-        <p className="mt-1 text-xs text-slate-500">ERP Multi Marketplace</p>
+    <aside className="fixed left-0 top-0 flex h-screen w-[232px] flex-col border-r border-borda bg-superficie">
+      <div className="flex items-center gap-2.5 px-5 py-4">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primaria text-[11px] font-bold tracking-wide text-white">NGK</div>
+        <span className="text-[15px] font-semibold text-texto">AutoHub</span>
       </div>
 
-      <nav className="flex-1 space-y-4 overflow-y-auto px-4 pb-4">
-        {secoes.map((g, i) => (
-          <div key={g.titulo ?? `g${i}`}>
-            {g.titulo && (
-              <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-slate-600">
-                {g.titulo}
-              </p>
-            )}
-            <div className="space-y-1">
-              {g.itens.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="block rounded-lg px-3 py-2 text-sm text-slate-300 transition-all hover:bg-slate-800 hover:text-white"
-                >
-                  {item.name}
-                </Link>
-              ))}
-            </div>
-          </div>
-        ))}
-      </nav>
-
-      <div className="m-4 rounded-xl border border-slate-800 bg-slate-950 p-4">
-        <p className="text-xs text-slate-500">NGK AutoHub</p>
-        <p className="mt-1 text-sm font-semibold text-green-400">Sistema Online</p>
-      </div>
+      <SidebarLinks grupos={grupos(escopo.admin, contador)} />
     </aside>
   );
 }

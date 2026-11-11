@@ -82,7 +82,8 @@ opcional**. Hoje o layout é escuro fixo (`bg-slate-950`, Sidebar `bg-slate-900`
 - **Critério:** nenhuma cor fixa `slate-9xx` sobra no layout. O contraste do texto
   é de pelo menos 4,5:1 nos dois temas.
 
-### [ ] A2. Menu lateral e barra superior
+### [x] A2. Menu lateral e barra superior
+> **Feito 11/11/2026:** `Sidebar.tsx` (servidor: escopo/admin) + `SidebarLinks.tsx` (cliente: `usePathname`, item ativo em primária suave, contador vermelho opcional) com 232 px, logo NGK em quadrado índigo e grupos Visão / Operação / Vendas / Produtos / Financeiro / Conta / Admin; Painel do dia e Devoluções ficaram comentados até existirem. `Icone.tsx` com os desenhos do Guia (SVG inline, sem biblioteca). `Topbar.tsx`: seletor de loja, período segmentado (Hoje, 7 dias, 30 dias, Mês + "Mais" com Ontem, Ano, Todos) mantendo os `searchParams`, busca (leva a `/pedidos?q=`; o filtro `q` entra na migração de Pedidos na A4), "Sincronizado hh:mm" (último `sync_jobs` concluído das lojas do usuário) com bolinha verde, botão sol/lua, sino com ponto vermelho quando há `alertas` novos, avatar com iniciais e menu Sair (`AuthStatus.tsx`). `/api/minhas-lojas` passou a devolver `sincronizado_em` e `alertas_novos`. Layout com `ml-[232px]`.
 
 **Onde:** `app/components/Sidebar.tsx`, `app/components/Topbar.tsx`.
 
