@@ -32,6 +32,7 @@ const ROTAS_CRON = [
   "/api/shopee/escrow/backfill",
   "/api/shopee/ams/sondar",
   "/api/shopee/devolucoes/sondar",
+  "/api/devolucoes/sincronizar",
   "/api/shopee/ams/token-refresh",
   "/api/shopee/ams/debug",
   "/api/shopee/ams/coletar",
@@ -50,7 +51,7 @@ export async function middleware(request: NextRequest) {
 
   // 1) Webhook do Telegram e coletor da extensão: já se protegem por segredo
   //    próprio no header (não têm sessão de usuário). Deixa passar.
-  if (pathname === "/api/telegram/webhook" || pathname === "/api/insights/coletor") {
+  if (pathname === "/api/telegram/webhook" || pathname === "/api/tiktok/webhook" || pathname === "/api/insights/coletor") {
     return NextResponse.next();
   }
 
