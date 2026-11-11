@@ -195,10 +195,12 @@ async function saudeContas(lojaIds: string[] | null, lojas: Map<string, { nome: 
 async function conferencias(lojaIds: string[] | null): Promise<Conferencia[]> {
   const out: Conferencia[] = [];
   try {
-    const { data } = await supabase.rpc("conferencia_pedido_fecha", { p_loja_ids: lojaIds, p_inicio: null, p_fim: null });
-    const r = (data as J) || {};
+    // últimos 30 dias (a função varre custos_pedido; sem janela passava dos 25 s e voltava vazia)
+    const { data, error } = await supabase.rpc("conferencia_pedido_fecha", { p_loja_ids: lojaIds, p_inicio: new Date(Date.now() - 30 * 86400000).toISOString(), p_fim: null });
+    if (error || !data) throw new Error(error?.message || "sem resposta");
+    const r = data as J;
     const dif = Number(r.diferenca || 0);
-    out.push({ nome: "Pedido fecha com o repasse", ok: dif === 0, texto: dif === 0 ? `OK · ${Number(r.ok || 0).toLocaleString("pt-BR")} pedidos` : `${dif} diferença(s) · R$ ${Number(r.diferenca_valor || 0).toFixed(2)}` });
+    out.push({ nome: "Pedido fecha com o repasse (30 d)", ok: dif === 0, texto: dif === 0 ? `OK · ${Number(r.ok || 0).toLocaleString("pt-BR")} pedidos` : `${dif} diferença(s) · R$ ${Number(r.diferenca_valor || 0).toFixed(2)}` });
     const desconhecidos = Array.isArray(r.campos_desconhecidos) ? (r.campos_desconhecidos as J[]).length : 0;
     out.push({ nome: "Campo novo no escrow", ok: desconhecidos === 0, texto: desconhecidos ? `${desconhecidos} regra(s) de taxa sem categoria` : "nenhum" });
   } catch {
@@ -258,7 +260,7 @@ export async function montarPainel(lojaIds: string[] | null, extras: { estoque?:
   const ordem: Record<Urgencia, number> = { agora: 0, hoje: 1, amanha: 2, depois: 3 };
   const pendencias = [...atrasados, ...postagem, ...chats, ...avaliacoes, ...tokens.pend, ...saude.pend, ...devolucoes, ...estoque, ...campanhas].sort((a, b) => ordem[a.urgencia] - ordem[b.urgencia] || (a.prazo && b.prazo ? a.prazo.localeCompare(b.prazo) : a.prazo ? -1 : 1));
   const contagem: Record<Urgencia, number> = { agora: 0, hoje: 0, amanha: 0, depois: 0 };
-  for (const p of pendencias) if (p.grupo !== "conferir") contagem[p.urgencia]++;
+  for (const p of pendencias) if (!p.grupo) contagem[p.urgencia]++;
   confs.push({ nome: "Devoluções vencendo em 24 h", ok: devolucoes.filter((d) => d.urgencia === "agora" || d.urgencia === "hoje").length === 0, texto: `${devolucoes.length} pendente(s)` });
   return { geradoEm: new Date().toISOString(), pendencias, contagem, resolvidosHoje, resolvidosOntem, saude: saude.saude, conferencias: confs, integracoes: tokens.integracoes };
 }

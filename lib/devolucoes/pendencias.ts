@@ -10,7 +10,7 @@ export type Pendencia = {
   detalhe: string;
   link: string;
   acao: string;
-  grupo?: "conferir"; // prazo vencido há mais de 7 dias: provavelmente status desatualizado
+  grupo?: "conferir" | "aviso"; // conferir = prazo vencido há dias (status provavelmente velho); aviso = sem prazo, só informa
 };
 
 export function urgencia(prazo: string | null, agora = new Date()): Pendencia["urgencia"] {
@@ -36,8 +36,10 @@ export async function pendenciasDevolucoes(lojaIds: string[] | null): Promise<Pe
     .limit(200);
   if (lojaIds) q = q.in("loja_id", lojaIds);
   const { data } = await q;
+  const limiteConferir = Date.now() - 3 * 86400000;
   return (data || []).map((d) => {
     const prazo = (d.prazo_resposta as string | null) ?? (d.prazo_prova as string | null) ?? null;
+    const vencidaHaDias = !!prazo && new Date(prazo).getTime() < limiteConferir;
     const item = (Array.isArray(d.itens) ? (d.itens as { nome: string | null }[])[0]?.nome : null) || d.pedido_id;
     return {
       prazo,
@@ -47,7 +49,8 @@ export async function pendenciasDevolucoes(lojaIds: string[] | null): Promise<Pe
       titulo: `${ETAPA_ACAO[d.etapa] ?? "Ver"} devolução · ${item}`,
       detalhe: `${d.motivo_codigo ?? "-"} · R$ ${Number(d.valor_reembolso_pedido || 0).toFixed(2)}`,
       link: `/devolucoes/${d.id}`,
-      acao: ETAPA_ACAO[d.etapa] ?? "Ver",
+      acao: vencidaHaDias ? "Conferir status" : ETAPA_ACAO[d.etapa] ?? "Ver",
+      grupo: vencidaHaDias ? ("conferir" as const) : undefined,
     };
   });
 }

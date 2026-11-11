@@ -34,7 +34,9 @@ export async function pendenciasCampanhas(lojaIds: string[] | null): Promise<Pen
     }
     for (const [cid, g] of porCampanha) {
       const c = (data || []).find((x) => x.id === cid)!;
-      saida.push({ prazo: c.inicio ?? null, urgencia: urgencia(c.inicio ?? null), canal: c.canal === "tiktok" ? "tiktok" : "shopee", loja_id: c.loja_id ?? "", titulo: `${g.n} item(ns) com margem negativa em ${c.nome}`, detalhe: g.ex.join(", "), link: `/campanhas?campanha=${cid}`, acao: "Revisar itens" });
+      // promoção já em andamento (ou sem prazo): só avisa, sem entrar na fila com prazo
+      const futura = !!c.inicio && new Date(c.inicio).getTime() > agora;
+      saida.push({ prazo: futura ? c.inicio : null, urgencia: futura ? urgencia(c.inicio ?? null) : "depois", canal: c.canal === "tiktok" ? "tiktok" : "shopee", loja_id: c.loja_id ?? "", titulo: `${g.n} item(ns) com margem negativa em ${c.nome}`, detalhe: g.ex.join(", "), link: `/campanhas?campanha=${cid}`, acao: "Revisar itens", grupo: futura ? undefined : ("aviso" as const) });
     }
   }
   return saida;

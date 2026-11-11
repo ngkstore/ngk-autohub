@@ -64,7 +64,7 @@ export default async function PainelPage({ searchParams }: { searchParams: Promi
         <div className="space-y-6 xl:col-span-2">
           {p.pendencias.length === 0 && <Vazio titulo="Nada pendente" texto="Nenhum prazo em aberto nas lojas selecionadas." />}
           {GRUPOS.map((g) => {
-            const itens = p.pendencias.filter((x) => x.urgencia === g.id && x.grupo !== "conferir");
+            const itens = p.pendencias.filter((x) => x.urgencia === g.id && !x.grupo);
             if (itens.length === 0) return null;
             return (
               <Card key={g.id}>
@@ -90,6 +90,19 @@ export default async function PainelPage({ searchParams }: { searchParams: Promi
         </div>
 
         <div className="space-y-6">
+          {p.pendencias.some((x) => x.grupo === "aviso") && (
+            <Card>
+              <CardHeader titulo="Avisos" descricao="sem prazo: só para você saber" />
+              <ul className="space-y-2">
+                {p.pendencias.filter((x) => x.grupo === "aviso").map((x, i) => (
+                  <li key={i} className="text-[13px]">
+                    <Link href={x.link} className="font-medium text-texto hover:underline">{x.titulo}</Link>
+                    <p className="text-xs text-texto-2">{x.detalhe}</p>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
           <Card>
             <CardHeader titulo="Saúde das contas" acoes={<BotaoLink href="/saude" pequeno>Detalhes</BotaoLink>} />
             {p.saude.length === 0 ? (
