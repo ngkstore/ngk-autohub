@@ -3,17 +3,19 @@ import { escopoDoUsuario, filtroLojas } from "@/lib/conta";
 import { ABAS_FILA, feitoHoje, listarDevolucoes, type DevolucaoResumo } from "@/lib/devolucoes/consultas";
 import { brl, prazoRelativo, urgenciaDoPrazo, data as fmtData } from "@/lib/formato";
 import Cabecalho from "./Cabecalho";
+import { motivoLegivel } from "@/lib/devolucoes/motivos";
 import SelecaoLote from "./SelecaoLote";
-import { Card, CardHeader, Kpi, Chip, ChipCanal, ChipPrazo, Tabs, Tabela, Th, Tr, Td, Produto, BotaoLink, Vazio, Segmentado } from "../components/ui";
+import { Card, CardHeader, Kpi, Chip, ChipCanal, ChipPrazo, Tabs, Tabela, Th, Tr, Td, BotaoLink, Vazio, Segmentado } from "../components/ui";
 
 export const dynamic = "force-dynamic";
 
 const MOTIVOS: { id: string; nome: string; casa: (m: string) => boolean }[] = [
-  { id: "defeito", nome: "Produto com defeito", casa: (m) => /FUNCTIONAL|DEFECT|damaged|defective|DAMAGE/i.test(m) },
-  { id: "diferente", nome: "Diferente do anúncio", casa: (m) => /NOT_MATCH|DIFFERENT|not_match|WRONG/i.test(m) },
-  { id: "nao_recebido", nome: "Não recebido", casa: (m) => /NOT_RECEIVED|not_received|NON_RECEIPT/i.test(m) },
-  { id: "faltando", nome: "Faltando peça", casa: (m) => /MISSING|missing|INCOMPLETE/i.test(m) },
-  { id: "arrependimento", nome: "Arrependimento", casa: (m) => /CHANGE_OF_MIND|change_mind|NO_LONGER|DONT_WANT/i.test(m) },
+  { id: "defeito", nome: "Produto com defeito", casa: (m) => /Produto com defeito/.test(m) },
+  { id: "danificado", nome: "Chegou danificado", casa: (m) => /Chegou danificado|Produto quebrado/.test(m) },
+  { id: "diferente", nome: "Diferente do anúncio", casa: (m) => /Diferente do anúncio|Item errado/.test(m) },
+  { id: "nao_recebido", nome: "Não recebido", casa: (m) => /Não recebido/.test(m) },
+  { id: "faltando", nome: "Faltando peça", casa: (m) => /Faltando peça/.test(m) },
+  { id: "arrependimento", nome: "Arrependimento", casa: (m) => /Arrependimento|Não serviu/.test(m) },
 ];
 const SUGESTOES = [
   { id: "aprovar", nome: "Aprovar" },
@@ -54,7 +56,7 @@ export default async function DevolucoesPage({ searchParams }: { searchParams: P
   const abaDef = ABAS_FILA.find((a) => a.id === aba) ?? ABAS_FILA[0];
   let lista = (aba === "encerradas" ? encerradas : abertas).filter((d) => (abaDef.etapas ? abaDef.etapas.includes(d.etapa) : abaDef.filtro ? abaDef.filtro(d) : true));
   const motivoSel = MOTIVOS.find((m) => m.id === params.motivo);
-  if (motivoSel) lista = lista.filter((d) => motivoSel.casa(`${d.motivo_codigo ?? ""} ${d.motivo_texto ?? ""}`));
+  if (motivoSel) lista = lista.filter((d) => motivoSel.casa(`${d.motivo_codigo ?? ""} ${d.motivo_texto ?? ""} ${motivoLegivel(d.motivo_codigo, d.motivo_texto)}`));
   if (params.sugestao) lista = lista.filter((d) => d.sugestao?.decisao === params.sugestao);
 
   const qs = (patch: Record<string, string | undefined>) => {
@@ -114,15 +116,24 @@ export default async function DevolucoesPage({ searchParams }: { searchParams: P
                         <Td>
                           <ChipCanal canal={d.canal} />
                         </Td>
-                        <Td>
-                          <Produto nome={item?.nome ?? d.pedido_id} imagem={item?.imagem ?? null} sku={`${d.pedido_id} · ${d.lojas?.apelido ?? ""}`} />
+                        <Td className="max-w-[260px]">
+                          <div className="flex items-center gap-2.5">
+                            {item?.imagem ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={item.imagem} alt="" className="h-9 w-9 shrink-0 rounded-[8px] object-cover" />
+                            ) : null}
+                            <div className="min-w-0">
+                              <p className="line-clamp-2 text-[13px] font-medium leading-tight text-texto">{item?.nome ?? d.pedido_id}</p>
+                              <p className="truncate text-[11px] text-texto-2">{d.pedido_id} · {d.lojas?.apelido ?? ""}</p>
+                            </div>
+                          </div>
                         </Td>
-                        <Td className="max-w-[220px] truncate" title={d.texto_comprador ?? ""}>
-                          {d.motivo_texto && d.motivo_texto !== d.motivo_codigo ? d.motivo_texto : d.motivo_codigo ?? "-"}
+                        <Td className="max-w-[160px]" title={d.texto_comprador ?? ""}>
+                          <span className="line-clamp-2 leading-tight">{motivoLegivel(d.motivo_codigo, d.motivo_texto)}</span>
                         </Td>
                         <Td numerica className="font-semibold">{brl(d.valor_reembolso_pedido)}</Td>
                         <Td>
-                          <Chip cor={d.sugestao ? (d.sugestao.decisao === "aprovar" ? "verde" : d.sugestao.decisao === "aguardar" ? "cinza" : "laranja") : "cinza"}>{rotuloSugestao(d)}</Chip>
+                          <Chip cor={d.sugestao ? (d.sugestao.decisao === "aprovar" ? "verde" : d.sugestao.decisao === "aguardar" ? "cinza" : "laranja") : "cinza"} className="max-w-[220px] !whitespace-normal leading-tight">{rotuloSugestao(d)}</Chip>
                         </Td>
                         <Td>
                           <Link href={`/devolucoes/${d.id}`} className="text-[13px] font-medium text-primaria hover:underline">

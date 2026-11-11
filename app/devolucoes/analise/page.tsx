@@ -2,6 +2,7 @@ import { escopoDoUsuario, filtroLojas } from "@/lib/conta";
 import { supabase } from "@/lib/supabase";
 import { brl, pct, agoraMs } from "@/lib/formato";
 import Cabecalho from "../Cabecalho";
+import { motivoLegivel } from "@/lib/devolucoes/motivos";
 import { Card, CardHeader, Kpi, Chip, ChipCanal, Tabela, Th, Tr, Td, Barra, Dica } from "../../components/ui";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,10 @@ const GRUPOS: { nome: string; casa: (m: string) => boolean; acao: string }[] = [
   { nome: "Faltando peça", casa: (m) => /MISSING|missing|INCOMPLETE|LACK/i.test(m), acao: "Conferir itens e parafusos na expedição" },
   { nome: "Não recebido", casa: (m) => /NOT_RECEIVED|not_received|NON_RECEIPT/i.test(m), acao: "Guardar foto de entrega e disputar com comprovante" },
 ];
-const grupoDe = (d: D) => GRUPOS.find((g) => g.casa(`${d.motivo_codigo ?? ""} ${d.motivo_texto ?? ""}`))?.nome ?? "Outros";
+const grupoDe = (d: D) => {
+  const legivel = motivoLegivel(d.motivo_codigo, d.motivo_texto);
+  return GRUPOS.find((g) => g.nome === legivel || g.casa(`${d.motivo_codigo ?? ""} ${d.motivo_texto ?? ""}`))?.nome ?? legivel;
+};
 
 export default async function AnalisePage({ searchParams }: { searchParams: Promise<{ loja?: string }> }) {
   const params = await searchParams;

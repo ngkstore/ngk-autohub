@@ -7,6 +7,7 @@ import { riscoDoComprador } from "@/lib/devolucoes/risco";
 import { textoCobranca } from "@/lib/devolucoes/credito";
 import { brl, data as fmtData, prazoRelativo, urgenciaDoPrazo } from "@/lib/formato";
 import ResponderCaso from "./ResponderCaso";
+import { motivoLegivel } from "@/lib/devolucoes/motivos";
 import { Card, CardHeader, Chip, ChipCanal, ChipPrazo, Tabela, Th, Tr, Td, BotaoLink, Dica, Aviso, LinhaDetalhe } from "../../components/ui";
 
 export const dynamic = "force-dynamic";
@@ -82,7 +83,7 @@ export default async function CasoPage({ params }: { params: Promise<{ id: strin
           <Card>
             <CardHeader titulo="O que o comprador diz" acoes={<Chip cor="azul">{d.tipo.replace("_", " + ")}</Chip>} />
             <div className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
-              <LinhaDetalhe rotulo="Motivo" valor={d.motivo_texto && d.motivo_texto !== d.motivo_codigo ? `${d.motivo_texto} (${d.motivo_codigo})` : d.motivo_codigo ?? "-"} />
+              <LinhaDetalhe rotulo="Motivo" valor={`${motivoLegivel(d.motivo_codigo, d.motivo_texto)}${d.motivo_codigo ? ` (${d.motivo_codigo})` : ""}`} />
               <LinhaDetalhe rotulo="Valor pedido" valor={`${brl(d.valor_reembolso_pedido)}${d.valor_pedido ? ` de ${brl(d.valor_pedido)}` : ""}`} destaque />
               <LinhaDetalhe rotulo="Aberto em" valor={fmtData(d.plataforma_criado_em, true)} />
               <LinhaDetalhe rotulo="Status na plataforma" valor={d.status_plataforma ?? "-"} />

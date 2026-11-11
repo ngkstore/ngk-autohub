@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { taxaVitoria, textoCobranca } from "@/lib/devolucoes/credito";
 import { brl, data as fmtData, agoraMs } from "@/lib/formato";
 import Cabecalho from "../Cabecalho";
+import { motivoLegivel } from "@/lib/devolucoes/motivos";
 import MarcarCreditado from "./MarcarCreditado";
 import { Card, CardHeader, Kpi, Chip, ChipCanal, Tabs, Tabela, Th, Tr, Td, Vazio, PainelDetalhe, SecaoDetalhe, LinhaDetalhe, Barra } from "../../components/ui";
 
@@ -109,7 +110,7 @@ export default async function DisputasPage({ searchParams }: { searchParams: Pro
                     <Td>
                       <ChipCanal canal={d.canal} />
                     </Td>
-                    <Td className="text-texto-2">{d.motivo_texto && d.motivo_texto !== d.motivo_codigo ? d.motivo_texto : d.motivo_codigo ?? "-"}</Td>
+                    <Td className="text-texto-2">{motivoLegivel(d.motivo_codigo, d.motivo_texto)}</Td>
                     <Td className="text-texto-2">{fmtData(d.plataforma_criado_em)}</Td>
                     <Td>
                       <Chip cor={d.resultado === "ganha" ? "verde" : d.resultado === "perdida" ? "vermelho" : d.resultado === "parcial" ? "amarelo" : "cinza"}>{d.resultado ?? d.disputa_status ?? d.compensacao_status ?? "em análise"}</Chip>
