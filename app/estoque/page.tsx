@@ -70,7 +70,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
           <h1 className="text-[22px] font-bold tracking-[-0.01em] text-texto">Estoque e ruptura</h1>
           <p className="mt-0.5 text-[13px] text-texto-2">Estoque físico único (UpSeller), dividido entre Shopee e TikTok, com previsão de quando cada item acaba.</p>
         </div>
-        <PedidoCompra sugestoes={sugestoes} />
+        <PedidoCompra sugestoes={sugestoes} temUpseller={temUpseller} />
       </div>
       <Tabs className="mb-5" ativa={aba} abas={[{ id: "estoque", nome: "Estoque", href: link({ aba: "estoque" }) }, { id: "mapeamento", nome: "Mapeamento", href: link({ aba: "mapeamento" }) }, { id: "fornecedores", nome: "Fornecedores e prazos", href: link({ aba: "fornecedores" }) }, { id: "importar", nome: "Importar", href: link({ aba: "importar" }) }]} />
 

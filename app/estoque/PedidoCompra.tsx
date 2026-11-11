@@ -7,7 +7,7 @@ type Sug = { sku: string; nome: string | null; fornecedor: string | null; quanti
 
 // D4 — "Gerar pedido de compra": lista sugerida por fornecedor em CSV para lançar no UpSeller.
 // Nada é enviado automaticamente.
-export default function PedidoCompra({ sugestoes }: { sugestoes: Sug[] }) {
+export default function PedidoCompra({ sugestoes, temUpseller }: { sugestoes: Sug[]; temUpseller: boolean }) {
   const [aberto, setAberto] = useState(false);
   const porFornecedor = new Map<string, Sug[]>();
   for (const s of sugestoes) porFornecedor.set(s.fornecedor ?? "Sem fornecedor", [...(porFornecedor.get(s.fornecedor ?? "Sem fornecedor") || []), s]);
@@ -24,9 +24,11 @@ export default function PedidoCompra({ sugestoes }: { sugestoes: Sug[] }) {
 
   return (
     <div className="relative">
-      <Botao variante="principal" onClick={() => setAberto((v) => !v)} disabled={sugestoes.length === 0}>
-        Gerar pedido de compra{sugestoes.length ? ` (${sugestoes.length})` : ""}
-      </Botao>
+      <span title={!temUpseller ? "Sem estoque coletado do UpSeller: a compra sugerida seria calculada só pelas vendas, sem saber o que há no armazém." : undefined}>
+        <Botao variante="principal" onClick={() => setAberto((v) => !v)} disabled={!temUpseller || sugestoes.length === 0}>
+          Gerar pedido de compra{temUpseller && sugestoes.length ? ` (${sugestoes.length})` : ""}
+        </Botao>
+      </span>
       {aberto && (
         <div className="absolute right-0 top-full z-20 mt-1 min-w-72 rounded-lg border border-borda bg-superficie p-2 shadow-cartao">
           <p className="px-2 py-1 text-xs text-texto-2">Planilha para lançar no UpSeller (nada é enviado automaticamente).</p>
