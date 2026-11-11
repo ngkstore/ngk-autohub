@@ -129,18 +129,38 @@ export async function listarArmazens(): Promise<ArmazemUp[]> {
   return lista(resp, "warehouseList", "warehouses", "list", "data").map(mapearArmazem).filter((a) => a.id);
 }
 
-export async function paginaSkusBruta(armazemId: string): Promise<J> {
+
+// 4001 "parâmetros inválidos" com os campos soltos: a doc fala num objeto PageWarehouseSkuQuery.
+// Tenta as formas abaixo até uma responder sem 4001; a que funcionar fica em cache no processo.
+let formaSku: number | null = null;
+function variantesArgsSku(armazemId: string, pageNo: number, pageSize: number, skus?: string[]): J[] {
+  const base: J = { warehouseIdList: [armazemId], pageNo, pageSize, ...(skus?.length ? { skuList: skus.slice(0, 300) } : {}) };
+  return [{ query: base }, { PageWarehouseSkuQuery: base }, base, { request: base }, { params: base }, { query: { ...base, warehouseIdList: [Number(armazemId)] } }];
+}
+async function chamarSkus(armazemId: string, pageNo: number, pageSize: number, skus?: string[]): Promise<{ resp: J; forma: number }> {
   const cfg = upsellerConfigurado();
-  const args: J = { warehouseIdList: [armazemId], pageNo: 1, pageSize: 5 };
-  return cfg.mcp ? mcpTool<J>("page_warehouse_sku_inventory_list", args) : restUpseller<J>("pageWarehouseSku/v1", args);
+  const variantes = variantesArgsSku(armazemId, pageNo, pageSize, skus);
+  const ordem = formaSku !== null ? [formaSku, ...variantes.map((_, i) => i).filter((i) => i !== formaSku)] : variantes.map((_, i) => i);
+  let ultimo: J = {};
+  for (const i of ordem) {
+    const resp = cfg.mcp ? await mcpTool<J>("page_warehouse_sku_inventory_list", variantes[i]) : await restUpseller<J>("pageWarehouseSku/v1", variantes[i]);
+    ultimo = resp;
+    if (Number(resp.code) === 4001) continue;
+    formaSku = i;
+    return { resp, forma: i };
+  }
+  return { resp: ultimo, forma: -1 };
+}
+
+export async function paginaSkusBruta(armazemId: string): Promise<J> {
+  const { resp, forma } = await chamarSkus(armazemId, 1, 5);
+  return { forma_que_funcionou: forma, ...resp };
 }
 
 export async function listarSkusArmazem(armazemId: string, opts: { skus?: string[]; maxPaginas?: number } = {}): Promise<SkuUp[]> {
-  const cfg = upsellerConfigurado();
   const saida: SkuUp[] = [];
   for (let pageNo = 1; pageNo <= (opts.maxPaginas ?? 100); pageNo++) {
-    const args: J = { warehouseIdList: [armazemId], pageNo, pageSize: 100, ...(opts.skus?.length ? { skuList: opts.skus.slice(0, 300) } : {}) };
-    const resp = cfg.mcp ? await mcpTool<J>("page_warehouse_sku_inventory_list", args) : await restUpseller<J>("pageWarehouseSku/v1", args);
+    const { resp } = await chamarSkus(armazemId, pageNo, 100, opts.skus);
     const itens = lista(resp, "skuList", "inventoryList", "list", "records", "data");
     for (const it of itens) {
       const s = mapearSku(it, armazemId);
