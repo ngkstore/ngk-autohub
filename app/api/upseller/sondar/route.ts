@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { autorizarAdmin } from "@/lib/autorizacao";
-import { listarArmazens, listarSkusArmazem, upsellerConfigurado } from "@/lib/upseller/cliente";
+import { listarArmazens, listarSkusArmazem, paginaSkusBruta, upsellerConfigurado } from "@/lib/upseller/cliente";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     const alvo = sp.get("armazem") || armazens[0]?.id;
     const skus = (sp.get("skus") || "").split(",").map((s) => s.trim()).filter(Boolean);
     const amostra = alvo ? await listarSkusArmazem(alvo, { skus, maxPaginas: 1 }) : [];
+    const bruto = alvo && amostra.length === 0 ? await paginaSkusBruta(alvo).catch((e) => ({ erro: String(e) })) : undefined;
     return NextResponse.json({
       sucesso: true,
       porta: cfg.mcp ? "mcp" : "rest",
@@ -26,6 +27,7 @@ export async function GET(request: NextRequest) {
       amostra_skus: amostra.slice(0, 5),
       campos_sku: amostra[0] ? Object.keys(amostra[0].bruto) : [],
       total_na_pagina: amostra.length,
+      pagina_bruta: bruto ? JSON.stringify(bruto).slice(0, 4000) : undefined,
     });
   } catch (e) {
     return NextResponse.json({ sucesso: false, configurado: cfg, erro: e instanceof Error ? e.message : String(e) }, { status: 500 });

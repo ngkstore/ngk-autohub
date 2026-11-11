@@ -129,6 +129,12 @@ export async function listarArmazens(): Promise<ArmazemUp[]> {
   return lista(resp, "warehouseList", "warehouses", "list", "data").map(mapearArmazem).filter((a) => a.id);
 }
 
+export async function paginaSkusBruta(armazemId: string): Promise<J> {
+  const cfg = upsellerConfigurado();
+  const args: J = { warehouseIdList: [armazemId], pageNo: 1, pageSize: 5 };
+  return cfg.mcp ? mcpTool<J>("page_warehouse_sku_inventory_list", args) : restUpseller<J>("pageWarehouseSku/v1", args);
+}
+
 export async function listarSkusArmazem(armazemId: string, opts: { skus?: string[]; maxPaginas?: number } = {}): Promise<SkuUp[]> {
   const cfg = upsellerConfigurado();
   const saida: SkuUp[] = [];
