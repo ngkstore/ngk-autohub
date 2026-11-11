@@ -617,7 +617,8 @@ Referência: `docs/design/Lives.html`. **Antes de cada coleta do TikTok, teste a
 chamada pela rota que já existe, `/api/tiktok/sondar`.** A disponibilidade depende da
 categoria do app.
 
-### [ ] E1. TikTok: lives, vídeos e produtos
+### [x] E1. TikTok: lives, vídeos e produtos
+> **Feito 11/11/2026:** sondagem por `/api/tiktok/sondar`: `shop_lives/performance` exige `account_type` e aceita **OFFICIAL_ACCOUNTS** e **AFFILIATE_ACCOUNTS** (não aceita ALL); `products_performance` por live OK; **minuto a minuto negado** (permissão do app); vídeos, produtos por canal e loja por hora OK. `lib/tiktok/lives.ts` coleta lives (as duas contas) + produtos da live, vídeos e produtos por canal → tabelas `lives`, `live_produtos`, `videos_desempenho`, `produtos_canal_dia` (migration 0015). Cron diário 03:10 (`/api/lives/sincronizar?dias=3`) e botão “Sincronizar TikTok agora” na tela.
 
 - **Lives:**
   - lista: `GET /analytics/202609/shop_lives/performance`, que só traz as contas
@@ -640,7 +641,8 @@ categoria do app.
 - **Cron:** diário de madrugada para o dia anterior, mais um disparo manual depois da
   live **[PERGUNTAR antes do `vercel.json`]**.
 
-### [ ] E2. TikTok: afiliados
+### [x] E2. TikTok: afiliados
+> **Feito 11/11/2026:** `lib/tiktok/afiliados.ts`: `orders/search` (create_time_ge) → `tiktok_afiliado_pedidos` (pedido, SKU, criador, conteúdo, taxa, comissão estimada/paga, liquidação); criador (`marketplace_creators/{id}`) devolveu 16901006 (região do criador ≠ loja) na sondagem — o cache semanal só grava quando responder. Campanhas de parceiros ficam para a Parte F.
 
 - **Pedidos:** `POST /affiliate_seller/202410/orders/search` (pedido, SKU, status
   de liquidação, comissão estimada e real) → tabela `tiktok_afiliado_pedidos`.
@@ -650,7 +652,8 @@ categoria do app.
 - **Campanhas de parceiros:** `Search Seller Partner Campaigns` e
   `Get Seller Partner Campaign Detail` alimentam o Calendário (Parte F).
 
-### [ ] E3. Shopee: lives e afiliados
+### [x] E3. Shopee: lives e afiliados
+> **Feito 11/11/2026:** lives da Shopee: lançamento manual na tela (`/api/lives/lancar`), já que a API `v2.livestream` não vale no Brasil; a captura pela extensão fica como evolução. AMS `get_conversion_report`: `lib/shopee/amsConversao.ts` → `afiliados_conversao`, **mas o endpoint recusou todos os nomes de intervalo testados** (purchase_time_from/to, order_create_time, purchase_time_start/end, complete_time, start_date/end_date, unix e YYYYMMDD: “at least one time range pair required”) e a doc da Open Platform não é acessível daqui; os nomes ficam na chave `ams_conversion_params` de `configuracoes` para o Gabriel conferir no API Test Tool do console.
 
 - **A API de lives da Shopee (`v2.livestream`) não vale no Brasil.** Ela é só para
   TW, ID, TH, PH, MY, SG e VN, e não lista sessões. Não implemente.
@@ -663,14 +666,16 @@ categoria do app.
   `v2.ams.get_conversion_report` para a comissão por pedido e por item, com reembolso
   e canal. A janela máxima de consulta está na doc.
 
-### [ ] E4. SPS do TikTok
+### [x] E4. SPS do TikTok
+> **Feito 11/11/2026:** tabela `sps_lancamentos` + lançamento manual semanal na tela (`/api/lives/lancar` { sps }). A captura pela extensão Coletor (host_permissions do Seller Center do TikTok) fica como opção para o Gabriel decidir.
 
 Sem API no Brasil. Proposta: estender a extensão Coletor para o Seller Center do
 TikTok (nova `host_permissions`) e capturar o SPS e as notas uma vez por dia. Até
 lá, um campo de lançamento manual semanal. **[PERGUNTAR]** qual dos dois o Gabriel
 prefere.
 
-### [ ] E5. Tela `/lives`
+### [x] E5. Tela `/lives`
+> **Feito 11/11/2026:** filtro Todos / TikTok / Shopee, KPIs (receita das lives com variação, horas ao vivo, receita por hora, pico, receita via afiliados), receita por live, saúde para afiliados (SPS), tabela de lives, afiliados que mais venderam (TikTok + Shopee AMS), lançamentos. Item “Lives e afiliados” no menu (Vendas).
 
 Siga o `Lives.html`:
 - filtro Todos / TikTok / Shopee;
