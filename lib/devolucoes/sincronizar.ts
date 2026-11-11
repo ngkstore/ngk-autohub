@@ -117,7 +117,9 @@ export async function sincronizarDevolucoesTikTokLoja(loja: LojaTikTok, opts: { 
   const agora = Math.floor(Date.now() / 1000);
   const desde = opts.dias ? agora - opts.dias * 86400 : marca ? Math.floor(marca.getTime() / 1000) - FOLGA_HORAS * 3600 : agora - DIAS_CARGA_INICIAL * 86400;
   try {
-    const [returns, cancelamentos] = await Promise.all([listarReturnsTikTok(loja, desde), listarCancelamentosTikTok(loja, desde)]);
+    // sequencial: o TikTok limita a taxa por API (36009002)
+    const returns = await listarReturnsTikTok(loja, desde);
+    const cancelamentos = await listarCancelamentosTikTok(loja, desde);
     for (const ro of returns) {
       if (opts.orcamentoMs && Date.now() - inicio > opts.orcamentoMs) break;
       r.vistos++;

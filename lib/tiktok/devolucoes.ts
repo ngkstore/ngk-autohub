@@ -15,6 +15,11 @@ async function paginar(loja: LojaTikTok, path: string, body: J, chave: string, m
       query: { page_size: "50", ...(pageToken ? { page_token: pageToken } : {}) },
       body,
     });
+    if (r.code === 36009002 && i < maxPaginas - 1) {
+      // limite de taxa: espera e tenta a mesma página de novo
+      await new Promise((ok) => setTimeout(ok, 2500));
+      continue;
+    }
     if (r.code !== 0) throw new Error(`${path}: ${r.code} ${r.message}`);
     todos.push(...((r.data?.[chave] as J[]) || []));
     pageToken = r.data?.next_page_token || "";
