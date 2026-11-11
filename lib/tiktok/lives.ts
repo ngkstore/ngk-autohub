@@ -21,10 +21,12 @@ export function mapearLive(s: J, lojaId: string, tipoConta: string) {
   const c = (s.creator as J) || {};
   const sp = (s.sales_performance as J) || {};
   const ip = (s.interaction_performance as J) || {};
-  const ep = (s.engagement_performance as J) || (s.traffic_performance as J) || {};
+  const ep = (s.traffic as J) || (s.engagement_performance as J) || (s.traffic_performance as J) || {};
   const inicio = str(s.start_time);
   const fim = str(s.end_time);
-  const dur = inicio && fim ? Math.max(0, Math.round((new Date(fim.replace(" ", "T") + "Z").getTime() - new Date(inicio.replace(" ", "T") + "Z").getTime()) / 1000)) : n(s.duration);
+  // start_time/end_time vêm como "YYYY-MM-DD HH:mm:ss" na hora local da loja (America/Sao_Paulo)
+  const brt = (v: string) => new Date(v.replace(" ", "T") + "-03:00");
+  const dur = inicio && fim ? Math.max(0, Math.round((brt(fim).getTime() - brt(inicio).getTime()) / 1000)) : n(s.duration);
   const receita = money(sp.live_attributed_gmv) ?? money(sp.live_gmv) ?? 0;
   return {
     canal: "tiktok" as const,
@@ -35,16 +37,16 @@ export function mapearLive(s: J, lojaId: string, tipoConta: string) {
     criador_nome: str(c.nick_name),
     criador_usuario: str(c.user_name),
     criador_id: str(c.open_id) || str(c.creator_id),
-    inicio: inicio ? new Date(inicio.replace(" ", "T") + "Z").toISOString() : null,
-    fim: fim ? new Date(fim.replace(" ", "T") + "Z").toISOString() : null,
+    inicio: inicio ? brt(inicio).toISOString() : null,
+    fim: fim ? brt(fim).toISOString() : null,
     duracao_s: dur,
     receita,
     pedidos: n(sp.live_attributed_sku_orders) ?? n(sp.created_sku_orders) ?? 0,
     itens: n(sp.live_attributed_items_sold) ?? 0,
     espectadores: n(ep.viewers) ?? n(ep.unique_viewers) ?? n(s.viewers),
-    pico: n(ep.peak_viewers) ?? n(ep.max_viewers) ?? n(s.peak_viewers),
-    tempo_medio_s: n(ep.avg_watch_duration) ?? n(ep.avg_viewing_duration),
-    ctr: n(ep.product_click_rate) ?? n(ep.ctr) ?? n(sp.ctr),
+    pico: n(ep.peak_viewers) ?? n(ep.max_viewers) ?? n(s.peak_viewers), // a API de analytics não traz pico: fica null
+    tempo_medio_s: n(ep.avg_viewing_duration) ?? n(ep.avg_watch_duration),
+    ctr: n(ep.live_ctr) ?? n(ep.product_click_rate) ?? n(ep.ctr) ?? n(sp.ctr),
     likes: n(ip.likes),
     comentarios: n(ip.comments),
     compartilhamentos: n(ip.shares),

@@ -37,15 +37,18 @@ export default async function LivesPage({ searchParams }: { searchParams: Promis
   ]);
   type L = { id: string; canal: "shopee" | "tiktok"; loja_id: string; origem: string; tipo_conta: string | null; criador_nome: string | null; criador_usuario: string | null; inicio: string | null; duracao_s: number | null; receita: number; pedidos: number; espectadores: number | null; pico: number | null; tempo_medio_s: number | null; ctr: number | null; receita_por_hora: number | null; lojas: { apelido: string } | null };
   const todas = ((livesRaw || []) as unknown) as L[];
-  const lives = todas.filter((l) => l.inicio && l.inicio >= desde);
-  const anteriores = todas.filter((l) => l.inicio && l.inicio < desde);
+  const relevante = (l: L) => Number(l.duracao_s || 0) >= 300 || Number(l.receita) > 0;
+  const todasRelevantes = todas.filter(relevante);
+  const ignoradas = todas.length - todasRelevantes.length;
+  const lives = todasRelevantes.filter((l) => l.inicio && l.inicio >= desde);
+  const anteriores = todasRelevantes.filter((l) => l.inicio && l.inicio < desde);
   const soma = (xs: L[], f: (l: L) => number) => xs.reduce((s, l) => s + (f(l) || 0), 0);
   const receita = soma(lives, (l) => Number(l.receita));
   const receitaAnt = soma(anteriores, (l) => Number(l.receita));
   const varPct = receitaAnt > 0 ? ((receita - receitaAnt) / receitaAnt) * 100 : null;
   const horas = soma(lives, (l) => Number(l.duracao_s || 0)) / 3600;
   const receitaHora = horas > 0 ? receita / horas : 0;
-  const pico = Math.max(0, ...lives.map((l) => Number(l.pico || 0)));
+  const pico = Math.max(0, ...lives.map((l) => Number(l.pico ?? l.espectadores ?? 0))); // a API não traz pico: usa espectadores
   const porCanal = (c: string) => soma(lives.filter((l) => l.canal === c), (l) => Number(l.receita));
   const horasCanal = (c: string) => soma(lives.filter((l) => l.canal === c), (l) => Number(l.duracao_s || 0)) / 3600;
   const afiliadoReceita = (afTik || []).reduce((s, a) => s + Number(a.base_comissao || 0), 0);
@@ -94,18 +97,18 @@ export default async function LivesPage({ searchParams }: { searchParams: Promis
         <Kpi icone="lives" cor="indigo" rotulo="Receita das lives" valor={brl(receita, 0)} variacao={varPct ?? undefined} detalhe={`TikTok ${brl(porCanal("tiktok"), 0)} · Shopee ${brl(porCanal("shopee"), 0)}`} />
         <Kpi icone="painel" cor="ceu" rotulo="Horas ao vivo" valor={`${numero(horas, 0)} h`} detalhe={`${numero(horasCanal("tiktok"), 0)} TikTok · ${numero(horasCanal("shopee"), 0)} Shopee`} />
         <Kpi icone="financas" cor="verde" rotulo="Receita por hora" valor={brl(receitaHora, 0)} />
-        <Kpi icone="insights" cor="roxo" rotulo="Pico de espectadores" valor={numero(pico)} />
+        <Kpi icone="insights" cor="roxo" rotulo="Espectadores (maior live)" valor={numero(pico)} detalhe="a API não informa o pico" />
         <Kpi icone="ads" cor="laranja" rotulo="Receita via afiliados" valor={brl(afiliadoReceita, 0)} detalhe={receita > 0 ? `${pct((afiliadoReceita / Math.max(receita, afiliadoReceita)) * 100, 0)} da receita TikTok` : "pedidos de afiliados TikTok"} />
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-3">
         <Card className="xl:col-span-2">
-          <CardHeader titulo="Receita por live" descricao={melhor ? `melhor: ${fmtData(melhor.inicio)} · ${brl(melhor.receita, 0)}` : undefined} />
+          <CardHeader titulo="Receita por live" descricao={`${melhor ? `melhor: ${fmtData(melhor.inicio, true)} · ${brl(melhor.receita, 0)} · ` : ""}só lives com 5 min ou mais, ou com receita${ignoradas ? ` (${ignoradas} sessão(ões) curtas sem venda ignoradas)` : ""}; as 12 mais recentes`} />
           {lives.length === 0 ? (
             <Vazio titulo="Nenhuma live no período" texto="As lives do TikTok entram pela API (madrugada e botão Sincronizar); as da Shopee pelo lançamento manual." />
           ) : (
             <div className="space-y-1.5">
-              {lives.slice(0, 20).map((l) => (
+              {[...lives].sort((a, b) => String(b.inicio).localeCompare(String(a.inicio))).slice(0, 12).map((l) => (
                 <div key={l.id} className="flex items-center gap-3 text-[13px]">
                   <span className="w-24 shrink-0 text-texto-2">{fmtData(l.inicio, true)}</span>
                   <div className="flex-1">
@@ -150,7 +153,7 @@ export default async function LivesPage({ searchParams }: { searchParams: Promis
               <Th>Duração</Th>
               <Th numerica>Receita</Th>
               <Th numerica>Pedidos</Th>
-              <Th numerica>Pico</Th>
+              <Th numerica>Pico / espectadores</Th>
               <Th numerica>Tempo médio</Th>
               <Th numerica>Clique no produto</Th>
               <Th numerica>Receita/hora</Th>
@@ -172,7 +175,7 @@ export default async function LivesPage({ searchParams }: { searchParams: Promis
                 <Td>{dur(l.duracao_s)}</Td>
                 <Td numerica className="font-semibold">{brl(l.receita, 0)}</Td>
                 <Td numerica>{numero(l.pedidos)}</Td>
-                <Td numerica>{l.pico == null ? "—" : numero(l.pico)}</Td>
+                <Td numerica>{l.pico == null ? (l.espectadores == null ? "—" : `${numero(l.espectadores)} esp.`) : numero(l.pico)}</Td>
                 <Td numerica>{l.tempo_medio_s == null ? "—" : dur(Math.round(Number(l.tempo_medio_s)))}</Td>
                 <Td numerica>{l.ctr == null ? "—" : pct(Number(l.ctr) * (Number(l.ctr) <= 1 ? 100 : 1))}</Td>
                 <Td numerica>{l.receita_por_hora == null ? "—" : brl(l.receita_por_hora, 0)}</Td>
