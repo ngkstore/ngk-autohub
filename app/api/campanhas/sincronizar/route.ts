@@ -23,21 +23,23 @@ export async function GET(request: NextRequest) {
     if (lojaId) q = q.eq("loja_id", lojaId);
     const { data } = await q;
     for (const t of data || []) {
-      if (!t.loja_id || Date.now() - inicio > 200_000) break;
+      if (!t.loja_id || Date.now() - inicio > 120_000) break;
       saida.push({ canal: "shopee", loja_id: t.loja_id, ...(await coletarPromocoesShopee(String(t.loja_id))) });
     }
   }
   if (!canal || canal === "tiktok") {
     for (const l of (await lojasTikTokAtivas()).filter((l) => !lojaId || l.lojaId === lojaId)) {
-      if (Date.now() - inicio > 200_000) break;
+      if (Date.now() - inicio > 120_000) break;
       saida.push({ canal: "tiktok", loja_id: l.lojaId, ...(await coletarAtividadesTikTok(l)) });
     }
   }
   let margens = 0;
   if (sp.get("margem") !== "0") {
-    const { data: camps } = await supabase.from("campanhas").select("id").or(`fim.gte.${new Date().toISOString()},fim.is.null`).limit(60);
+    // margem: campanhas em andamento ou que começam em 30 dias, as mais próximas primeiro, até o orçamento
+    const em30d = new Date(Date.now() + 30 * 86400000).toISOString();
+    const { data: camps } = await supabase.from("campanhas").select("id").or(`fim.gte.${new Date().toISOString()},fim.is.null`).lte("inicio", em30d).order("inicio", { ascending: true }).limit(25);
     for (const c of camps || []) {
-      if (Date.now() - inicio > 240_000) break;
+      if (Date.now() - inicio > 220_000) break;
       await calcularMargensCampanha(c.id);
       margens++;
     }
