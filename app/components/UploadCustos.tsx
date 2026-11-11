@@ -33,11 +33,11 @@ export default function UploadCustos() {
   }
 
   return (
-    <div className="mb-5 rounded-2xl border border-slate-800 bg-slate-900 p-5">
+    <div className="mb-5 rounded-2xl border border-borda bg-superficie p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="font-semibold text-white">📥 Importar planilha de estoque</h3>
-          <p className="mt-1 text-sm text-slate-400">
+          <h3 className="font-semibold text-texto">📥 Importar planilha de estoque</h3>
+          <p className="mt-1 text-sm text-texto-2">
             Sobe o arquivo (.xlsx ou .csv) com as colunas <b>SKU</b> e <b>Custo</b> — o sistema grava o custo de
             cada variação automaticamente.
           </p>
@@ -46,7 +46,7 @@ export default function UploadCustos() {
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={estado === "enviando"}
-          className="rounded-xl bg-emerald-600 px-5 py-2.5 font-medium text-white transition hover:bg-emerald-500 disabled:opacity-60"
+          className="rounded-xl bg-primaria px-5 py-2.5 font-medium text-texto transition hover:bg-primaria-hover disabled:opacity-60"
         >
           {estado === "enviando" ? "Importando…" : "Escolher arquivo"}
         </button>
@@ -63,7 +63,7 @@ export default function UploadCustos() {
         />
       </div>
       {msg && (
-        <p className={`mt-3 text-sm ${estado === "ok" ? "text-emerald-400" : estado === "erro" ? "text-red-400" : "text-slate-400"}`}>
+        <p className={`mt-3 text-sm ${estado === "ok" ? "text-sucesso" : estado === "erro" ? "text-perigo" : "text-texto-2"}`}>
           {estado === "ok" ? "✓ " : estado === "erro" ? "✗ " : "… "}
           {msg}
         </p>

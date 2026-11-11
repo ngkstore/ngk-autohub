@@ -8,6 +8,7 @@ import UploadCustos from "../components/UploadCustos";
 import ImpostoForm from "../components/ImpostoForm";
 import SeletorEstado from "../components/SeletorEstado";
 import Custos from "./Custos";
+import { Tabs, Kpi as KpiUi, Chip as ChipUi } from "../components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -112,31 +113,15 @@ export default async function FinancasPage({ searchParams }: Props) {
   const linkAba = (k: string) => `/financas?aba=${k}${sufixo}`;
 
   return (
-    <div className="p-8 text-white">
-      <h1 className="text-4xl font-bold">💰 Finanças</h1>
-      <p className="mt-2 text-slate-400">
-        Tudo do dinheiro num lugar só — do pedido ao resultado. Use os seletores de
-        <b> loja</b> e <b>período</b> no topo.
-      </p>
-
-      {/* sub-abas */}
-      <div className="mt-6 flex flex-wrap gap-1 border-b border-slate-800">
-        {ABAS.map((t) => (
-          <Link
-            key={t.k}
-            href={linkAba(t.k)}
-            className={`-mb-px rounded-t-lg border-b-2 px-4 py-3 text-sm ${
-              t.k === aba
-                ? "border-emerald-500 font-semibold text-white"
-                : "border-transparent text-slate-400 hover:bg-slate-800 hover:text-white"
-            }`}
-          >
-            {t.r}
-          </Link>
-        ))}
+    <div className="mx-auto max-w-[1400px] p-6">
+      <div className="mb-4">
+        <h1 className="text-[22px] font-bold tracking-[-0.01em] text-texto">Finanças</h1>
+        <p className="mt-0.5 text-[13px] text-texto-2">Tudo do dinheiro num lugar só, do pedido ao resultado. Use os seletores de loja e período no topo.</p>
       </div>
 
-      <div className="mt-8">
+      <Tabs abas={ABAS.map((t) => ({ id: t.k, nome: t.r, href: linkAba(t.k) }))} ativa={aba} />
+
+      <div className="mt-6">
         {aba === "balanco" && <Balanco lojas={lojas} periodo={periodo} conta={escopo.contaId} />}
         {(aba === "conciliacao" || aba === "divergencias") && <Conciliacao lojas={lojas} periodo={periodo} />}
         {aba === "previsao" && <Previsao lojas={lojas} ufTend={params.ufTend} sufixo={sufixo} />}
@@ -283,38 +268,38 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
   return (
     <div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <Kpi label="Lucro líquido" val={cobertura > 0 ? brl(lucro) : "—"} hint={cobertura > 0 ? `margem ${margemLucro.toFixed(1)}% · ${cobertura.toFixed(0)}% dos itens c/ custo` : "cadastre os custos p/ ver"} cor={lucro >= 0 ? "text-emerald-300" : "text-red-300"} />
-        <Kpi label="Recebido" val={brl(n(r.recebido))} hint={`${n(r.qtd_recebido)} pedido(s)`} cor="text-emerald-300" />
-        <Kpi label="Falta receber" val={brl(n(r.a_receber))} hint={`${n(r.qtd_a_receber)} pedido(s)`} cor="text-blue-300" />
+        <Kpi label="Lucro líquido" val={cobertura > 0 ? brl(lucro) : "—"} hint={cobertura > 0 ? `margem ${margemLucro.toFixed(1)}% · ${cobertura.toFixed(0)}% dos itens c/ custo` : "cadastre os custos p/ ver"} cor={lucro >= 0 ? "text-sucesso" : "text-perigo"} />
+        <Kpi label="Recebido" val={brl(n(r.recebido))} hint={`${n(r.qtd_recebido)} pedido(s)`} cor="text-sucesso" />
+        <Kpi label="Falta receber" val={brl(n(r.a_receber))} hint={`${n(r.qtd_a_receber)} pedido(s)`} cor="text-primaria" />
         <Kpi label="Resultado" val={brl(resultado)} hint="antes do custo da mercadoria" trend={deltaResultado} />
-        <Kpi label="Afiliado pago" val={brl(afiliado)} hint={`${n(r.qtd_afiliado)} pedido(s) · custo opcional`} cor="text-violet-300" />
-        <Kpi label="Cupom próprio" val={brl(cupom)} hint={`${n(r.qtd_cupom)} pedido(s)`} cor="text-orange-300" />
+        <Kpi label="Afiliado pago" val={brl(afiliado)} hint={`${n(r.qtd_afiliado)} pedido(s) · custo opcional`} cor="text-chip-roxo-texto" />
+        <Kpi label="Cupom próprio" val={brl(cupom)} hint={`${n(r.qtd_cupom)} pedido(s)`} cor="text-alerta" />
       </div>
 
       {evo.length > 1 && (
-        <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6">
+        <div className="mt-8 rounded-2xl border border-borda bg-superficie p-6">
           <h2 className="mb-1 text-xl font-bold">Evolução (últimos meses)</h2>
-          <p className="mb-5 text-xs text-slate-500">
+          <p className="mb-5 text-xs text-texto-2">
             Receita por mês e a <b>margem de contribuição</b> (receita − taxas − afiliado − cupom − custo). Pra ver se
             está crescendo e se a margem se mantém.
           </p>
           <div className="space-y-3">
             {evo.map((e) => (
               <div key={e.mes} className="flex items-center gap-3">
-                <span className="w-14 shrink-0 text-sm text-slate-400">{mesLabel(e.mes)}</span>
-                <div className="h-7 flex-1 overflow-hidden rounded-md bg-slate-800">
+                <span className="w-14 shrink-0 text-sm text-texto-2">{mesLabel(e.mes)}</span>
+                <div className="h-7 flex-1 overflow-hidden rounded-md bg-superficie-2">
                   <div
-                    className="flex h-full items-center justify-end rounded-md bg-emerald-600 pr-2 text-xs font-semibold text-white"
+                    className="flex h-full items-center justify-end rounded-md bg-primaria pr-2 text-xs font-semibold text-texto"
                     style={{ width: `${Math.max(8, (n(e.receita) / maxEvoR) * 100)}%` }}
                   >
                     {brl(n(e.receita))}
                   </div>
                 </div>
                 <span className="w-24 shrink-0 text-right text-sm">
-                  <span className={`font-semibold ${n(e.margem_pct) >= 12 ? "text-emerald-300" : n(e.margem_pct) >= 0 ? "text-orange-300" : "text-red-300"}`}>
+                  <span className={`font-semibold ${n(e.margem_pct) >= 12 ? "text-sucesso" : n(e.margem_pct) >= 0 ? "text-alerta" : "text-perigo"}`}>
                     {n(e.margem_pct)}%
                   </span>
-                  <span className="ml-1 text-xs text-slate-500">margem</span>
+                  <span className="ml-1 text-xs text-texto-2">margem</span>
                 </span>
               </div>
             ))}
@@ -322,38 +307,38 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
         </div>
       )}
 
-      <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6">
+      <div className="mt-8 rounded-2xl border border-borda bg-superficie p-6">
         <h2 className="mb-2 text-xl font-bold">Do bruto ao resultado</h2>
-        <div className="divide-y divide-slate-800">
+        <div className="divide-y divide-linha">
           {linhas.map((li) => (
             <div
               key={li.l}
-              className={`flex items-center justify-between py-3 ${li.tot ? "rounded-lg bg-slate-800 px-3 font-bold" : ""}`}
+              className={`flex items-center justify-between py-3 ${li.tot ? "rounded-lg bg-superficie-2 px-3 font-bold" : ""}`}
             >
               <span>{li.l}</span>
-              <span className={li.v < 0 ? "text-red-300" : li.tot ? "text-emerald-300" : ""}>
+              <span className={li.v < 0 ? "text-perigo" : li.tot ? "text-sucesso" : ""}>
                 {li.v < 0 ? `− ${brl(Math.abs(li.v))}` : brl(li.v)}
               </span>
             </div>
           ))}
         </div>
         {emprestimo > 0 && (
-          <div className="mt-3 flex items-center justify-between rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300">
+          <div className="mt-3 flex items-center justify-between rounded-lg border border-borda px-3 py-2 text-sm text-texto">
             <span>
               Parcelas do Empréstimo para Vendedores (Shopee) pagas pela carteira no período
-              <span className="ml-2 text-xs text-slate-500">
+              <span className="ml-2 text-xs text-texto-2">
                 {emp.parcelas} parcela(s) · fora do resultado: empréstimo não é despesa, é devolução de dinheiro adiantado
               </span>
             </span>
-            <span className="text-slate-400">{brl(emprestimo)}</span>
+            <span className="text-texto-2">{brl(emprestimo)}</span>
           </div>
         )}
         {!usaDetalhe && cdPedidos > 0 && (
-          <p className="mt-3 text-xs text-slate-500">
+          <p className="mt-3 text-xs text-texto-2">
             Topo do DRE pela fonte resumida: só {cdCobertura.toFixed(0)}% dos pedidos do período têm detalhamento linha a linha (o backfill roda a cada 10 min). Com 95% ou mais, as linhas passam a vir do detalhamento e fecham com a renda do pedido.
           </p>
         )}
-        <p className="mt-4 text-xs text-slate-500">
+        <p className="mt-4 text-xs text-texto-2">
           {cobertura < 100 ? (
             <>O <b>lucro líquido</b> considera o custo de <b>{cobertura.toFixed(0)}%</b> dos itens vendidos —
             cadastre o custo dos produtos restantes na aba <b>Produtos &amp; Margem</b> pra fechar 100%. </>
@@ -365,16 +350,16 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
       </div>
 
       {Array.isArray(r.por_uf) && (r.por_uf as unknown[]).length > 0 && (
-        <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-6">
+        <div className="mt-6 rounded-2xl border border-borda bg-superficie p-6">
           <h2 className="mb-4 text-xl font-bold">Vendas por região (UF)</h2>
           <div className="flex flex-wrap gap-2">
             {(r.por_uf as { uf: string; pedidos: number; valor: number }[]).map((u) => (
-              <span key={u.uf} className="rounded-lg bg-slate-800 px-3 py-2 text-sm">
+              <span key={u.uf} className="rounded-lg bg-superficie-2 px-3 py-2 text-sm">
                 <b>{u.uf}</b> · {u.pedidos} ped. · {brl(u.valor)}
               </span>
             ))}
           </div>
-          <p className="mt-3 text-xs text-slate-500">Região vem do rastreio do envio (destino do pedido).</p>
+          <p className="mt-3 text-xs text-texto-2">Região vem do rastreio do envio (destino do pedido).</p>
         </div>
       )}
     </div>
@@ -430,10 +415,10 @@ async function Conciliacao({ lojas, periodo }: { lojas: string[] | null; periodo
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi label="Recebidos" val={int(n(con.recebidos))} hint={`de ${int(n(con.total))} no período`} cor="text-emerald-300" />
-        <Kpi label="A receber" val={int(n(con.a_receber))} hint="ainda não caíram" cor="text-blue-300" />
-        <Kpi label="Divergência no recebido" val={int(n(con.divergentes))} hint={n(con.divergentes) > 0 ? brl(n(con.diverg_valor)) : "tudo certo"} cor={n(con.divergentes) ? "text-red-300" : undefined} />
-        <Kpi label="Taxa cobrada a mais" val={brl(n(aud.cobrado_a_mais))} hint={`${int(aud.divergentes)} fora da sua tabela`} cor="text-orange-300" />
+        <Kpi label="Recebidos" val={int(n(con.recebidos))} hint={`de ${int(n(con.total))} no período`} cor="text-sucesso" />
+        <Kpi label="A receber" val={int(n(con.a_receber))} hint="ainda não caíram" cor="text-primaria" />
+        <Kpi label="Divergência no recebido" val={int(n(con.divergentes))} hint={n(con.divergentes) > 0 ? brl(n(con.diverg_valor)) : "tudo certo"} cor={n(con.divergentes) ? "text-perigo" : undefined} />
+        <Kpi label="Taxa cobrada a mais" val={brl(n(aud.cobrado_a_mais))} hint={`${int(aud.divergentes)} fora da sua tabela`} cor="text-alerta" />
       </div>
 
       {/* Aging de recebimento: pagos que ainda não caíram, por tempo de espera */}
@@ -441,19 +426,19 @@ async function Conciliacao({ lojas, periodo }: { lojas: string[] | null; periodo
         <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-xl font-bold">Aging de recebimento</h2>
           {n(ag.b60_qtd) === 0 ? (
-            <span className="text-xs font-semibold text-emerald-300">nada vencido ✓</span>
+            <span className="text-xs font-semibold text-sucesso">nada vencido ✓</span>
           ) : (
-            <span className="text-xs font-semibold text-red-300">⚠ {int(n(ag.b60_qtd))} vencido(s)</span>
+            <span className="text-xs font-semibold text-perigo">⚠ {int(n(ag.b60_qtd))} vencido(s)</span>
           )}
         </div>
-        <p className="mb-3 text-xs text-slate-500">
+        <p className="mb-3 text-xs text-texto-2">
           Pedidos pagos que ainda não caíram na carteira, por tempo de espera. A maioria liquida em ~60 dias —
           acima disso já passou do prazo normal (vale cobrar a Shopee). Só lojas conectadas, a partir do início da carteira de cada uma.
         </p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Kpi label="A caminho (até 30d)" val={brl(n(ag.b0_30_val))} hint={`${int(n(ag.b0_30_qtd))} pedidos · normal`} cor="text-blue-300" />
-          <Kpi label="Atrasando (30–60d)" val={brl(n(ag.b30_60_val))} hint={`${int(n(ag.b30_60_qtd))} pedidos · de olho`} cor="text-orange-300" />
-          <Kpi label="Vencido (+60d)" val={brl(n(ag.b60_val))} hint={n(ag.b60_qtd) > 0 ? `${int(n(ag.b60_qtd))} pedidos · cobrar Shopee` : "tudo em dia"} cor={n(ag.b60_qtd) > 0 ? "text-red-300" : "text-emerald-300"} />
+          <Kpi label="A caminho (até 30d)" val={brl(n(ag.b0_30_val))} hint={`${int(n(ag.b0_30_qtd))} pedidos · normal`} cor="text-primaria" />
+          <Kpi label="Atrasando (30–60d)" val={brl(n(ag.b30_60_val))} hint={`${int(n(ag.b30_60_qtd))} pedidos · de olho`} cor="text-alerta" />
+          <Kpi label="Vencido (+60d)" val={brl(n(ag.b60_val))} hint={n(ag.b60_qtd) > 0 ? `${int(n(ag.b60_qtd))} pedidos · cobrar Shopee` : "tudo em dia"} cor={n(ag.b60_qtd) > 0 ? "text-perigo" : "text-sucesso"} />
         </div>
       </section>
 
@@ -462,34 +447,34 @@ async function Conciliacao({ lojas, periodo }: { lojas: string[] | null; periodo
         <section>
           <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="text-xl font-bold">🚚 Frete cobrado pelo TikTok</h2>
-            <span className={`text-xs font-semibold ${n(fr.liquido) > 0 ? "text-orange-300" : "text-emerald-300"}`}>
+            <span className={`text-xs font-semibold ${n(fr.liquido) > 0 ? "text-alerta" : "text-sucesso"}`}>
               líquido no período: {brl(n(fr.liquido))}
             </span>
           </div>
-          <p className="mb-3 text-xs text-slate-500">
+          <p className="mb-3 text-xs text-texto-2">
             Você paga 6% do Programa de Frete Grátis (já nas taxas). O TikTok cobra o frete real de cada pedido e devolve o subsídio
             mais o que o cliente pagou; em pedido normal fecha em zero. O que sobra é custo seu e aparece aqui por motivo,
             com a lista pra contestar.
           </p>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <Kpi label="Frete real cobrado" val={brl(n(fr.frete_real))} hint={`${int(n(fr.pedidos))} pedidos`} cor="text-slate-200" />
-            <Kpi label="Subsídio Frete Grátis" val={brl(n(fr.subsidio))} hint="devolvido pelo TikTok" cor="text-emerald-300" />
-            <Kpi label="Pago pelo cliente" val={brl(n(fr.pago_cliente))} hint="creditado a você" cor="text-emerald-300" />
-            <Kpi label="Custo líquido" val={brl(n(fr.custo))} hint={n(fr.credito) > 0 ? `crédito a seu favor ${brl(n(fr.credito))}` : "o que sobrou pra você"} cor="text-orange-300" />
+            <Kpi label="Frete real cobrado" val={brl(n(fr.frete_real))} hint={`${int(n(fr.pedidos))} pedidos`} cor="text-texto" />
+            <Kpi label="Subsídio Frete Grátis" val={brl(n(fr.subsidio))} hint="devolvido pelo TikTok" cor="text-sucesso" />
+            <Kpi label="Pago pelo cliente" val={brl(n(fr.pago_cliente))} hint="creditado a você" cor="text-sucesso" />
+            <Kpi label="Custo líquido" val={brl(n(fr.custo))} hint={n(fr.credito) > 0 ? `crédito a seu favor ${brl(n(fr.credito))}` : "o que sobrou pra você"} cor="text-alerta" />
           </div>
           {frMotivos.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2">
               {frMotivos.map((m) => (
-                <span key={m.motivo} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs text-slate-300">
+                <span key={m.motivo} className="rounded-full border border-borda bg-superficie px-3 py-1 text-xs text-texto">
                   {MOTIVO[m.motivo] || m.motivo}: <b>{brl(n(m.valor))}</b> · {int(n(m.pedidos))} pedidos
                 </span>
               ))}
             </div>
           )}
           {freteLista.length > 0 && (
-            <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900">
+            <div className="mt-4 overflow-x-auto rounded-2xl border border-borda bg-superficie">
               <table className="w-full text-left text-sm">
-                <thead className="bg-slate-800 text-xs uppercase text-slate-400">
+                <thead className="bg-superficie-2 text-xs uppercase text-texto-2">
                   <tr>
                     <th className="p-3">Pedido</th><th className="p-3">Cliente</th><th className="p-3">Data</th><th className="p-3">Motivo</th>
                     <th className="p-3 text-right">Receita</th><th className="p-3 text-right">Frete real</th><th className="p-3 text-right">Subsídio</th>
@@ -498,24 +483,24 @@ async function Conciliacao({ lojas, periodo }: { lojas: string[] | null; periodo
                 </thead>
                 <tbody>
                   {freteLista.map((f) => (
-                    <tr key={f.order_id} className="border-t border-slate-800">
+                    <tr key={f.order_id} className="border-t border-borda">
                       <td className="p-3 font-mono text-xs">{f.order_id}</td>
-                      <td className="p-3 text-slate-300">{f.cliente_nome || "—"}</td>
-                      <td className="p-3 text-slate-400">{f.data_pedido ? new Date(f.data_pedido).toLocaleDateString("pt-BR") : "—"}</td>
+                      <td className="p-3 text-texto">{f.cliente_nome || "—"}</td>
+                      <td className="p-3 text-texto-2">{f.data_pedido ? new Date(f.data_pedido).toLocaleDateString("pt-BR") : "—"}</td>
                       <td className="p-3"><Chip cor={f.motivo === "devolucao" || f.motivo === "reembolso" ? "neg" : "info"}>{MOTIVO[f.motivo] || f.motivo}</Chip></td>
                       <td className="p-3 text-right">{brl(n(f.revenue))}</td>
                       <td className="p-3 text-right">{brl(n(f.frete_real))}</td>
-                      <td className="p-3 text-right text-emerald-300">{brl(n(f.subsidio))}</td>
-                      <td className="p-3 text-right text-emerald-300">{brl(n(f.pago_cliente))}</td>
+                      <td className="p-3 text-right text-sucesso">{brl(n(f.subsidio))}</td>
+                      <td className="p-3 text-right text-sucesso">{brl(n(f.pago_cliente))}</td>
                       <td className="p-3 text-right">{n(f.devolucao) > 0 ? brl(n(f.devolucao)) : "—"}</td>
-                      <td className="p-3 text-right font-semibold text-orange-300">{brl(n(f.liquido))}</td>
+                      <td className="p-3 text-right font-semibold text-alerta">{brl(n(f.liquido))}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
-          <p className="mt-2 text-xs text-slate-500">
+          <p className="mt-2 text-xs text-texto-2">
             Os {freteLista.length} maiores custos do período. Devolução e reembolso são os casos a contestar quando a culpa não foi sua
             (pedido do cliente entregue e devolvido, ou cancelamento depois do envio).
           </p>
@@ -525,13 +510,13 @@ async function Conciliacao({ lojas, periodo }: { lojas: string[] | null; periodo
       {/* 1 — Recebimento */}
       <section>
         <h2 className="mb-1 text-xl font-bold">Recebimento</h2>
-        <p className="mb-3 text-xs text-slate-500">
+        <p className="mb-3 text-xs text-texto-2">
           Pedido × carteira: o que o escrow prometeu (esperado) vs o que caiu (recebido). A coluna
           &quot;Recebido&quot; aparece após a sincronização da carteira.
         </p>
-        <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900">
+        <div className="overflow-x-auto rounded-2xl border border-borda bg-superficie">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-800 text-xs uppercase text-slate-400">
+            <thead className="bg-superficie-2 text-xs uppercase text-texto-2">
               <tr>
                 <th className="p-3">Pedido</th><th className="p-3">Cliente</th><th className="p-3">UF</th>
                 <th className="p-3 text-right">Esperado</th><th className="p-3 text-right">Recebido</th><th className="p-3">Status</th>
@@ -539,16 +524,16 @@ async function Conciliacao({ lojas, periodo }: { lojas: string[] | null; periodo
             </thead>
             <tbody>
               {pedidos.length === 0 ? (
-                <tr><td className="p-4 text-slate-400" colSpan={6}>Nenhum pedido no período.</td></tr>
+                <tr><td className="p-4 text-texto-2" colSpan={6}>Nenhum pedido no período.</td></tr>
               ) : pedidos.slice(0, 120).map((p, i) => {
                 const esperado = n(p.valor_liquido) || n(p.valor_total);
                 const recebido = p.recebido_em ? n(p.valor_recebido) : null;
                 const diverg = recebido != null && Math.abs(recebido - esperado) > 0.5;
                 return (
-                  <tr key={i} className="border-t border-slate-800">
+                  <tr key={i} className="border-t border-borda">
                     <td className="p-3 font-mono text-xs">{String(p.pedido_externo_id)}</td>
-                    <td className="p-3 text-slate-300">{String(p.cliente_nome || "—")}</td>
-                    <td className="p-3 text-slate-400">{String(p.uf || "—")}</td>
+                    <td className="p-3 text-texto">{String(p.cliente_nome || "—")}</td>
+                    <td className="p-3 text-texto-2">{String(p.uf || "—")}</td>
                     <td className="p-3 text-right">{brl(esperado)}</td>
                     <td className="p-3 text-right">{recebido != null ? brl(recebido) : "—"}</td>
                     <td className="p-3">
@@ -560,7 +545,7 @@ async function Conciliacao({ lojas, periodo }: { lojas: string[] | null; periodo
             </tbody>
           </table>
         </div>
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-texto-2">
           Amostra dos {Math.min(120, pedidos.length)} pedidos mais recentes — o período inteiro tem{" "}
           <b>{int(n(con.total))}</b> pedidos, e os KPIs acima e as divergências abaixo já cobrem todos eles.
         </p>
@@ -572,11 +557,11 @@ async function Conciliacao({ lojas, periodo }: { lojas: string[] | null; periodo
           <h2 className="text-xl font-bold">Divergências de recebimento</h2>
           <form action="/api/financas/divergencias/export" method="get" className="flex items-center gap-2">
             {lojas && lojas.length === 1 && <input type="hidden" name="loja" value={lojas[0]} />}
-            <label className="text-xs text-slate-400">Mês:</label>
+            <label className="text-xs text-texto-2">Mês:</label>
             <select
               name="mes"
               defaultValue={meses[0].v}
-              className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none"
+              className="rounded-lg border border-borda bg-superficie-2 px-3 py-2 text-sm text-texto focus:border-primaria focus:outline-none"
             >
               {meses.map((m) => (
                 <option key={m.v} value={m.v}>{m.l}</option>
@@ -584,32 +569,32 @@ async function Conciliacao({ lojas, periodo }: { lojas: string[] | null; periodo
             </select>
             <button
               type="submit"
-              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+              className="rounded-lg bg-primaria px-4 py-2 text-sm font-semibold text-texto hover:bg-primaria-hover"
             >
               ⬇ Exportar (CSV)
             </button>
           </form>
         </div>
-        <p className="mb-3 text-xs text-slate-500">
+        <p className="mb-3 text-xs text-texto-2">
           Pedidos que caíram na carteira com valor diferente do que o escrow prometeu, no período inteiro
           (maiores primeiro). Boa parte é afiliado/ajuste aplicado após a captura.
         </p>
         {divergencias.length === 0 ? (
-          <p className="text-slate-400">Nenhuma divergência de recebimento no período. 🎉</p>
+          <p className="text-texto-2">Nenhuma divergência de recebimento no período. 🎉</p>
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900">
+          <div className="overflow-x-auto rounded-2xl border border-borda bg-superficie">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-800 text-xs uppercase text-slate-400">
+              <thead className="bg-superficie-2 text-xs uppercase text-texto-2">
                 <tr><th className="p-3">Pedido</th><th className="p-3">Cliente</th><th className="p-3 text-right">Esperado</th><th className="p-3 text-right">Recebido</th><th className="p-3 text-right">Diferença</th></tr>
               </thead>
               <tbody>
                 {divergencias.slice(0, 100).map((p, i) => (
-                  <tr key={i} className="border-t border-slate-800">
+                  <tr key={i} className="border-t border-borda">
                     <td className="p-3 font-mono text-xs">{String(p.pedido_externo_id)}</td>
-                    <td className="p-3 text-slate-300">{String(p.cliente_nome || "—")}</td>
+                    <td className="p-3 text-texto">{String(p.cliente_nome || "—")}</td>
                     <td className="p-3 text-right">{brl(n(p.esperado))}</td>
                     <td className="p-3 text-right">{brl(n(p.recebido))}</td>
-                    <td className={`p-3 text-right ${n(p.dif) < 0 ? "text-red-300" : "text-emerald-300"}`}>
+                    <td className={`p-3 text-right ${n(p.dif) < 0 ? "text-perigo" : "text-sucesso"}`}>
                       {n(p.dif) < 0 ? "− " : "+ "}{brl(Math.abs(n(p.dif)))}
                     </td>
                   </tr>
@@ -623,34 +608,34 @@ async function Conciliacao({ lojas, periodo }: { lojas: string[] | null; periodo
       {/* 3 — Auditoria de Taxas */}
       <section>
         <h2 className="mb-1 text-xl font-bold">Auditoria de Taxas</h2>
-        <p className="mb-4 text-xs text-slate-500">
+        <p className="mb-4 text-xs text-texto-2">
           Confere a taxa que a Shopee cobrou (comissão + serviço) contra a <b>esperada pela sua tabela</b>. Parte das
           divergências pode ser regra que a tabela não captura — use como sinal pra revisar/contestar os casos grandes.
         </p>
         <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="rounded-xl border border-slate-800 bg-slate-900 p-4"><p className="text-xs text-slate-400">Taxa esperada</p><p className="mt-1 text-lg font-bold">{brl(n(aud.taxa_esperada_total))}</p></div>
-          <div className="rounded-xl border border-slate-800 bg-slate-900 p-4"><p className="text-xs text-slate-400">Taxa cobrada</p><p className="mt-1 text-lg font-bold">{brl(n(aud.taxa_real_total))}</p></div>
-          <div className="rounded-xl border border-slate-800 bg-slate-900 p-4"><p className="text-xs text-slate-400">Cobrado a mais</p><p className="mt-1 text-lg font-bold text-orange-300">{brl(n(aud.cobrado_a_mais))}</p></div>
-          <div className="rounded-xl border border-slate-800 bg-slate-900 p-4"><p className="text-xs text-slate-400">Cobrado a menos</p><p className="mt-1 text-lg font-bold text-emerald-300">{brl(Math.abs(n(aud.cobrado_a_menos)))}</p></div>
+          <div className="rounded-xl border border-borda bg-superficie p-4"><p className="text-xs text-texto-2">Taxa esperada</p><p className="mt-1 text-lg font-bold">{brl(n(aud.taxa_esperada_total))}</p></div>
+          <div className="rounded-xl border border-borda bg-superficie p-4"><p className="text-xs text-texto-2">Taxa cobrada</p><p className="mt-1 text-lg font-bold">{brl(n(aud.taxa_real_total))}</p></div>
+          <div className="rounded-xl border border-borda bg-superficie p-4"><p className="text-xs text-texto-2">Cobrado a mais</p><p className="mt-1 text-lg font-bold text-alerta">{brl(n(aud.cobrado_a_mais))}</p></div>
+          <div className="rounded-xl border border-borda bg-superficie p-4"><p className="text-xs text-texto-2">Cobrado a menos</p><p className="mt-1 text-lg font-bold text-sucesso">{brl(Math.abs(n(aud.cobrado_a_menos)))}</p></div>
         </div>
-        <p className="mb-3 text-sm text-slate-300">Maiores diferenças (Shopee cobrou <b>a mais</b> que a sua tabela):</p>
+        <p className="mb-3 text-sm text-texto">Maiores diferenças (Shopee cobrou <b>a mais</b> que a sua tabela):</p>
         {audList.length === 0 ? (
-          <p className="text-slate-400">Sem divergências relevantes de taxa no período. 🎉</p>
+          <p className="text-texto-2">Sem divergências relevantes de taxa no período. 🎉</p>
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900">
+          <div className="overflow-x-auto rounded-2xl border border-borda bg-superficie">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-800 text-xs uppercase text-slate-400">
+              <thead className="bg-superficie-2 text-xs uppercase text-texto-2">
                 <tr><th className="p-3">Pedido</th><th className="p-3">Cliente</th><th className="p-3 text-right">Venda</th><th className="p-3 text-right">Esperada</th><th className="p-3 text-right">Cobrada</th><th className="p-3 text-right">Diferença</th></tr>
               </thead>
               <tbody>
                 {audList.map((a, i) => (
-                  <tr key={i} className="border-t border-slate-800">
+                  <tr key={i} className="border-t border-borda">
                     <td className="p-3 font-mono text-xs">{String(a.pedido_externo_id)}</td>
-                    <td className="p-3 text-slate-300">{String(a.cliente_nome || "—")}</td>
+                    <td className="p-3 text-texto">{String(a.cliente_nome || "—")}</td>
                     <td className="p-3 text-right">{brl(n(a.valor_total))}</td>
                     <td className="p-3 text-right">{brl(n(a.taxa_esperada))}</td>
                     <td className="p-3 text-right">{brl(n(a.taxa_real))}</td>
-                    <td className="p-3 text-right text-orange-300">+ {brl(n(a.taxa_diferenca))}</td>
+                    <td className="p-3 text-right text-alerta">+ {brl(n(a.taxa_diferenca))}</td>
                   </tr>
                 ))}
               </tbody>
@@ -722,20 +707,20 @@ async function Carteira({ lojas }: { lojas: string[] | null }) {
         <div className="mb-3 flex items-baseline justify-between gap-3">
           <h2 className="text-xl font-bold">Saldo por carteira</h2>
           {carteiras.length > 1 && (
-            <span className="text-sm text-slate-400">
-              Total: <b className="text-emerald-300">{brl(totalGeral)}</b>
+            <span className="text-sm text-texto-2">
+              Total: <b className="text-sucesso">{brl(totalGeral)}</b>
             </span>
           )}
         </div>
         {carteiras.length === 0 ? (
-          <p className="text-slate-400">Sem carteira sincronizada ainda. Rode a sincronização da carteira.</p>
+          <p className="text-texto-2">Sem carteira sincronizada ainda. Rode a sincronização da carteira.</p>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {carteiras.map((c) => (
-              <div key={c.loja_id} className="rounded-2xl border border-emerald-800 bg-slate-900 p-5">
-                <p className="text-sm text-slate-400">👛 {c.nome}</p>
-                <p className="mt-1 text-3xl font-bold text-emerald-300">{brl(n(c.saldo))}</p>
-                <p className="mt-1 text-xs text-slate-500">atualizado {dt(c.atualizado_em)}</p>
+              <div key={c.loja_id} className="rounded-2xl border border-chip-verde-fundo bg-superficie p-5">
+                <p className="text-sm text-texto-2">👛 {c.nome}</p>
+                <p className="mt-1 text-3xl font-bold text-sucesso">{brl(n(c.saldo))}</p>
+                <p className="mt-1 text-xs text-texto-2">atualizado {dt(c.atualizado_em)}</p>
               </div>
             ))}
           </div>
@@ -743,17 +728,17 @@ async function Carteira({ lojas }: { lojas: string[] | null }) {
       </div>
 
       {/* Movimento líquido por dia da semana */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
+      <div className="rounded-2xl border border-borda bg-superficie p-6">
         <h2 className="mb-1 text-xl font-bold">
-          Movimento por dia da semana <span className="text-sm font-normal text-slate-500">· média por dia</span>
+          Movimento por dia da semana <span className="text-sm font-normal text-texto-2">· média por dia</span>
         </h2>
-        <p className="mb-5 text-xs text-slate-500">
-          Média de um dia típico (base: últimos 60 dias). Tudo que <span className="text-emerald-300">entrou</span>{" "}
-          (vendas + antecipação) menos tudo que <span className="text-red-300">saiu</span> (saques/PIX + ads +
+        <p className="mb-5 text-xs text-texto-2">
+          Média de um dia típico (base: últimos 60 dias). Tudo que <span className="text-sucesso">entrou</span>{" "}
+          (vendas + antecipação) menos tudo que <span className="text-perigo">saiu</span> (saques/PIX + ads +
           reembolsos). A Shopee não credita vendas no fim de semana, então o acúmulo cai na <b>segunda</b>.
         </p>
         {!temMov ? (
-          <p className="text-slate-400">Sem movimento no período. Rode a sincronização da carteira.</p>
+          <p className="text-texto-2">Sem movimento no período. Rode a sincronização da carteira.</p>
         ) : (
           <div className="space-y-2">
             {diasOrd.map((d) => {
@@ -762,26 +747,26 @@ async function Carteira({ lojas }: { lojas: string[] | null }) {
               const liq = ent - sai;
               return (
                 <div key={d} className="flex items-center gap-3">
-                  <span className="w-10 shrink-0 text-sm text-slate-400">{diasLbl[d]}</span>
+                  <span className="w-10 shrink-0 text-sm text-texto-2">{diasLbl[d]}</span>
                   <div className="flex flex-1 items-center">
                     <div className="flex w-1/2 justify-end">
                       <div
-                        className="h-5 rounded-l-md bg-red-500/80"
+                        className="h-5 rounded-l-md bg-chip-vermelho-fundo"
                         style={{ width: `${(sai / maxAbs) * 100}%` }}
                         title={`Saiu: ${brl(sai)}`}
                       />
                     </div>
-                    <div className="h-6 w-px bg-slate-600" />
+                    <div className="h-6 w-px bg-chip-cinza-fundo" />
                     <div className="flex w-1/2 justify-start">
                       <div
-                        className="h-5 rounded-r-md bg-emerald-500/85"
+                        className="h-5 rounded-r-md bg-primaria"
                         style={{ width: `${(ent / maxAbs) * 100}%` }}
                         title={`Entrou: ${brl(ent)}`}
                       />
                     </div>
                   </div>
                   <span
-                    className={`w-28 shrink-0 text-right text-sm tabular-nums ${liq >= 0 ? "text-emerald-300" : "text-red-300"}`}
+                    className={`w-28 shrink-0 text-right text-sm tabular-nums ${liq >= 0 ? "text-sucesso" : "text-perigo"}`}
                   >
                     {liq >= 0 ? "+ " : "− "}
                     {brl(Math.abs(liq))}
@@ -791,41 +776,41 @@ async function Carteira({ lojas }: { lojas: string[] | null }) {
             })}
           </div>
         )}
-        <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-          <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-500/85" /> entrou</span>
-          <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-red-500/80" /> saiu</span>
+        <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-texto-2">
+          <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-primaria" /> entrou</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-chip-vermelho-fundo" /> saiu</span>
           <span>· o valor à direita é o líquido médio do dia</span>
         </div>
       </div>
 
       {/* Quanto você saca por dia da semana */}
       {temSaque && (
-        <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-6">
+        <div className="mt-6 rounded-2xl border border-borda bg-superficie p-6">
           <div className="mb-1 flex items-baseline justify-between gap-3">
             <h2 className="text-xl font-bold">Quanto você saca por dia</h2>
-            <span className="text-sm text-slate-400">
-              média <b className="text-red-300">{brl(saqueMedioDia)}</b>/dia
+            <span className="text-sm text-texto-2">
+              média <b className="text-perigo">{brl(saqueMedioDia)}</b>/dia
             </span>
           </div>
-          <p className="mb-5 text-xs text-slate-500">
+          <p className="mb-5 text-xs text-texto-2">
             Média do que sai pra sua conta (saque + PIX) em cada dia da semana, e o % do total de saques
             (base: últimos 30 dias).
           </p>
           <div className="space-y-2">
             {diasOrd.map((d) => (
               <div key={d} className="flex items-center gap-3">
-                <span className="w-10 shrink-0 text-sm text-slate-400">{diasLbl[d]}</span>
-                <div className="h-6 flex-1 overflow-hidden rounded-md bg-slate-800">
+                <span className="w-10 shrink-0 text-sm text-texto-2">{diasLbl[d]}</span>
+                <div className="h-6 flex-1 overflow-hidden rounded-md bg-superficie-2">
                   <div
-                    className="flex h-full items-center justify-end rounded-md bg-red-500/75 pr-2"
+                    className="flex h-full items-center justify-end rounded-md bg-chip-vermelho-fundo pr-2"
                     style={{ width: `${saquePorDia[d] > 0 ? Math.max(8, (saquePorDia[d] / maxSaque) * 100) : 0}%` }}
                   >
                     {saquePct[d] > 0 && (
-                      <span className="text-[11px] font-semibold text-white">{saquePct[d].toFixed(0)}%</span>
+                      <span className="text-[11px] font-semibold text-texto">{saquePct[d].toFixed(0)}%</span>
                     )}
                   </div>
                 </div>
-                <span className="w-28 shrink-0 text-right text-sm tabular-nums text-slate-200">
+                <span className="w-28 shrink-0 text-right text-sm tabular-nums text-texto">
                   {brl(saquePorDia[d])}
                 </span>
               </div>
@@ -836,16 +821,16 @@ async function Carteira({ lojas }: { lojas: string[] | null }) {
 
       {/* Horário em que as vendas caem (por hora) */}
       {temHora && (
-        <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-6">
+        <div className="mt-6 rounded-2xl border border-borda bg-superficie p-6">
           <div className="mb-1 flex items-baseline justify-between gap-3">
             <h2 className="text-xl font-bold">Horário em que as vendas caem</h2>
             {horaPico != null && (
-              <span className="text-sm text-slate-400">
-                pico às <b className="text-emerald-300">{horaPico}h</b>
+              <span className="text-sm text-texto-2">
+                pico às <b className="text-sucesso">{horaPico}h</b>
               </span>
             )}
           </div>
-          <p className="mb-5 text-xs text-slate-500">Que horas a Shopee credita as vendas (renda), soma dos 60 dias.</p>
+          <p className="mb-5 text-xs text-texto-2">Que horas a Shopee credita as vendas (renda), soma dos 60 dias.</p>
           <div className="overflow-x-auto">
             <div className="min-w-[560px]">
               <div className="flex h-28 items-end gap-[3px]">
@@ -853,14 +838,14 @@ async function Carteira({ lojas }: { lojas: string[] | null }) {
                   <div
                     key={h}
                     title={`${h}h · ${brl(perHour[h])}`}
-                    className="flex-1 rounded-t bg-emerald-500/80"
+                    className="flex-1 rounded-t bg-primaria"
                     style={{ height: `${Math.max(2, (perHour[h] / maxHour) * 100)}%` }}
                   />
                 ))}
               </div>
               <div className="mt-1 flex gap-[3px]">
                 {horas.map((h) => (
-                  <div key={h} className="flex-1 text-center text-[9px] text-slate-500">
+                  <div key={h} className="flex-1 text-center text-[9px] text-texto-2">
                     {h % 3 === 0 ? h : ""}
                   </div>
                 ))}
@@ -895,15 +880,15 @@ async function Ads({ lojas }: { lojas: string[] | null }) {
   return (
     <div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Kpi label="Gasto em Ads (30d)" val={brl(tot.gasto)} hint={`${linhas.length} loja(s)`} cor="text-orange-300" />
-        <Kpi label="ROAS (direto)" val={`${roasTot.toFixed(1)}×`} hint="GMV de ads ÷ gasto" cor="text-emerald-300" />
-        <Kpi label="TACOS" val={`${tacosTot.toFixed(1)}%`} hint="gasto ÷ receita total" cor="text-blue-300" />
+        <Kpi label="Gasto em Ads (30d)" val={brl(tot.gasto)} hint={`${linhas.length} loja(s)`} cor="text-alerta" />
+        <Kpi label="ROAS (direto)" val={`${roasTot.toFixed(1)}×`} hint="GMV de ads ÷ gasto" cor="text-sucesso" />
+        <Kpi label="TACOS" val={`${tacosTot.toFixed(1)}%`} hint="gasto ÷ receita total" cor="text-primaria" />
         <Kpi label="Pedidos via Ads" val={String(tot.ped)} hint="atribuição direta" />
       </div>
 
-      <div className="mt-6 overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900">
+      <div className="mt-6 overflow-x-auto rounded-2xl border border-borda bg-superficie">
         <table className="w-full text-left text-sm">
-          <thead className="bg-slate-800 text-xs uppercase text-slate-400">
+          <thead className="bg-superficie-2 text-xs uppercase text-texto-2">
             <tr>
               <th className="p-3">Loja</th>
               <th className="p-3 text-right">Gasto</th>
@@ -916,14 +901,14 @@ async function Ads({ lojas }: { lojas: string[] | null }) {
           </thead>
           <tbody>
             {linhas.length === 0 ? (
-              <tr><td className="p-4 text-slate-400" colSpan={7}>Sem dados de Ads ainda — sincroniza em alguns minutos.</td></tr>
+              <tr><td className="p-4 text-texto-2" colSpan={7}>Sem dados de Ads ainda — sincroniza em alguns minutos.</td></tr>
             ) : linhas.map((l) => (
-              <tr key={l.loja} className="border-t border-slate-800">
+              <tr key={l.loja} className="border-t border-borda">
                 <td className="p-3">{l.loja}</td>
                 <td className="p-3 text-right">{brl(n(l.gasto))}</td>
                 <td className="p-3 text-right">{brl(n(l.gmv_direto))}</td>
-                <td className="p-3 text-right text-emerald-300">{n(l.roas_direto).toFixed(1)}×</td>
-                <td className={`p-3 text-right ${n(l.tacos) > 15 ? "text-red-300" : n(l.tacos) > 8 ? "text-orange-300" : "text-emerald-300"}`}>
+                <td className="p-3 text-right text-sucesso">{n(l.roas_direto).toFixed(1)}×</td>
+                <td className={`p-3 text-right ${n(l.tacos) > 15 ? "text-perigo" : n(l.tacos) > 8 ? "text-alerta" : "text-sucesso"}`}>
                   {n(l.tacos).toFixed(1)}%
                 </td>
                 <td className="p-3 text-right">{n(l.ctr).toFixed(2)}%</td>
@@ -934,7 +919,7 @@ async function Ads({ lojas }: { lojas: string[] | null }) {
         </table>
       </div>
 
-      <p className="mt-4 text-xs text-slate-500">
+      <p className="mt-4 text-xs text-texto-2">
         Últimos 30 dias · nível <b>loja</b>, direto da API de Ads da Shopee. <b>TACOS</b> = gasto ÷ receita total
         (quanto da venda o anúncio come). <b>ROAS</b> = retorno sobre o anúncio. A <b>Fase 2</b> (Raio-X por
         anúncio, com ROAS de equilíbrio na margem) vem com o coletor.
@@ -971,31 +956,31 @@ async function Variacoes({ lojas }: { lojas: string[] | null }) {
     <div>
       <UploadCustos />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-texto-2">
           💡 Cada <b>variação</b> com seu custo. Digite e aperte <b>Enter</b> pra pular pra próxima. Vazio = <b>herda o custo do item</b>.
         </p>
-        <span className="text-sm text-slate-300">
-          <b className="text-emerald-300">{comProprio}</b> / {total} variações com custo próprio
+        <span className="text-sm text-texto">
+          <b className="text-sucesso">{comProprio}</b> / {total} variações com custo próprio
         </span>
       </div>
 
       {lista.length === 0 ? (
-        <p className="rounded-2xl border border-slate-800 bg-slate-900 p-6 text-slate-400">
+        <p className="rounded-2xl border border-borda bg-superficie p-6 text-texto-2">
           Nenhuma variação com venda nos últimos 90 dias.
         </p>
       ) : (
         <div className="space-y-4">
           {lista.map((g) => (
-            <div key={g.loja + g.item_sku} className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
-              <div className="flex items-center justify-between gap-3 border-b border-slate-800 bg-slate-800/50 px-4 py-3">
+            <div key={g.loja + g.item_sku} className="overflow-hidden rounded-2xl border border-borda bg-superficie">
+              <div className="flex items-center justify-between gap-3 border-b border-borda bg-superficie-2 px-4 py-3">
                 <div>
-                  <span className="font-semibold text-white">{g.item_nome}</span>
-                  <span className="ml-2 font-mono text-xs text-slate-400">{g.item_sku}</span>
+                  <span className="font-semibold text-texto">{g.item_nome}</span>
+                  <span className="ml-2 font-mono text-xs text-texto-2">{g.item_sku}</span>
                 </div>
-                <span className="whitespace-nowrap text-xs text-slate-400">{g.loja.replace(" Shopee", "")} · {int(g.un)} un</span>
+                <span className="whitespace-nowrap text-xs text-texto-2">{g.loja.replace(" Shopee", "")} · {int(g.un)} un</span>
               </div>
               <table className="w-full text-left text-sm">
-                <thead className="text-xs uppercase text-slate-500">
+                <thead className="text-xs uppercase text-texto-2">
                   <tr>
                     <th className="px-4 py-2">Variação</th>
                     <th className="px-4 py-2 text-right">Vend.</th>
@@ -1011,20 +996,20 @@ async function Variacoes({ lojas }: { lojas: string[] | null }) {
                     const margem = preco > 0 && custoEfetivo != null ? ((preco - custoEfetivo) / preco) * 100 : null;
                     const meu = idx++;
                     return (
-                      <tr key={v.model_sku} className="border-t border-slate-800/70">
+                      <tr key={v.model_sku} className="border-t border-borda">
                         <td className="px-4 py-2">
-                          <span className="text-slate-200">{v.variacao || "—"}</span>
-                          <span className="ml-2 font-mono text-[11px] text-violet-300">{v.model_sku}</span>
+                          <span className="text-texto">{v.variacao || "—"}</span>
+                          <span className="ml-2 font-mono text-[11px] text-chip-roxo-texto">{v.model_sku}</span>
                         </td>
-                        <td className="px-4 py-2 text-right text-slate-400">{int(v.un)}</td>
+                        <td className="px-4 py-2 text-right text-texto-2">{int(v.un)}</td>
                         <td className="px-4 py-2 text-right">{brl(preco)}</td>
                         <td className="px-4 py-2 text-right">
                           <CustoVariacaoInput lojaId={v.loja_id} modelSku={v.model_sku} inicial={v.custo != null ? n(v.custo) : null} idx={meu} />
                           {v.custo == null && v.custo_item != null && (
-                            <span className="ml-2 text-[11px] text-orange-300">herda {brl(n(v.custo_item))}</span>
+                            <span className="ml-2 text-[11px] text-alerta">herda {brl(n(v.custo_item))}</span>
                           )}
                         </td>
-                        <td className={`px-4 py-2 text-right ${margem == null ? "text-slate-500" : margem < 0 ? "text-red-300" : margem < 30 ? "text-orange-300" : "text-emerald-300"}`}>
+                        <td className={`px-4 py-2 text-right ${margem == null ? "text-texto-2" : margem < 0 ? "text-perigo" : margem < 30 ? "text-alerta" : "text-sucesso"}`}>
                           {margem == null ? "—" : `${margem.toFixed(0)}%`}
                         </td>
                       </tr>
@@ -1069,16 +1054,16 @@ async function Produtos({ lojas, pagina, sufixo, busca, semCusto, semVenda, loja
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <p className="max-w-xl text-sm text-slate-400">
+        <p className="max-w-xl text-sm text-texto-2">
           💡 <b>Margem real por venda</b> = preço − taxa Shopee do item − 6% (ads+afiliado+imposto) − custo. Digite o
           custo e aperte <b>Enter</b> pra salvar e pular pra próxima linha.
         </p>
-        <span className="text-sm text-slate-300">
+        <span className="text-sm text-texto">
           {int(total)} linha(s) · pág. {pagina + 1}/{totalPaginas}
         </span>
       </div>
       {/* Busca + filtros (GET; preserva loja/período da Topbar) */}
-      <form method="get" action="/financas" className="mb-3 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900 p-3 text-sm">
+      <form method="get" action="/financas" className="mb-3 flex flex-wrap items-center gap-3 rounded-2xl border border-borda bg-superficie p-3 text-sm">
         <input type="hidden" name="aba" value="produtos" />
         {loja && <input type="hidden" name="loja" value={loja} />}
         {periodo && <input type="hidden" name="periodo" value={periodo} />}
@@ -1086,29 +1071,29 @@ async function Produtos({ lojas, pagina, sufixo, busca, semCusto, semVenda, loja
           name="q"
           defaultValue={busca}
           placeholder="buscar por nome, SKU ou item_id"
-          className="w-64 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-white placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none"
+          className="w-64 rounded-lg border border-borda bg-superficie-2 px-3 py-1.5 text-texto placeholder:text-texto-2 focus:border-primaria focus:outline-none"
         />
-        <label className="flex items-center gap-2 text-slate-300">
+        <label className="flex items-center gap-2 text-texto">
           <input type="checkbox" name="semCusto" value="1" defaultChecked={semCusto} className="accent-emerald-500" /> só sem custo
         </label>
-        <select name="semVenda" defaultValue={semVenda ? "1" : "0"} className="rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-white focus:border-emerald-500 focus:outline-none">
+        <select name="semVenda" defaultValue={semVenda ? "1" : "0"} className="rounded-lg border border-borda bg-superficie-2 px-2 py-1.5 text-texto focus:border-primaria focus:outline-none">
           <option value="1">com e sem venda (inclui produtos novos)</option>
           <option value="0">só com venda nos últimos 90 dias</option>
         </select>
-        <button type="submit" className="rounded-lg bg-slate-700 px-3 py-1.5 font-semibold text-white hover:bg-slate-600">Filtrar</button>
+        <button type="submit" className="rounded-lg bg-chip-cinza-fundo px-3 py-1.5 font-semibold text-texto hover:bg-chip-cinza-fundo">Filtrar</button>
         {(busca || semCusto) && (
-          <a href={`/financas?aba=produtos${sufixo}`} className="text-xs text-slate-400 hover:text-white">limpar</a>
+          <a href={`/financas?aba=produtos${sufixo}`} className="text-xs text-texto-2 hover:text-texto">limpar</a>
         )}
       </form>
       {semCustoPag > 0 && (
-        <p className="mb-3 text-xs text-orange-300">
+        <p className="mb-3 text-xs text-alerta">
           ⚠ {semCustoPag} linha(s) desta página sem custo — a margem delas ainda não conta o custo. Linhas &quot;(produto inteiro)&quot; são
           produtos sem variação ou sem venda ainda: o custo vale pro item todo (variações herdam até terem custo próprio).
         </p>
       )}
-      <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900">
+      <div className="overflow-x-auto rounded-2xl border border-borda bg-superficie">
         <table className="w-full text-left text-sm">
-          <thead className="bg-slate-800 text-xs uppercase text-slate-400">
+          <thead className="bg-superficie-2 text-xs uppercase text-texto-2">
             <tr>
               <th className="p-3">Variação (SKU)</th>
               <th className="p-3 text-right">Vendas</th>
@@ -1121,29 +1106,29 @@ async function Produtos({ lojas, pagina, sufixo, busca, semCusto, semVenda, loja
           </thead>
           <tbody>
             {rows.length === 0 ? (
-              <tr><td className="p-4 text-slate-400" colSpan={7}>Nenhuma variação com vendas no escopo.</td></tr>
+              <tr><td className="p-4 text-texto-2" colSpan={7}>Nenhuma variação com vendas no escopo.</td></tr>
             ) : rows.map((r) => {
               const novoGrupo = r.item_id !== ultimoItem;
               ultimoItem = r.item_id;
               idx++;
               const m = n(r.margem_pct);
-              const cor = r.custo == null ? "text-slate-500" : m < 0 ? "text-red-300" : m < 10 ? "text-orange-300" : "text-emerald-300";
+              const cor = r.custo == null ? "text-texto-2" : m < 0 ? "text-perigo" : m < 10 ? "text-alerta" : "text-sucesso";
               return (
                 <Fragment key={`${r.loja_id}-${r.model_sku}`}>
                   {novoGrupo && (
-                    <tr className="border-t-2 border-slate-700 bg-slate-800/40">
-                      <td className="px-3 py-2 font-semibold text-slate-200" colSpan={7}>{r.produto}</td>
+                    <tr className="border-t-2 border-borda bg-superficie-2">
+                      <td className="px-3 py-2 font-semibold text-texto" colSpan={7}>{r.produto}</td>
                     </tr>
                   )}
-                  <tr className="border-t border-slate-800">
+                  <tr className="border-t border-borda">
                     <td className="p-3">
-                      <span className={r.fonte === "item" ? "text-amber-200" : "text-slate-300"}>{r.variacao || "—"}</span>
-                      <span className="ml-2 font-mono text-xs text-slate-500">{r.model_sku || r.item_id}</span>
-                      {(r.fonte === "item" || r.fonte === "modelo") && n(r.unidades) === 0 && <span className="ml-2 rounded-full border border-slate-700 px-2 py-0.5 text-[10px] text-slate-400">sem venda em 90d</span>}
+                      <span className={r.fonte === "item" ? "text-alerta" : "text-texto"}>{r.variacao || "—"}</span>
+                      <span className="ml-2 font-mono text-xs text-texto-2">{r.model_sku || r.item_id}</span>
+                      {(r.fonte === "item" || r.fonte === "modelo") && n(r.unidades) === 0 && <span className="ml-2 rounded-full border border-borda px-2 py-0.5 text-[10px] text-texto-2">sem venda em 90d</span>}
                     </td>
-                    <td className="p-3 text-right text-slate-400">{int(r.unidades)}</td>
+                    <td className="p-3 text-right text-texto-2">{int(r.unidades)}</td>
                     <td className="p-3 text-right">{brl(n(r.preco))}</td>
-                    <td className="p-3 text-right text-slate-400">{n(r.taxa_pct)}%</td>
+                    <td className="p-3 text-right text-texto-2">{n(r.taxa_pct)}%</td>
                     <td className="p-3 text-right">
                       {r.fonte === "item" && r.produto_id ? (
                         <CustoInput produtoId={r.produto_id} inicial={r.custo != null ? n(r.custo) : null} idx={idx} />
@@ -1163,14 +1148,14 @@ async function Produtos({ lojas, pagina, sufixo, busca, semCusto, semVenda, loja
       <div className="mt-4 flex items-center justify-between">
         <a
           href={linkPag(Math.max(0, pagina - 1))}
-          className={`rounded-lg px-4 py-2 text-sm ${pagina === 0 ? "pointer-events-none text-slate-600" : "bg-slate-800 text-white hover:bg-slate-700"}`}
+          className={`rounded-lg px-4 py-2 text-sm ${pagina === 0 ? "pointer-events-none text-texto-2" : "bg-superficie-2 text-texto hover:bg-chip-cinza-fundo"}`}
         >
           ← Anterior
         </a>
-        <span className="text-sm text-slate-400">página {pagina + 1} de {totalPaginas}</span>
+        <span className="text-sm text-texto-2">página {pagina + 1} de {totalPaginas}</span>
         <a
           href={linkPag(pagina + 1)}
-          className={`rounded-lg px-4 py-2 text-sm ${pagina + 1 >= totalPaginas ? "pointer-events-none text-slate-600" : "bg-slate-800 text-white hover:bg-slate-700"}`}
+          className={`rounded-lg px-4 py-2 text-sm ${pagina + 1 >= totalPaginas ? "pointer-events-none text-texto-2" : "bg-superficie-2 text-texto hover:bg-chip-cinza-fundo"}`}
         >
           Próxima →
         </a>
@@ -1193,19 +1178,19 @@ async function Impostos({ conta }: { conta: string | null }) {
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
+      <div className="rounded-2xl border border-borda bg-superficie p-6">
         <h2 className="text-xl font-bold">Lançar imposto pago</h2>
-        <p className="mb-4 mt-1 text-sm text-slate-400">
+        <p className="mb-4 mt-1 text-sm text-texto-2">
           No fim do mês, lance o imposto que <b>de fato foi pago</b> — entra no Balanço do mês.
         </p>
         <ImpostoForm competenciaInicial={compAtual} />
       </div>
-      <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
+      <div className="rounded-2xl border border-borda bg-superficie p-6">
         <h2 className="mb-4 text-xl font-bold">Lançados</h2>
         {lista.length === 0 ? (
-          <p className="text-slate-400">Nenhum imposto lançado ainda.</p>
+          <p className="text-texto-2">Nenhum imposto lançado ainda.</p>
         ) : (
-          <div className="divide-y divide-slate-800">
+          <div className="divide-y divide-linha">
             {lista.map((im) => (
               <div key={im.competencia} className="flex justify-between py-3">
                 <span>{im.competencia}</span>
@@ -1251,35 +1236,35 @@ async function Previsao({ lojas, ufTend, sufixo }: { lojas: string[] | null; ufT
   return (
     <div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Kpi label="A receber (total)" val={brl(n(r.total_a_receber))} hint={`${n(r.qtd_a_receber)} pedido(s) em aberto`} cor="text-blue-300" />
-        <Kpi label="Próximos 7 dias" val={brl(prox7)} hint="previsto cair na carteira" cor="text-emerald-300" />
+        <Kpi label="A receber (total)" val={brl(n(r.total_a_receber))} hint={`${n(r.qtd_a_receber)} pedido(s) em aberto`} cor="text-primaria" />
+        <Kpi label="Próximos 7 dias" val={brl(prox7)} hint="previsto cair na carteira" cor="text-sucesso" />
         <Kpi label="Tempo médio" val={`${n(r.media_geral_dias)} dias`} hint={`90% cai em até ${n(r.p90_dias)}d · base ${int(n(r.base_amostra))}`} />
-        <Kpi label="Atrasado" val={brl(n(r.atrasado_valor))} hint={`${int(n(r.atrasado_pedidos))} pedido(s) passaram de ${n(r.p90_dias)} dias sem cair`} cor="text-orange-300" />
+        <Kpi label="Atrasado" val={brl(n(r.atrasado_valor))} hint={`${int(n(r.atrasado_pedidos))} pedido(s) passaram de ${n(r.p90_dias)} dias sem cair`} cor="text-alerta" />
       </div>
 
-      <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6">
+      <div className="mt-8 rounded-2xl border border-borda bg-superficie p-6">
         <h2 className="mb-1 text-xl font-bold">Quanto entra por dia (próximos 30 dias)</h2>
-        <p className="mb-5 text-xs text-slate-500">
+        <p className="mb-5 text-xs text-texto-2">
           Estimativa: data do pedido + tempo médio até cair (por UF quando há amostra, senão a média geral).
         </p>
         {dias.length === 0 ? (
-          <p className="text-slate-400">
+          <p className="text-texto-2">
             Ainda sem base pra prever. Assim que a carteira e a região terminarem de sincronizar, a previsão aparece.
           </p>
         ) : (
           <div className="space-y-2">
             {dias.map((d) => (
               <div key={d.dia} className="flex items-center gap-3">
-                <span className="w-24 shrink-0 text-sm text-slate-400">{diaLabel(d.dia)}</span>
-                <div className="h-6 flex-1 overflow-hidden rounded-md bg-slate-800">
+                <span className="w-24 shrink-0 text-sm text-texto-2">{diaLabel(d.dia)}</span>
+                <div className="h-6 flex-1 overflow-hidden rounded-md bg-superficie-2">
                   <div
-                    className="flex h-full items-center justify-end rounded-md bg-emerald-600 pr-2 text-xs font-semibold text-white"
+                    className="flex h-full items-center justify-end rounded-md bg-primaria pr-2 text-xs font-semibold text-texto"
                     style={{ width: `${Math.max(6, (n(d.valor) / maxV) * 100)}%` }}
                   >
                     {brl(n(d.valor))}
                   </div>
                 </div>
-                <span className="w-16 shrink-0 text-right text-xs text-slate-500">{n(d.pedidos)} ped.</span>
+                <span className="w-16 shrink-0 text-right text-xs text-texto-2">{n(d.pedidos)} ped.</span>
               </div>
             ))}
           </div>
@@ -1287,20 +1272,20 @@ async function Previsao({ lojas, ufTend, sufixo }: { lojas: string[] | null; ufT
       </div>
 
       {/* Tempo de entrega por estado (janela uniforme) */}
-      <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-6">
+      <div className="mt-6 rounded-2xl border border-borda bg-superficie p-6">
         <h2 className="mb-1 text-xl font-bold">Tempo de entrega por estado</h2>
-        <p className="mb-4 text-xs text-slate-500">
+        <p className="mb-4 text-xs text-texto-2">
           Dias médios do pedido até a entrega, por UF (do mais rápido ao mais lento), nos <b>últimos 60 dias</b> —
           janela uniforme pra comparação justa. Todos os 27 estados; os sem amostra aparecem apagados.
         </p>
         {teComDados.length === 0 ? (
-          <p className="text-slate-400">Ainda enchendo a base de região (o rastreio está sincronizando) — volte em breve.</p>
+          <p className="text-texto-2">Ainda enchendo a base de região (o rastreio está sincronizando) — volte em breve.</p>
         ) : (
           <div className="mb-4 flex flex-wrap gap-2">
             {teComDados.map((u) => (
-              <span key={u.uf} className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm">
-                <b>{u.uf}</b> · <span className="text-emerald-300">{u.media_dias}d</span>{" "}
-                <span className="text-slate-500">({int(u.amostra)})</span>
+              <span key={u.uf} className="rounded-lg border border-borda bg-superficie-2 px-3 py-2 text-sm">
+                <b>{u.uf}</b> · <span className="text-sucesso">{u.media_dias}d</span>{" "}
+                <span className="text-texto-2">({int(u.amostra)})</span>
               </span>
             ))}
           </div>
@@ -1308,7 +1293,7 @@ async function Previsao({ lojas, ufTend, sufixo }: { lojas: string[] | null; ufT
         {teSemDados.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {teSemDados.map((uf) => (
-              <span key={uf} className="rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-600">{uf}</span>
+              <span key={uf} className="rounded-md border border-borda px-2 py-1 text-xs text-texto-2">{uf}</span>
             ))}
           </div>
         )}
@@ -1316,34 +1301,34 @@ async function Previsao({ lojas, ufTend, sufixo }: { lojas: string[] | null; ufT
 
       {/* Evolução do tempo de entrega por estado */}
       {ufSel && (
-        <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-6">
+        <div className="mt-6 rounded-2xl border border-borda bg-superficie p-6">
           <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-xl font-bold">Evolução da entrega no tempo</h2>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400">Estado:</span>
+              <span className="text-xs text-texto-2">Estado:</span>
               <SeletorEstado estados={porAmostra} atual={ufSel} baseUrl={`/financas?aba=previsao${sufixo}`} />
             </div>
           </div>
-          <p className="mb-5 text-xs text-slate-500">
+          <p className="mb-5 text-xs text-texto-2">
             Média de dias até a entrega em <b>{ufSel}</b>, por semana. Barra <b>menor = mais rápido</b> — dá pra ver se
             a logística vem melhorando ou piorando.
           </p>
           {evo.length === 0 ? (
-            <p className="text-slate-400">Sem dados suficientes pra {ufSel} ainda.</p>
+            <p className="text-texto-2">Sem dados suficientes pra {ufSel} ainda.</p>
           ) : (
             <div className="space-y-2">
               {evo.map((e) => (
                 <div key={e.semana} className="flex items-center gap-3">
-                  <span className="w-24 shrink-0 text-sm text-slate-400">{diaLabel(e.semana)}</span>
-                  <div className="h-6 flex-1 overflow-hidden rounded-md bg-slate-800">
+                  <span className="w-24 shrink-0 text-sm text-texto-2">{diaLabel(e.semana)}</span>
+                  <div className="h-6 flex-1 overflow-hidden rounded-md bg-superficie-2">
                     <div
-                      className="flex h-full items-center justify-end rounded-md bg-blue-600 pr-2 text-xs font-semibold text-white"
+                      className="flex h-full items-center justify-end rounded-md bg-primaria pr-2 text-xs font-semibold text-texto"
                       style={{ width: `${Math.max(10, (n(e.media_dias) / maxEvo) * 100)}%` }}
                     >
                       {e.media_dias}d
                     </div>
                   </div>
-                  <span className="w-16 shrink-0 text-right text-xs text-slate-500">{int(e.amostra)} ped.</span>
+                  <span className="w-16 shrink-0 text-right text-xs text-texto-2">{int(e.amostra)} ped.</span>
                 </div>
               ))}
             </div>
@@ -1356,27 +1341,9 @@ async function Previsao({ lojas, ufTend, sufixo }: { lojas: string[] | null; ufT
 
 // ---------------- UI helpers ----------------
 function Kpi({ label, val, hint, cor, trend }: { label: string; val: string; hint?: string; cor?: string; trend?: number | null }) {
-  return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-      <p className="text-sm text-slate-400">{label}</p>
-      <p className={`mt-2 text-2xl font-bold ${cor || "text-white"}`}>{val}</p>
-      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-        {trend != null && (
-          <span className={`text-xs font-semibold ${trend >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-            {trend >= 0 ? "▲" : "▼"} {Math.abs(trend).toFixed(0)}%
-          </span>
-        )}
-        {hint && <span className="text-xs text-slate-500">{hint}</span>}
-      </div>
-    </div>
-  );
+  return <KpiUi rotulo={label} valor={<span className={cor}>{val}</span>} variacao={trend ?? undefined} detalhe={hint} />;
 }
 function Chip({ cor, children }: { cor: "pos" | "neg" | "warn" | "info"; children: React.ReactNode }) {
-  const m = {
-    pos: "bg-emerald-900 text-emerald-300",
-    neg: "bg-red-900 text-red-300",
-    warn: "bg-amber-900 text-amber-300",
-    info: "bg-blue-900 text-blue-300",
-  } as const;
-  return <span className={`rounded-full px-3 py-1 text-xs font-semibold ${m[cor]}`}>{children}</span>;
+  const m = { pos: "verde", neg: "vermelho", warn: "amarelo", info: "azul" } as const;
+  return <ChipUi cor={m[cor]}>{children}</ChipUi>;
 }

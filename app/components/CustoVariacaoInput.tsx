@@ -36,7 +36,7 @@ export default function CustoVariacaoInput({
 
   return (
     <span className="inline-flex items-center gap-2">
-      <span className="text-slate-500">R$</span>
+      <span className="text-texto-2">R$</span>
       <input
         data-cvidx={idx}
         value={valor}
@@ -55,11 +55,11 @@ export default function CustoVariacaoInput({
         }}
         inputMode="decimal"
         placeholder="herda item"
-        className="w-24 rounded-lg border border-slate-700 bg-slate-800 px-2 py-1 text-right text-white focus:border-emerald-500 focus:outline-none"
+        className="w-24 rounded-lg border border-borda bg-superficie-2 px-2 py-1 text-right text-texto focus:border-primaria focus:outline-none"
       />
-      {estado === "salvando" && <span className="text-xs text-slate-400">…</span>}
-      {estado === "ok" && <span className="text-xs text-emerald-400">✓</span>}
-      {estado === "erro" && <span className="text-xs text-red-400">erro</span>}
+      {estado === "salvando" && <span className="text-xs text-texto-2">…</span>}
+      {estado === "ok" && <span className="text-xs text-sucesso">✓</span>}
+      {estado === "erro" && <span className="text-xs text-perigo">erro</span>}
     </span>
   );
 }

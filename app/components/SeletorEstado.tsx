@@ -17,7 +17,7 @@ export default function SeletorEstado({
       onChange={(e) => {
         window.location.href = `${baseUrl}&ufTend=${e.target.value}`;
       }}
-      className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm font-semibold text-white focus:border-emerald-500 focus:outline-none"
+      className="rounded-lg border border-borda bg-superficie-2 px-3 py-2 text-sm font-semibold text-texto focus:border-primaria focus:outline-none"
     >
       {estados.map((uf) => (
         <option key={uf} value={uf}>
