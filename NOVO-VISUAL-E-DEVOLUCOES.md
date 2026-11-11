@@ -135,7 +135,8 @@ Em `lib/formato.ts`: `brl()`, `pct()`, `numero()` e `prazoRelativo()` (ex.: "em 
 "vencida 2 h"). Os gráficos do Recharts (`DashboardCharts.tsx`) passam a ler as
 cores dos tokens, para funcionar nos dois temas.
 
-### [ ] A4. Migrar as telas existentes
+### [x] A4. Migrar as telas existentes
+> **Feito 11/11/2026:** uma tela por commit: Visão geral (reescrita com `Kpi`, `Card`, `Tabela`, chips), Finanças (abas, KPIs e chips pelo kit + 306 trocas de cor), Pedidos (+ filtro `?q=` da busca do topo), Saúde, Ads e as demais 16 (ads-controle, raio-x, insights, produtos, auditoria, alertas, uso, configuracoes, integracoes, sincronizacao, atendimento, avaliacoes, analytics, financeiro, lojas, login) mais os componentes compartilhados. Método: script de mapeamento classe antiga → token (`bg-slate-900` → `bg-superficie`, `text-slate-400` → `text-texto-2`, `text-emerald-300` → `text-sucesso`…) e normalização do cabeçalho (wrapper 1400 px, h1 22 px sem emoji, subtítulo 13 px, cartões com borda e raio 14). Nenhuma consulta mudou. Nenhuma classe de cor fixa sobrou em `app/`. Tema padrão sem cookie passou a **claro**. Conferido com `npm run build`; a conferência visual em 1280 px e nos dois temas fica com o Gabriel (eu não tenho navegador aqui): o que destoar, ajusto tela a tela.
 
 Uma tela por commit, nesta ordem: Visão geral (`/`, use `Visao.html`), Finanças (use
 `Financas.html` como direção: o bloco "Do preço ao lucro" é o DRE que já existe, com
