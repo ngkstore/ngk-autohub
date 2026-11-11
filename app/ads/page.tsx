@@ -83,19 +83,19 @@ export default async function AdsPage({ searchParams }: Props) {
   });
 
   const Kpi = ({ label, val, hint, cor }: { label: string; val: string; hint?: string; cor?: string }) => (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-      <p className="text-sm text-slate-400">{label}</p>
-      <p className={`mt-2 text-2xl font-bold ${cor || "text-white"}`}>{val}</p>
-      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
+    <div className="rounded-[14px] border border-borda bg-superficie p-5 shadow-cartao">
+      <p className="text-sm text-texto-2">{label}</p>
+      <p className={`mt-2 text-2xl font-bold ${cor || "text-texto"}`}>{val}</p>
+      {hint && <p className="mt-1 text-xs text-texto-2">{hint}</p>}
     </div>
   );
 
   return (
-    <div className="p-8 text-white">
+    <div className="mx-auto max-w-[1400px] p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-bold">📊 Ads</h1>
-          <p className="mt-2 max-w-xl text-slate-400">
+          <h1 className="text-[22px] font-bold tracking-[-0.01em] text-texto">Ads</h1>
+          <p className="mt-2 max-w-xl text-texto-2">
             Gasto, retorno e tendência dos anúncios (nível loja, direto da API da Shopee). A análise por anúncio fica no <b>Raio-X</b>.
           </p>
         </div>
@@ -103,43 +103,43 @@ export default async function AdsPage({ searchParams }: Props) {
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Kpi label="Gasto em Ads" val={brl(tot.gasto)} hint={labelPer} cor="text-orange-300" />
-        <Kpi label="ROAS efetivo" val={`${roasEfetivo.toFixed(1)}×`} hint={`faturamento real ÷ gasto · equilíbrio ≈ ${roasEquilibrio.toFixed(1)}×`} cor="text-emerald-300" />
-        <Kpi label="TACOS" val={`${tacosTot.toFixed(1)}%`} hint="gasto ÷ faturamento real" cor="text-blue-300" />
-        <Kpi label="Faturamento (real)" val={brl(tot.receita)} hint={`ROAS atribuído do Ads: ${roasAtribuido.toFixed(1)}×`} cor="text-violet-300" />
+        <Kpi label="Gasto em Ads" val={brl(tot.gasto)} hint={labelPer} cor="text-alerta" />
+        <Kpi label="ROAS efetivo" val={`${roasEfetivo.toFixed(1)}×`} hint={`faturamento real ÷ gasto · equilíbrio ≈ ${roasEquilibrio.toFixed(1)}×`} cor="text-sucesso" />
+        <Kpi label="TACOS" val={`${tacosTot.toFixed(1)}%`} hint="gasto ÷ faturamento real" cor="text-primaria" />
+        <Kpi label="Faturamento (real)" val={brl(tot.receita)} hint={`ROAS atribuído do Ads: ${roasAtribuido.toFixed(1)}×`} cor="text-chip-roxo-texto" />
       </div>
 
       {porDia.length > 0 && (
-        <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6">
+        <div className="mt-6 rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
           <div className="mb-1 flex flex-wrap items-baseline justify-between gap-3">
-            <h2 className="text-xl font-bold">Gasto por dia · {labelPer}</h2>
+            <h2 className="text-[15px] font-semibold text-texto">Gasto por dia · {labelPer}</h2>
             {diaPico && (
-              <span className="text-sm text-slate-400">
-                dia campeão: <b className="text-orange-300">{diaLabel(diaPico.dia)}</b> · {brl(diaPico.gasto)}
+              <span className="text-sm text-texto-2">
+                dia campeão: <b className="text-alerta">{diaLabel(diaPico.dia)}</b> · {brl(diaPico.gasto)}
               </span>
             )}
           </div>
-          <p className="mb-5 text-xs text-slate-500">Quanto entrou de gasto de anúncio em cada dia — pra ver picos e a evolução.</p>
+          <p className="mb-5 text-xs text-texto-2">Quanto entrou de gasto de anúncio em cada dia — pra ver picos e a evolução.</p>
           <div className="space-y-1.5">
             {porDia.map((d) => (
               <div key={d.dia} className="flex items-center gap-3">
-                <span className="w-24 shrink-0 text-xs text-slate-400">{diaLabel(d.dia)}</span>
-                <div className="h-5 flex-1 overflow-hidden rounded-md bg-slate-800">
+                <span className="w-24 shrink-0 text-xs text-texto-2">{diaLabel(d.dia)}</span>
+                <div className="h-5 flex-1 overflow-hidden rounded-md bg-superficie-2">
                   <div
                     className={`h-full rounded-md ${diaPico && d.dia === diaPico.dia ? "bg-orange-500" : "bg-orange-500/60"}`}
                     style={{ width: `${Math.max(2, (d.gasto / maxGasto) * 100)}%` }}
                   />
                 </div>
-                <span className="w-24 shrink-0 text-right text-xs tabular-nums text-slate-300">{brl(d.gasto)}</span>
+                <span className="w-24 shrink-0 text-right text-xs tabular-nums text-texto">{brl(d.gasto)}</span>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      <div className="mt-6 overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900">
+      <div className="mt-6 overflow-x-auto rounded-[14px] border border-borda bg-superficie shadow-cartao">
         <table className="w-full text-left text-sm">
-          <thead className="bg-slate-800 text-xs uppercase text-slate-400">
+          <thead className="bg-superficie-2 text-xs uppercase text-texto-2">
             <tr>
               <th className="p-3">Loja</th>
               <th className="p-3 text-right">Gasto</th>
@@ -152,14 +152,14 @@ export default async function AdsPage({ searchParams }: Props) {
           </thead>
           <tbody>
             {linhas.length === 0 ? (
-              <tr><td className="p-4 text-slate-400" colSpan={7}>Sem dados de Ads ainda — sincroniza em alguns minutos.</td></tr>
+              <tr><td className="p-4 text-texto-2" colSpan={7}>Sem dados de Ads ainda — sincroniza em alguns minutos.</td></tr>
             ) : linhas.map((l) => (
-              <tr key={l.loja} className="border-t border-slate-800">
+              <tr key={l.loja} className="border-t border-borda">
                 <td className="p-3">{l.loja}</td>
                 <td className="p-3 text-right">{brl(n(l.gasto))}</td>
                 <td className="p-3 text-right">{brl(n(l.receita))}</td>
-                <td className="p-3 text-right text-emerald-300">{n(l.roas_efetivo).toFixed(1)}×</td>
-                <td className={`p-3 text-right ${n(l.tacos) > 15 ? "text-red-300" : n(l.tacos) > 8 ? "text-orange-300" : "text-emerald-300"}`}>
+                <td className="p-3 text-right text-sucesso">{n(l.roas_efetivo).toFixed(1)}×</td>
+                <td className={`p-3 text-right ${n(l.tacos) > 15 ? "text-perigo" : n(l.tacos) > 8 ? "text-alerta" : "text-sucesso"}`}>
                   {n(l.tacos).toFixed(1)}%
                 </td>
                 <td className="p-3 text-right">{n(l.ctr).toFixed(2)}%</td>
@@ -170,7 +170,7 @@ export default async function AdsPage({ searchParams }: Props) {
         </table>
       </div>
 
-      <p className="mt-4 text-xs text-slate-500">
+      <p className="mt-4 text-xs text-texto-2">
         <b>ROAS efetivo</b> = faturamento REAL (pedidos pagos) ÷ gasto — usa seu número de verdade, não a atribuição do Ads
         (que costuma inflar; aqui o GMV atribuído chegou a passar o faturamento total). <b>TACOS</b> = gasto ÷ faturamento real.
         <b> Equilíbrio</b> ≈ {roasEquilibrio.toFixed(1)}× (margem de contribuição ~{(margemContrib * 100).toFixed(0)}%): abaixo

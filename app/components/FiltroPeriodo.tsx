@@ -29,12 +29,12 @@ export default function FiltroPeriodo() {
 
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <span className="text-sm text-slate-400">Período:</span>
+      <span className="text-sm text-texto-2">Período:</span>
 
       <select
         value={periodoAtual}
         onChange={(e) => alterarPeriodo(e.target.value)}
-        className="rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-sm text-white"
+        className="rounded-lg border border-borda bg-superficie px-4 py-2 text-sm text-texto"
       >
         <option value="todos">Todos</option>
         <option value="hoje">Hoje</option>

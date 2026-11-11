@@ -20,7 +20,7 @@ export default function AdsFiltros({
     window.location.href = `/ads?${params.toString()}`;
   };
   const cls =
-    "rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm font-semibold text-white focus:border-emerald-500 focus:outline-none";
+    "rounded-lg border border-borda bg-superficie-2 px-3 py-2 text-sm font-semibold text-texto focus:border-primaria focus:outline-none";
 
   return (
     <div className="flex flex-wrap items-center gap-2">
