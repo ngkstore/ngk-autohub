@@ -129,28 +129,35 @@ export async function coletarLivesTikTok(loja: LojaTikTok, dias = 7): Promise<{ 
   const erros: string[] = [];
   for (const tipo of TIPOS_CONTA) {
     try {
+      // ~500 lives de afiliados por dia: grava em lote (500 por upsert), não uma a uma
       const sessoes = await paginar(loja, "/analytics/202609/shop_lives/performance", { ...janela, account_type: tipo }, "live_stream_sessions");
-      for (const s of sessoes) {
-        const linha = mapearLive(s, loja.lojaId, tipo);
-        const { data: salvo, error } = await supabase.from("lives").upsert(linha, { onConflict: "canal,live_id" }).select("id").single();
-        if (error || !salvo) {
-          erros.push(`live ${linha.live_id}: ${error?.message}`);
+      const linhas = sessoes.map((s) => mapearLive(s, loja.lojaId, tipo));
+      const ids = new Map<string, string>();
+      for (let i = 0; i < linhas.length; i += 500) {
+        const { data, error } = await supabase.from("lives").upsert(linhas.slice(i, i + 500), { onConflict: "canal,live_id" }).select("id, live_id");
+        if (error) {
+          erros.push(`lives ${tipo}: ${error.message}`);
           continue;
         }
-        lives++;
-        if (!(linha.receita > 0)) continue; // produtos só nas lives que venderam (1.231 lives em 30 d: economiza chamadas)
+        for (const d of data || []) ids.set(String(d.live_id), d.id as string);
+        lives += data?.length ?? 0;
+      }
+      // produtos só nas lives que venderam
+      for (const l of linhas.filter((x) => x.receita > 0).slice(0, 150)) {
+        const uuid = ids.get(l.live_id);
+        if (!uuid) continue;
         try {
-          const r = await chamarTikTok(`/analytics/202512/shop/${encodeURIComponent(linha.live_id)}/products_performance`, { accessToken: loja.accessToken, shopCipher: loja.shopCipher, query: { page_size: "100" } });
+          const r = await chamarTikTok(`/analytics/202512/shop/${encodeURIComponent(l.live_id)}/products_performance`, { accessToken: loja.accessToken, shopCipher: loja.shopCipher, query: { page_size: "100" } });
           const itens = (r.data?.products as J[]) || [];
           if (itens.length) {
             await supabase.from("live_produtos").upsert(
-              itens.map((p) => ({ live_uuid: salvo.id, produto_id: String(p.id ?? p.product_id), sku: str(p.sku) ?? str(p.seller_sku), nome: str(p.name ?? p.product_name), receita: money(p.live_attributed_gmv) ?? money(p.gmv) ?? 0, pedidos: n(p.sku_orders) ?? n(p.orders) ?? 0, itens: n(p.items_sold) ?? 0, cliques: n(p.product_clicks), impressoes: n(p.product_impressions), bruto: p })),
+              itens.map((p) => ({ live_uuid: uuid, produto_id: String(p.id ?? p.product_id), sku: str(p.sku) ?? str(p.seller_sku), nome: str(p.name ?? p.product_name), receita: money(p.live_attributed_gmv) ?? money(p.gmv) ?? 0, pedidos: n(p.sku_orders) ?? n(p.orders) ?? 0, itens: n(p.items_sold) ?? 0, cliques: n(p.product_clicks), impressoes: n(p.product_impressions), bruto: p })),
               { onConflict: "live_uuid,produto_id" }
             );
             produtos += itens.length;
           }
         } catch (e) {
-          erros.push(`produtos da live ${linha.live_id}: ${e instanceof Error ? e.message : e}`);
+          erros.push(`produtos da live ${l.live_id}: ${e instanceof Error ? e.message : e}`);
         }
       }
     } catch (e) {
