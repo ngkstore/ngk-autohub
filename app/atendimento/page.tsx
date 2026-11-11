@@ -96,14 +96,14 @@ export default async function AtendimentoPage({
   }
 
   return (
-    <div className="p-8 text-white">
-      <h1 className="text-4xl font-bold">Atendimento Pendente</h1>
-      <p className="mt-2 text-slate-400">
+    <div className="mx-auto max-w-[1400px] p-6">
+      <h1 className="text-[22px] font-bold tracking-[-0.01em] text-texto">Atendimento Pendente</h1>
+      <p className="mt-0.5 text-[13px] text-texto-2">
         Chats que o robô escalou e precisam de você. Edite a sugestão se quiser e
         envie, ou marque como resolvido.
       </p>
 
-      <div className="mt-4 inline-block rounded-full bg-yellow-900 px-4 py-1 text-sm font-semibold text-yellow-300">
+      <div className="mt-4 inline-block rounded-full bg-chip-amarelo-fundo px-4 py-1 text-sm font-semibold text-alerta">
         {escalados.length} pendente(s)
       </div>
 
@@ -121,33 +121,33 @@ export default async function AtendimentoPage({
             return (
               <div
                 key={`${c.marketplace}:${c.conversation_id}`}
-                className="rounded-xl bg-slate-900 p-5"
+                className="rounded-xl bg-superficie p-5"
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-bold">{c.to_name || "Cliente"}</span>
-                  <span className="rounded-full bg-cyan-900 px-2 py-0.5 text-xs text-cyan-200">
+                  <span className="rounded-full bg-chip-ceu-fundo px-2 py-0.5 text-xs text-chip-ceu-texto">
                     {c.marketplace === "tiktok_shop" ? "TikTok" : "Shopee"}
                     {c.loja_id && mapaLojas.get(c.loja_id)
                       ? ` · ${mapaLojas.get(c.loja_id)}`
                       : ""}
                   </span>
                   {c.categoria && (
-                    <span className="rounded-full bg-slate-700 px-2 py-0.5 text-xs text-slate-200">
+                    <span className="rounded-full bg-chip-cinza-fundo px-2 py-0.5 text-xs text-texto">
                       {c.categoria}
                     </span>
                   )}
                   {c.marketplace !== "tiktok_shop" && (
-                    <span className="text-xs text-orange-300">{produto}</span>
+                    <span className="text-xs text-alerta">{produto}</span>
                   )}
                 </div>
 
-                <p className="mt-3 text-slate-300">
-                  <strong className="text-slate-400">Cliente:</strong>{" "}
+                <p className="mt-3 text-texto">
+                  <strong className="text-texto-2">Cliente:</strong>{" "}
                   {pergunta}
                 </p>
 
                 {aguardaHumano(c) ? (
-                  <p className="mt-1 text-xs text-yellow-300">
+                  <p className="mt-1 text-xs text-alerta">
                     O robô já avisou o cliente que alguém da equipe vai
                     responder
                     {c.resposta_ia ? `: “${c.resposta_ia}”` : "."} Ele está
@@ -155,7 +155,7 @@ export default async function AtendimentoPage({
                   </p>
                 ) : (
                   c.resposta_ia && (
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-texto-2">
                       Sugestão da IA pré-carregada abaixo (edite se quiser).
                     </p>
                   )
@@ -170,7 +170,7 @@ export default async function AtendimentoPage({
             );
           })
         ) : (
-          <div className="rounded-xl bg-slate-900 p-6 text-slate-400">
+          <div className="rounded-xl bg-superficie p-6 text-texto-2">
             Nenhum atendimento pendente. 🎉 O robô está dando conta!
           </div>
         )}
