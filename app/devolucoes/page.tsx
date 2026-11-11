@@ -77,8 +77,8 @@ export default async function DevolucoesPage({ searchParams }: { searchParams: P
         <Kpi icone="auditoria" cor="ceu" rotulo="Disputas ganhas" valor={ganhas + perdidas ? `${Math.round((ganhas / (ganhas + perdidas)) * 100)}%` : "—"} detalhe={`${brl(recuperado, 0)} recuperados`} />
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <Card className="xl:col-span-2" semPadding>
+      <div className="mt-6 space-y-6">
+        <Card semPadding>
           <Tabs className="px-[18px]" abas={ABAS_FILA.map((a) => ({ id: a.id, nome: a.nome, contador: contagem[a.id], href: qs({ aba: a.id }) }))} ativa={aba} />
           <div className="flex flex-wrap items-center gap-2 px-[18px] py-3">
             <Segmentado rotulo="Motivo" ativa={params.motivo || "todos"} opcoes={[{ id: "todos", nome: "Todos os motivos", href: qs({ motivo: undefined }) }, ...MOTIVOS.map((m) => ({ id: m.id, nome: m.nome, href: qs({ motivo: m.id }) }))]} />
@@ -138,7 +138,7 @@ export default async function DevolucoesPage({ searchParams }: { searchParams: P
           )}
         </Card>
 
-        <div className="space-y-6">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
           <Card>
             <CardHeader titulo="Hoje o assistente fez" />
             {feito.length === 0 ? (
