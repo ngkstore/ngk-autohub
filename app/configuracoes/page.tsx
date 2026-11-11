@@ -1,7 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import ConfiguracoesForm from "../components/ConfiguracoesForm";
 import DevolucoesConfigForm from "../components/DevolucoesConfigForm";
-import DevolucoesConfigForm from "../components/DevolucoesConfigForm";
 
 export default async function ConfiguracoesPage() {
   const { data: lojas } = await supabase
