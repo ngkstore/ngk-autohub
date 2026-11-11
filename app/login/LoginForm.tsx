@@ -40,38 +40,38 @@ export default function LoginForm() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950 p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-fundo p-6">
       <form
         onSubmit={entrar}
-        className="w-full max-w-sm rounded-2xl border border-slate-800 bg-slate-900 p-8 text-white"
+        className="w-full max-w-sm rounded-2xl border border-borda bg-superficie p-8 text-texto"
       >
         <h1 className="text-3xl font-bold">NGK AutoHub</h1>
-        <p className="mt-1 text-sm text-slate-400">
+        <p className="mt-1 text-sm text-texto-2">
           Entre com sua conta para acessar o sistema.
         </p>
 
-        <label className="mt-6 block text-sm text-slate-300">E-mail</label>
+        <label className="mt-6 block text-sm text-texto">E-mail</label>
         <input
           type="email"
           required
           autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-white outline-none focus:border-cyan-500"
+          className="mt-1 w-full rounded-lg border border-borda bg-superficie-2 px-4 py-2 text-texto outline-none focus:border-primaria"
         />
 
-        <label className="mt-4 block text-sm text-slate-300">Senha</label>
+        <label className="mt-4 block text-sm text-texto">Senha</label>
         <input
           type="password"
           required
           autoComplete="current-password"
           value={senha}
           onChange={(e) => setSenha(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-white outline-none focus:border-cyan-500"
+          className="mt-1 w-full rounded-lg border border-borda bg-superficie-2 px-4 py-2 text-texto outline-none focus:border-primaria"
         />
 
         {erro && (
-          <p className="mt-4 rounded-lg bg-red-900/60 px-3 py-2 text-sm text-red-200">
+          <p className="mt-4 rounded-lg bg-chip-vermelho-fundo/60 px-3 py-2 text-sm text-perigo">
             {erro}
           </p>
         )}
@@ -79,7 +79,7 @@ export default function LoginForm() {
         <button
           type="submit"
           disabled={carregando}
-          className="mt-6 w-full rounded-xl bg-cyan-600 px-4 py-2.5 font-semibold text-white hover:bg-cyan-500 disabled:opacity-50"
+          className="mt-6 w-full rounded-xl bg-primaria px-4 py-2.5 font-semibold text-texto hover:bg-primaria-hover disabled:opacity-50"
         >
           {carregando ? "Entrando..." : "Entrar"}
         </button>
