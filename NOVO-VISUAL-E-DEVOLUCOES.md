@@ -167,7 +167,8 @@ Estas são as telas de referência:
 Etapas de um caso, que é a coluna `etapa`: `solicitado → resposta → voltando →
 recebido → inspecao → decisao → encerrado`.
 
-### [ ] B0. Verificações antes de codar **[PERGUNTAR]**
+### [x] B0. Verificações antes de codar **[PERGUNTAR]**
+> **Feito 11/11/2026 (Gabriel autorizou seguir o plano inteiro):** Shopee `returns` **liberado** na NGK (`/api/shopee/devolucoes/sondar?loja=…&dias=15`, só leitura: `get_return_list` + `get_return_detail` + `get_available_solutions`; janela máxima de 15 dias por consulta). TikTok: `returns/search`, `cancellations/search` e `returns/{id}/records` respondem `code 0`; `aftersales/search` exige `filters` no corpo. Bucket privado `devolucoes` criado pela migration 0011 (limite 250 MB por arquivo). Crons: 29 de 40 do plano Pro, cabe o novo. E-mail da disputa: Gabriel não usa e-mail no processo; a API exige um, então vai o e-mail de login da loja, editável em Configurações (B3). Fixtures reais não foram copiadas para o repo (trazem nome de usuário e e-mail mascarado do comprador); os testes usam exemplos anonimizados.
 
 - **Shopee:** confirmar que o app tem permissão do módulo `returns`. Crie uma rota de
   teste só para admin que chama `v2.returns.get_return_list` (page_size 10) na NGK01.
@@ -181,7 +182,8 @@ recebido → inspecao → decisao → encerrado`.
 - **E-mail da disputa Shopee:** o `v2.returns.dispute` exige um e-mail. Pergunte qual
   usar e guarde em Configurações.
 
-### [ ] B1. Banco — `0011_devolucoes.sql`
+### [x] B1. Banco — `0011_devolucoes.sql`
+> **Feito 11/11/2026:** `devolucoes`, `devolucao_eventos` (com `chave` única para idempotência), `devolucao_midias`, `devolucao_inspecoes`, `regras_devolucao`, `devolucao_aprovacoes` (com `idempotency_key`), `compradores_risco`; índices pedidos; RLS ligado em todas; bucket `devolucoes`; trigger de `atualizado_em`. Aplicada no banco.
 
 Tabelas, todas com RLS ligado, acesso só pelo servidor com a service role.
 
