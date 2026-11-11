@@ -22,8 +22,8 @@ type Late = { loja_id: string; dia: string; order_sn: string; shipping_deadline:
 type Iss = { loja_id: string; dia: string; item_id: number; reason: number | null };
 
 const COR_RATING: Record<number, string> = {
-  1: "bg-chip-vermelho-fundo/60 text-perigo border-chip-vermelho-fundo", 2: "bg-chip-laranja-fundo/60 text-alerta border-orange-800",
-  3: "bg-chip-verde-fundo text-sucesso border-chip-verde-fundo", 4: "bg-emerald-800/60 text-emerald-100 border-chip-verde-fundo",
+  1: "bg-chip-vermelho-fundo/60 text-perigo border-chip-vermelho-fundo", 2: "bg-chip-laranja-fundo/60 text-alerta border-chip-laranja-fundo",
+  3: "bg-chip-verde-fundo text-sucesso border-chip-verde-fundo", 4: "bg-chip-verde-fundo text-chip-verde-texto border-chip-verde-fundo",
 };
 const dt = (s: string | null) => (s ? new Date(s).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "—");
 const dth = (s: string | null) =>
@@ -136,7 +136,7 @@ export default async function SaudePage({ searchParams }: Props) {
             {pAtivas.length > 0 && (
               <div className="mt-4 space-y-2">
                 {pAtivas.map((p, i) => (
-                  <div key={i} className="rounded-xl border border-red-900 bg-chip-vermelho-fundo/40 px-4 py-3 text-sm text-perigo">
+                  <div key={i} className="rounded-xl border border-chip-vermelho-fundo bg-chip-vermelho-fundo/40 px-4 py-3 text-sm text-perigo">
                     ⛔ Punição em vigor: <b>{PUNICAO_PT[p.punishment_type] || `tipo ${p.punishment_type}`}</b> desde {dt(p.start_time)}
                     {p.end_time ? ` até ${dt(p.end_time)}` : ""}
                     {p.order_limit ? ` · limite de pedidos ${p.order_limit}%` : ""}

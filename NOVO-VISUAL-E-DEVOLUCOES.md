@@ -493,8 +493,8 @@ Siga o `Main.html`:
 
 Depois, coloque "Painel do dia" no menu (grupo Visão).
 
-### [x] C3. Resumo no Telegram **[PERGUNTAR antes de mexer no `vercel.json`]**
-> **Feito 11/11/2026:** sem cron novo: o cron de 15 min das devoluções chama `enviarResumoSeForHora()` e envia às 8 h e 14 h (America/Sao_Paulo) os números de Agora/Hoje, as 5 pendências mais urgentes e o link; registro em `saude_alertas` (chave `painel_resumo:<dia>:<hora>`) evita duplicidade. Botão manual na tela.
+### [ ] C3. Resumo no Telegram **[PERGUNTAR antes de mexer no `vercel.json`]**
+> **Fora desta rodada (revisão de 12/11/2026):** botão e texto retirados do painel e o envio automático desligado; o código ficou em `lib/painel/resumoTelegram.ts` para quando for liberado. Do que havia sido feito: sem cron novo: o cron de 15 min das devoluções chama `enviarResumoSeForHora()` e envia às 8 h e 14 h (America/Sao_Paulo) os números de Agora/Hoje, as 5 pendências mais urgentes e o link; registro em `saude_alertas` (chave `painel_resumo:<dia>:<hora>`) evita duplicidade. Botão manual na tela.
 
 Às 8 h e às 14 h (America/Sao_Paulo), mande pelo `enviarTelegram`:
 - os números de Agora e Hoje;

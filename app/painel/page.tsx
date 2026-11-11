@@ -48,7 +48,7 @@ export default async function PainelPage({ searchParams }: { searchParams: Promi
           <h1 className="text-[22px] font-bold tracking-[-0.01em] text-texto">Painel do dia</h1>
           <p className="mt-0.5 text-[13px] capitalize text-texto-2">{hoje} · tudo que tem prazo, do mais urgente ao menos</p>
         </div>
-        <PainelAcoes admin={escopo.admin} />
+        <PainelAcoes />
       </div>
 
       <div className="grid grid-cols-2 gap-3.5 md:grid-cols-4">
@@ -129,7 +129,6 @@ export default async function PainelPage({ searchParams }: { searchParams: Promi
                 <Chip cor={i.ok ? "verde" : "vermelho"}>{i.texto}</Chip>
               </div>
             ))}
-            <p className="mt-2 text-[11px] text-texto-2">Resumo no Telegram às 08:00 e 14:00.</p>
           </Card>
         </div>
       </div>
