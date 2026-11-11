@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { enviarTelegram } from "@/lib/telegram";
 import { configDevolucoes, contaDaLoja } from "@/lib/devolucoes/config";
+import { getFlagConta } from "@/lib/flags";
 import { avaliarRegras, type ContextoCaso, type Regra } from "@/lib/devolucoes/regras";
 import { sugerir, type CasoAssistente, type Sugestao } from "@/lib/devolucoes/assistente";
 import { atualizarRiscoCompradores, riscoDoComprador } from "@/lib/devolucoes/risco";
@@ -86,6 +87,7 @@ export async function processarDevolucoes(opts: { lojaId?: string; orcamentoMs?:
   const r = { casos: 0, sugestoes: 0, regras: 0, executadas: 0, aprovacoes_pedidas: 0, alertas: 0, inspecoes: 0, erros: 0, ultimo_erro: undefined as string | undefined };
 
   const cfgPorConta = new Map<string, Awaited<ReturnType<typeof configDevolucoes>>>();
+  const modoPorConta = new Map<string, "sugerir" | "aprovar">(); // modo do assistente (Regras e assistente)
   const regrasPorConta = new Map<string, Regra[]>();
   const contaPorLoja = new Map<string, string | null>();
   const cfgDe = async (lojaId: string) => {
@@ -93,7 +95,8 @@ export async function processarDevolucoes(opts: { lojaId?: string; orcamentoMs?:
     const conta = contaPorLoja.get(lojaId) || "";
     if (!cfgPorConta.has(conta)) cfgPorConta.set(conta, await configDevolucoes(conta));
     if (!regrasPorConta.has(conta)) regrasPorConta.set(conta, await regrasDaConta(conta || null));
-    return { conta, cfg: cfgPorConta.get(conta)!, regras: regrasPorConta.get(conta)! };
+    if (!modoPorConta.has(conta)) modoPorConta.set(conta, conta && (await getFlagConta("devolucoes_modo_assistente", conta)) ? "aprovar" : "sugerir");
+    return { conta, cfg: cfgPorConta.get(conta)!, regras: regrasPorConta.get(conta)!, modo: modoPorConta.get(conta)! };
   };
 
   // 1. risco (limite da primeira conta; as contas usam o mesmo padrão)
@@ -121,7 +124,7 @@ export async function processarDevolucoes(opts: { lojaId?: string; orcamentoMs?:
     if (estourou()) break;
     r.casos++;
     try {
-      const { cfg, regras } = await cfgDe(c.loja_id);
+      const { cfg, regras, modo } = await cfgDe(c.loja_id);
       const ctx = await contextoRegras(c);
 
       // 3a. prazo crítico → alerta (uma vez por prazo)
@@ -183,12 +186,13 @@ export async function processarDevolucoes(opts: { lojaId?: string; orcamentoMs?:
       }
 
       // assistente (só quando não há sugestão ou o caso mudou), com teto por rodada
-      if (mudou && sugestoesFeitas < (opts.maxSugestoes ?? 20)) {
+      if (mudou && sugestoesFeitas < (opts.maxSugestoes ?? 10)) {
         const s = await sugerir(c);
         sugestoesFeitas++;
         r.sugestoes++;
-        // Sugestão com confiança alta/média que não seja "aguardar": pede aprovação no Telegram
-        if (s.decisao !== "aguardar" && s.confianca !== "baixa" && (c.etapa === "resposta" || c.etapa === "decisao")) {
+        // Modo "pedir aprovação": sugestão com confiança alta/média (não "aguardar") vai ao Telegram.
+        // Modo "só sugerir" (padrão): fica na fila e no caso.
+        if (modo === "aprovar" && s.decisao !== "aguardar" && s.confianca !== "baixa" && (c.etapa === "resposta" || c.etapa === "decisao")) {
           await pedirAprovacaoTelegram({ ...c, sugestao: s }, acaoDaSugestao(s), "assistente");
           r.aprovacoes_pedidas++;
         }
