@@ -138,6 +138,7 @@ export async function coletarLivesTikTok(loja: LojaTikTok, dias = 7): Promise<{ 
           continue;
         }
         lives++;
+        if (!(linha.receita > 0)) continue; // produtos só nas lives que venderam (1.231 lives em 30 d: economiza chamadas)
         try {
           const r = await chamarTikTok(`/analytics/202512/shop/${encodeURIComponent(linha.live_id)}/products_performance`, { accessToken: loja.accessToken, shopCipher: loja.shopCipher, query: { page_size: "100" } });
           const itens = (r.data?.products as J[]) || [];
