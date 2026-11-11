@@ -27,17 +27,17 @@ const ROTULO: Record<string, string> = {
   retomar_meta: "Retomar meta anterior",
 };
 const COR: Record<string, string> = {
-  campeao: "text-emerald-300", pronto_proximo_degrau: "text-emerald-300", abaixo_do_minimo: "text-red-300", retomar_meta: "text-red-300",
-  aprendizado: "text-blue-300", estabilizacao: "text-blue-300", sem_margem: "text-slate-400", saudavel: "text-slate-300",
-  orcamento_esgotando: "text-amber-300",
+  campeao: "text-sucesso", pronto_proximo_degrau: "text-sucesso", abaixo_do_minimo: "text-perigo", retomar_meta: "text-perigo",
+  aprendizado: "text-primaria", estabilizacao: "text-primaria", sem_margem: "text-texto-2", saudavel: "text-texto",
+  orcamento_esgotando: "text-alerta",
 };
 
 function Kpi({ label, val, hint, cor }: { label: string; val: string; hint?: string; cor?: string }) {
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
-      <p className="text-xs text-slate-400">{label}</p>
-      <p className={`mt-1 text-xl font-bold ${cor || "text-white"}`}>{val}</p>
-      {hint && <p className="mt-1 text-[11px] text-slate-500">{hint}</p>}
+    <div className="rounded-[14px] border border-borda bg-superficie p-4 shadow-cartao">
+      <p className="text-xs text-texto-2">{label}</p>
+      <p className={`mt-1 text-xl font-bold ${cor || "text-texto"}`}>{val}</p>
+      {hint && <p className="mt-1 text-[11px] text-texto-2">{hint}</p>}
     </div>
   );
 }
@@ -65,9 +65,9 @@ export default async function AdsItemPage({ searchParams }: Props) {
   const escopo = await escopoDoUsuario();
   if (!lojaId || !Number.isFinite(itemId) || !podeVerLoja(escopo, lojaId)) {
     return (
-      <div className="p-8 text-white">
-        <Link href="/ads-controle" className="text-sm text-slate-400 hover:text-white">← Controle de Ads</Link>
-        <p className="mt-6 text-slate-400">Item não encontrado ou loja fora da sua conta.</p>
+      <div className="mx-auto max-w-[1400px] p-6">
+        <Link href="/ads-controle" className="text-sm text-texto-2 hover:text-texto">← Controle de Ads</Link>
+        <p className="mt-6 text-texto-2">Item não encontrado ou loja fora da sua conta.</p>
       </div>
     );
   }
@@ -130,8 +130,8 @@ export default async function AdsItemPage({ searchParams }: Props) {
   const reforcoHoje = reforcos.find((r) => String(r.dia) === hoje && !r.revertido_em) || null;
 
   return (
-    <div className="p-8 text-white">
-      <Link href={`/ads-controle?loja=${lojaId}`} className="text-sm text-slate-400 hover:text-white">← Controle de Ads · {nomeLoja}</Link>
+    <div className="mx-auto max-w-[1400px] p-6">
+      <Link href={`/ads-controle?loja=${lojaId}`} className="text-sm text-texto-2 hover:text-texto">← Controle de Ads · {nomeLoja}</Link>
 
       {/* Cabeçalho do produto */}
       <div className="mt-4 flex flex-wrap items-start gap-5">
@@ -141,18 +141,18 @@ export default async function AdsItemPage({ searchParams }: Props) {
         ) : null}
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-bold">{nome}</h1>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-texto-2">
             item {itemId} · campanha {campaignId || "—"} · {cfg ? `${String(cfg.status)} desde ${cfg.data_inicio ? diaBr(String(cfg.data_inicio)) : "—"}` : "sem config"}
             {prod?.categoria ? ` · ${String(prod.categoria)}` : ""}
           </p>
           <div className="mt-3 flex flex-wrap gap-2 text-xs">
-            <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1">Meta ROAS <b>{metaAtual != null ? x1(metaAtual) : "—"}</b></span>
-            <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1">Orçamento/dia <b>{orcAtual != null ? (orcAtual === 0 ? "sem limite" : brl(orcAtual)) : "—"}</b></span>
-            {prod?.preco != null && <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1">Preço <b>{brl2(prod.preco)}</b></span>}
-            {prod?.custo != null && <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1">Custo <b>{brl2(prod.custo)}</b></span>}
-            {prod?.estoque != null && <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1">Estoque <b>{int(prod.estoque)}</b></span>}
+            <span className="rounded-full border border-borda bg-superficie px-3 py-1">Meta ROAS <b>{metaAtual != null ? x1(metaAtual) : "—"}</b></span>
+            <span className="rounded-full border border-borda bg-superficie px-3 py-1">Orçamento/dia <b>{orcAtual != null ? (orcAtual === 0 ? "sem limite" : brl(orcAtual)) : "—"}</b></span>
+            {prod?.preco != null && <span className="rounded-full border border-borda bg-superficie px-3 py-1">Preço <b>{brl2(prod.preco)}</b></span>}
+            {prod?.custo != null && <span className="rounded-full border border-borda bg-superficie px-3 py-1">Custo <b>{brl2(prod.custo)}</b></span>}
+            {prod?.estoque != null && <span className="rounded-full border border-borda bg-superficie px-3 py-1">Estoque <b>{int(prod.estoque)}</b></span>}
             {janela && (
-              <span className={`rounded-full border border-slate-700 bg-slate-900 px-3 py-1 ${janela === "livre" ? "text-slate-400" : "text-blue-300"}`}>
+              <span className={`rounded-full border border-borda bg-superficie px-3 py-1 ${janela === "livre" ? "text-texto-2" : "text-primaria"}`}>
                 🕐 {janela}{janela !== "livre" ? ` · faltam ${n(rec?.dias_restantes_janela)}d` : ""}
               </span>
             )}
@@ -162,34 +162,34 @@ export default async function AdsItemPage({ searchParams }: Props) {
 
       {/* Recomendação do dia */}
       {rec ? (
-        <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-5">
-          <p className="text-xs text-slate-400">Recomendação de hoje</p>
-          <p className={`mt-1 text-lg font-bold ${COR[String(rec.classificacao)] || "text-orange-300"}`}>{ROTULO[String(rec.classificacao)] || String(rec.classificacao)}</p>
-          <p className="mt-1 text-sm text-slate-200">{String(rec.acao)}</p>
-          <p className="mt-1 text-xs text-slate-500">{String(rec.detalhe || "")}{rec.motivo_supressao ? ` · ${String(rec.motivo_supressao)}` : ""}{rec.status === "aplicada" ? " · ✓ aplicada hoje" : ""}</p>
+        <div className="mt-6 rounded-[14px] border border-borda bg-superficie p-5 shadow-cartao">
+          <p className="text-xs text-texto-2">Recomendação de hoje</p>
+          <p className={`mt-1 text-lg font-bold ${COR[String(rec.classificacao)] || "text-alerta"}`}>{ROTULO[String(rec.classificacao)] || String(rec.classificacao)}</p>
+          <p className="mt-1 text-sm text-texto">{String(rec.acao)}</p>
+          <p className="mt-1 text-xs text-texto-2">{String(rec.detalhe || "")}{rec.motivo_supressao ? ` · ${String(rec.motivo_supressao)}` : ""}{rec.status === "aplicada" ? " · ✓ aplicada hoje" : ""}</p>
           <div className="mt-3 flex flex-wrap gap-2 text-xs">
-            <span className="rounded-full border border-slate-700 px-3 py-1">ROAS real <b>{x1(rec.roas_real)}</b> (Shopee {x1(rec.roas_shopee)} × fator {n(rec.fator).toFixed(3)})</span>
-            <span className="rounded-full border border-slate-700 px-3 py-1">ROAS mínimo <b>{rec.roas_minimo != null ? x1(rec.roas_minimo) : "—"}</b></span>
-            <span className="rounded-full border border-slate-700 px-3 py-1">Meta calculada <b>{metaCalc != null ? x1(metaCalc) : "—"}</b></span>
-            <span className="rounded-full border border-slate-700 px-3 py-1">Orçamento ideal <b>{rec.orcamento_ideal != null ? brl(rec.orcamento_ideal) : "—"}</b>{rec.censurado_teto ? " (no teto)" : ""} · gasto normal/dia: 28d {rec.gasto_medio_normal_28d != null ? brl(rec.gasto_medio_normal_28d) : "—"} · 7d {rec.gasto_medio_normal_7d != null ? brl(rec.gasto_medio_normal_7d) : "—"}</span>
-            {rec.promo ? <span className="rounded-full border border-amber-700 px-3 py-1 text-amber-300">🏷️ em promoção</span> : null}
+            <span className="rounded-full border border-borda px-3 py-1">ROAS real <b>{x1(rec.roas_real)}</b> (Shopee {x1(rec.roas_shopee)} × fator {n(rec.fator).toFixed(3)})</span>
+            <span className="rounded-full border border-borda px-3 py-1">ROAS mínimo <b>{rec.roas_minimo != null ? x1(rec.roas_minimo) : "—"}</b></span>
+            <span className="rounded-full border border-borda px-3 py-1">Meta calculada <b>{metaCalc != null ? x1(metaCalc) : "—"}</b></span>
+            <span className="rounded-full border border-borda px-3 py-1">Orçamento ideal <b>{rec.orcamento_ideal != null ? brl(rec.orcamento_ideal) : "—"}</b>{rec.censurado_teto ? " (no teto)" : ""} · gasto normal/dia: 28d {rec.gasto_medio_normal_28d != null ? brl(rec.gasto_medio_normal_28d) : "—"} · 7d {rec.gasto_medio_normal_7d != null ? brl(rec.gasto_medio_normal_7d) : "—"}</span>
+            {rec.promo ? <span className="rounded-full border border-chip-amarelo-fundo px-3 py-1 text-alerta">🏷️ em promoção</span> : null}
           </div>
         </div>
       ) : (
-        <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-5 text-sm text-slate-400">Sem recomendação hoje (item sem gasto nos últimos 7 dias ou campanha inativa).</div>
+        <div className="mt-6 rounded-[14px] border border-borda bg-superficie p-5 shadow-cartao text-sm text-texto-2">Sem recomendação hoje (item sem gasto nos últimos 7 dias ou campanha inativa).</div>
       )}
 
       {/* Avaliação pós-degrau: como o anúncio se moveu depois da última troca de meta */}
       {degrau && (
-        <div className={`mt-4 rounded-2xl border p-5 ${degrau.veredito === "regrediu" ? "border-red-800 bg-red-950/30" : "border-slate-800 bg-slate-900"}`}>
-          <p className="text-xs text-slate-400">Movimento após a troca de meta {x1(degrau.meta_antes)} → {x1(degrau.meta_depois)} em {diaBr(String(degrau.data_troca))} ({int(degrau.dias_depois)} dias depois)</p>
+        <div className={`mt-4 rounded-2xl border p-5 ${degrau.veredito === "regrediu" ? "border-chip-vermelho-fundo bg-chip-vermelho-fundo/30" : "border-borda bg-superficie"}`}>
+          <p className="text-xs text-texto-2">Movimento após a troca de meta {x1(degrau.meta_antes)} → {x1(degrau.meta_depois)} em {diaBr(String(degrau.data_troca))} ({int(degrau.dias_depois)} dias depois)</p>
           <div className="mt-2 grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
-            <div><p className="text-[11px] text-slate-500">GMV/dia</p><p className="tabular-nums">{brl(degrau.gmv_dia_antes)} → <b>{brl(degrau.gmv_dia_depois)}</b></p></div>
-            <div><p className="text-[11px] text-slate-500">Gasto/dia</p><p className="tabular-nums">{brl(degrau.gasto_dia_antes)} → <b>{brl(degrau.gasto_dia_depois)}</b></p></div>
-            <div><p className="text-[11px] text-slate-500">ROAS Shopee</p><p className="tabular-nums">{x1(degrau.roas_antes)} → <b>{x1(degrau.roas_depois)}</b></p></div>
-            <div><p className="text-[11px] text-slate-500">Lucro/dia estimado</p><p className="tabular-nums">{brl(degrau.lucro_dia_antes)} → <b>{brl(degrau.lucro_dia_depois)}</b></p></div>
+            <div><p className="text-[11px] text-texto-2">GMV/dia</p><p className="tabular-nums">{brl(degrau.gmv_dia_antes)} → <b>{brl(degrau.gmv_dia_depois)}</b></p></div>
+            <div><p className="text-[11px] text-texto-2">Gasto/dia</p><p className="tabular-nums">{brl(degrau.gasto_dia_antes)} → <b>{brl(degrau.gasto_dia_depois)}</b></p></div>
+            <div><p className="text-[11px] text-texto-2">ROAS Shopee</p><p className="tabular-nums">{x1(degrau.roas_antes)} → <b>{x1(degrau.roas_depois)}</b></p></div>
+            <div><p className="text-[11px] text-texto-2">Lucro/dia estimado</p><p className="tabular-nums">{brl(degrau.lucro_dia_antes)} → <b>{brl(degrau.lucro_dia_depois)}</b></p></div>
           </div>
-          <p className={`mt-2 text-xs ${degrau.veredito === "regrediu" ? "text-red-300" : "text-slate-400"}`}>
+          <p className={`mt-2 text-xs ${degrau.veredito === "regrediu" ? "text-perigo" : "text-texto-2"}`}>
             {degrau.veredito === "regrediu"
               ? "Perdeu volume e lucro depois de subir a meta: vale voltar à meta anterior pra reaquecer o público."
               : degrau.veredito === "volume_caiu_lucro_ok"
@@ -202,30 +202,30 @@ export default async function AdsItemPage({ searchParams }: Props) {
 
       {/* Reforço automático do dia */}
       {reforcoHoje && (
-        <div className="mt-4 rounded-2xl border border-amber-800 bg-amber-950/20 p-4 text-sm">
+        <div className="mt-4 rounded-2xl border border-chip-amarelo-fundo bg-chip-amarelo-fundo p-4 text-sm">
           ⚡ <b>Reforço automático ativo hoje:</b> orçamento base {brl(reforcoHoje.orcamento_base)} → atual <b>{brl(reforcoHoje.orcamento_atual)}</b> ({int(reforcoHoje.reforcos)}× reforço). Volta ao base à meia-noite.
           {Array.isArray(reforcoHoje.historico) && (reforcoHoje.historico as Row[]).length > 0 && (
-            <span className="text-xs text-slate-400"> · {(reforcoHoje.historico as Row[]).map((h) => `${h.hora}h: ${brl(h.de)}→${brl(h.para)} (gasto ${brl(h.gasto)}, ROAS ${x1(h.roas_hoje)})`).join(" · ")}</span>
+            <span className="text-xs text-texto-2"> · {(reforcoHoje.historico as Row[]).map((h) => `${h.hora}h: ${brl(h.de)}→${brl(h.para)} (gasto ${brl(h.gasto)}, ROAS ${x1(h.roas_hoje)})`).join(" · ")}</span>
           )}
         </div>
       )}
       {!reforcoHoje && reforcos.length > 0 && (
-        <p className="mt-3 text-xs text-slate-500">⚡ Reforços automáticos recentes: {reforcos.slice(0, 3).map((r) => `${diaBr(String(r.dia))} ${brl(r.orcamento_base)}→${brl(r.orcamento_atual)} (${int(r.reforcos)}×${r.revertido_em ? ", revertido" : ""})`).join(" · ")}</p>
+        <p className="mt-3 text-xs text-texto-2">⚡ Reforços automáticos recentes: {reforcos.slice(0, 3).map((r) => `${diaBr(String(r.dia))} ${brl(r.orcamento_base)}→${brl(r.orcamento_atual)} (${int(r.reforcos)}×${r.revertido_em ? ", revertido" : ""})`).join(" · ")}</p>
       )}
 
       {/* KPIs 7 dias (28 no rodapé de cada card) */}
-      <h2 className="mt-8 text-lg font-bold">Últimos 7 dias <span className="text-sm font-normal text-slate-500">(entre parênteses: 28 dias)</span></h2>
+      <h2 className="mt-6 text-lg font-bold">Últimos 7 dias <span className="text-sm font-normal text-texto-2">(entre parênteses: 28 dias)</span></h2>
       <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
-        <Kpi label="Gasto" val={brl(a7.gasto)} hint={`28d ${brl(a28.gasto)}`} cor="text-orange-300" />
+        <Kpi label="Gasto" val={brl(a7.gasto)} hint={`28d ${brl(a28.gasto)}`} cor="text-alerta" />
         <Kpi label="Impressões" val={int(a7.imp)} hint={`28d ${int(a28.imp)}`} />
         <Kpi label="Cliques · CTR" val={`${int(a7.cli)} · ${pct(a7.ctr)}`} hint={`28d ${int(a28.cli)} · ${pct(a28.ctr)}`} />
         <Kpi label="Pedidos · conversão" val={`${int(a7.ped)} · ${pct(a7.cr)}`} hint={`28d ${int(a28.ped)} · ${pct(a28.cr)}`} />
         <Kpi label="CPC · custo por venda" val={`${brl2(a7.cpc)} · ${brl2(a7.custoVenda)}`} hint={`28d ${brl2(a28.cpc)} · ${brl2(a28.custoVenda)}`} />
-        <Kpi label="ROAS Shopee (direto)" val={x1(a7.roas)} hint={`28d ${x1(a28.roas)}`} cor="text-emerald-300" />
+        <Kpi label="ROAS Shopee (direto)" val={x1(a7.roas)} hint={`28d ${x1(a28.roas)}`} cor="text-sucesso" />
         <Kpi label="GMV Shopee direto" val={brl(a7.gmv)} hint={`28d ${brl(a28.gmv)}`} />
         <Kpi label="GMV Shopee amplo" val={brl(gmvAmplo7)} hint={`28d ${brl(gmvAmplo28)} · loja após o clique`} />
-        <Kpi label="GMV real (pedidos pagos)" val={brl(real7)} hint={`28d ${brl(real28)} · ${int(ped7Real)} pedidos em 7d · todo o item, não só via Ads`} cor="text-violet-300" />
-        <Kpi label="ROAS real / mínimo" val={rec ? `${x1(rec.roas_real)} / ${rec.roas_minimo != null ? x1(rec.roas_minimo) : "—"}` : "—"} hint="real = Shopee × fator de efetivação" cor="text-emerald-300" />
+        <Kpi label="GMV real (pedidos pagos)" val={brl(real7)} hint={`28d ${brl(real28)} · ${int(ped7Real)} pedidos em 7d · todo o item, não só via Ads`} cor="text-chip-roxo-texto" />
+        <Kpi label="ROAS real / mínimo" val={rec ? `${x1(rec.roas_real)} / ${rec.roas_minimo != null ? x1(rec.roas_minimo) : "—"}` : "—"} hint="real = Shopee × fator de efetivação" cor="text-sucesso" />
       </div>
 
       {/* Ajuste assistido */}
@@ -248,10 +248,10 @@ export default async function AdsItemPage({ searchParams }: Props) {
       )}
 
       {/* Diário 28 dias */}
-      <h2 className="mt-8 text-lg font-bold">Dia a dia (28 dias)</h2>
-      <div className="mt-3 overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900">
+      <h2 className="mt-6 text-lg font-bold">Dia a dia (28 dias)</h2>
+      <div className="mt-3 overflow-x-auto rounded-[14px] border border-borda bg-superficie shadow-cartao">
         <table className="w-full text-left text-sm">
-          <thead className="bg-slate-800 text-xs uppercase text-slate-400">
+          <thead className="bg-superficie-2 text-xs uppercase text-texto-2">
             <tr>
               <th className="p-3">Dia</th>
               <th className="p-3 text-right">Gasto</th>
@@ -269,23 +269,23 @@ export default async function AdsItemPage({ searchParams }: Props) {
           </thead>
           <tbody>
             {direto.length === 0 ? (
-              <tr><td className="p-4 text-slate-400" colSpan={12}>Sem performance coletada nos últimos 28 dias.</td></tr>
+              <tr><td className="p-4 text-texto-2" colSpan={12}>Sem performance coletada nos últimos 28 dias.</td></tr>
             ) : [...direto].reverse().map((p) => {
               const d = String(p.dia), imp = n(p.impressoes), cli = n(p.cliques), ped = n(p.pedidos), g = n(p.gasto), gmv = n(p.gmv);
               return (
-                <tr key={d} className="border-t border-slate-800">
-                  <td className="p-3 text-xs text-slate-400">{diaBr(d)}</td>
+                <tr key={d} className="border-t border-borda">
+                  <td className="p-3 text-xs text-texto-2">{diaBr(d)}</td>
                   <td className="p-3 text-right tabular-nums">{brl2(g)}</td>
-                  <td className="p-3 text-right tabular-nums text-slate-300">{int(imp)}</td>
-                  <td className="p-3 text-right tabular-nums text-slate-300">{int(cli)}</td>
-                  <td className="p-3 text-right tabular-nums text-slate-400">{imp > 0 ? pct(cli / imp) : "—"}</td>
+                  <td className="p-3 text-right tabular-nums text-texto">{int(imp)}</td>
+                  <td className="p-3 text-right tabular-nums text-texto">{int(cli)}</td>
+                  <td className="p-3 text-right tabular-nums text-texto-2">{imp > 0 ? pct(cli / imp) : "—"}</td>
                   <td className="p-3 text-right tabular-nums">{int(ped)}</td>
-                  <td className="p-3 text-right tabular-nums text-slate-400">{cli > 0 ? pct(ped / cli) : "—"}</td>
-                  <td className="p-3 text-right tabular-nums text-slate-400">{cli > 0 ? brl2(g / cli) : "—"}</td>
+                  <td className="p-3 text-right tabular-nums text-texto-2">{cli > 0 ? pct(ped / cli) : "—"}</td>
+                  <td className="p-3 text-right tabular-nums text-texto-2">{cli > 0 ? brl2(g / cli) : "—"}</td>
                   <td className="p-3 text-right tabular-nums">{brl(gmv)}</td>
-                  <td className="p-3 text-right tabular-nums text-slate-400">{brl(amploPorDia[d] ?? 0)}</td>
-                  <td className="p-3 text-right tabular-nums text-violet-300">{brl(realPorDia[d] ?? 0)}</td>
-                  <td className={`p-3 text-right tabular-nums ${g > 0 && rec?.roas_minimo != null && gmv / g < n(rec.roas_minimo) ? "text-red-300" : "text-emerald-300"}`}>{g > 0 ? x1(gmv / g) : "—"}</td>
+                  <td className="p-3 text-right tabular-nums text-texto-2">{brl(amploPorDia[d] ?? 0)}</td>
+                  <td className="p-3 text-right tabular-nums text-chip-roxo-texto">{brl(realPorDia[d] ?? 0)}</td>
+                  <td className={`p-3 text-right tabular-nums ${g > 0 && rec?.roas_minimo != null && gmv / g < n(rec.roas_minimo) ? "text-perigo" : "text-sucesso"}`}>{g > 0 ? x1(gmv / g) : "—"}</td>
                 </tr>
               );
             })}
@@ -295,25 +295,25 @@ export default async function AdsItemPage({ searchParams }: Props) {
 
       {/* Histórico */}
       {(alteracoes.length > 0 || ajustes.length > 0) && (
-        <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="rounded-[14px] border border-borda bg-superficie p-5 shadow-cartao">
             <h3 className="font-bold">🕐 Alterações detectadas</h3>
-            {alteracoes.length === 0 ? <p className="mt-2 text-xs text-slate-500">Nenhuma desde o início da coleta (10/09).</p> : (
-              <ul className="mt-2 space-y-1 text-xs text-slate-300">
+            {alteracoes.length === 0 ? <p className="mt-2 text-xs text-texto-2">Nenhuma desde o início da coleta (10/09).</p> : (
+              <ul className="mt-2 space-y-1 text-xs text-texto">
                 {alteracoes.map((a) => (
                   <li key={String(a.id)}>{diaBr(String(a.data_deteccao))} · <b>{String(a.campo)}</b>: {String(a.valor_antigo ?? "—")} → {String(a.valor_novo ?? "—")}</li>
                 ))}
               </ul>
             )}
           </div>
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+          <div className="rounded-[14px] border border-borda bg-superficie p-5 shadow-cartao">
             <h3 className="font-bold">⚙️ Ajustes feitos pelo sistema</h3>
-            {ajustes.length === 0 ? <p className="mt-2 text-xs text-slate-500">Nenhum ainda.</p> : (
-              <ul className="mt-2 space-y-1 text-xs text-slate-300">
+            {ajustes.length === 0 ? <p className="mt-2 text-xs text-texto-2">Nenhum ainda.</p> : (
+              <ul className="mt-2 space-y-1 text-xs text-texto">
                 {ajustes.map((a) => (
                   <li key={String(a.id)}>
                     {new Date(String(a.criado_em)).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })} · <b>{String(a.campo)}</b>: {String(a.valor_antigo ?? "—")} → {String(a.valor_novo)}
-                    {a.sucesso ? <span className="text-emerald-300"> ✓</span> : <span className="text-red-300"> ✗</span>}{a.simulado ? " (simulado)" : ""}
+                    {a.sucesso ? <span className="text-sucesso"> ✓</span> : <span className="text-perigo"> ✗</span>}{a.simulado ? " (simulado)" : ""}
                   </li>
                 ))}
               </ul>
@@ -322,7 +322,7 @@ export default async function AdsItemPage({ searchParams }: Props) {
         </div>
       )}
 
-      <p className="mt-6 text-xs text-slate-500">
+      <p className="mt-6 text-xs text-texto-2">
         <b>GMV real</b> = receita dos pedidos pagos do item (todos os canais, não só atribuídos ao Ads) — compare com o GMV da Shopee pra ver quanto do que o anúncio &quot;reporta&quot; virou venda de verdade.
         <b> Meta desalinhada</b>: a meta ROAS configurada difere &gt;15% da meta calculada (máx. entre 30× e o ROAS mínimo, ÷ fator). Meta abaixo da calculada = você aceita retorno menor que o necessário → suba em degraus de ~15%; meta acima = a Shopee entrega menos do que poderia → desça em degraus. Espere 12 dias entre degraus (janela de estabilização).
       </p>

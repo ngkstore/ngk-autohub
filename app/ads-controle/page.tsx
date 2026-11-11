@@ -23,11 +23,11 @@ const brl = (v: number) => (Number(v) || 0).toLocaleString("pt-BR", { style: "cu
 const n = (v: unknown) => Number(v || 0);
 
 const COR: Record<string, string> = {
-  campeao: "text-emerald-300", abaixo_do_minimo: "text-red-300", meta_desalinhada: "text-orange-300",
-  aprendizado: "text-blue-300", sem_margem: "text-slate-400", saudavel: "text-slate-300",
-  problema_anuncio: "text-orange-300", problema_pagina: "text-orange-300", meta_nao_entregue: "text-orange-300",
-  orcamento_esgotando: "text-amber-300", estabilizacao: "text-blue-300", pronto_proximo_degrau: "text-emerald-300",
-  retomar_meta: "text-red-300",
+  campeao: "text-sucesso", abaixo_do_minimo: "text-perigo", meta_desalinhada: "text-alerta",
+  aprendizado: "text-primaria", sem_margem: "text-texto-2", saudavel: "text-texto",
+  problema_anuncio: "text-alerta", problema_pagina: "text-alerta", meta_nao_entregue: "text-alerta",
+  orcamento_esgotando: "text-alerta", estabilizacao: "text-primaria", pronto_proximo_degrau: "text-sucesso",
+  retomar_meta: "text-perigo",
 };
 const ROTULO: Record<string, string> = {
   campeao: "Campeão", abaixo_do_minimo: "Abaixo do mínimo", meta_desalinhada: "Meta desalinhada",
@@ -40,15 +40,15 @@ const JANELA: Record<string, string> = { aprendizado: "🎓 aprendizado", estabi
 
 function Kpi({ label, val, hint, cor, trend }: { label: string; val: string; hint?: string; cor?: string; trend?: number | null }) {
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-      <p className="text-sm text-slate-400">{label}</p>
-      <p className={`mt-2 text-2xl font-bold ${cor || "text-white"}`}>{val}</p>
+    <div className="rounded-[14px] border border-borda bg-superficie p-5 shadow-cartao">
+      <p className="text-sm text-texto-2">{label}</p>
+      <p className={`mt-2 text-2xl font-bold ${cor || "text-texto"}`}>{val}</p>
       {trend != null && (
-        <p className={`mt-1 text-xs ${trend >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+        <p className={`mt-1 text-xs ${trend >= 0 ? "text-sucesso" : "text-perigo"}`}>
           {trend >= 0 ? "▲" : "▼"} {Math.abs(trend).toFixed(0)}% vs semana anterior
         </p>
       )}
-      {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
+      {hint && <p className="mt-1 text-xs text-texto-2">{hint}</p>}
     </div>
   );
 }
@@ -128,11 +128,11 @@ export default async function AdsControlePage({ searchParams }: Props) {
   if (nRet) alertas.push(`${nRet.qtd} item(ns) perderam volume e lucro depois de subir a meta — vale voltar à meta anterior (abra o item).`);
 
   return (
-    <div className="p-8 text-white">
+    <div className="mx-auto max-w-[1400px] p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-bold">🎯 Controle de Ads (GMV Max)</h1>
-          <p className="mt-2 max-w-2xl text-slate-400">
+          <h1 className="text-[22px] font-bold tracking-[-0.01em] text-texto">Controle de Ads (GMV Max)</h1>
+          <p className="mt-2 max-w-2xl text-texto-2">
             ROAS <b>real</b> por item (corrigido pelo fator de efetivação) contra o ROAS <b>mínimo</b> (margem da conciliação) e a sua meta.
             Clique no produto pra abrir o painel completo (conversão, CTR, custo por venda, GMV real) e ajustar orçamento/meta.
           </p>
@@ -141,7 +141,7 @@ export default async function AdsControlePage({ searchParams }: Props) {
       </div>
 
       {recsAtrasadas && (
-        <div className="mt-6 rounded-xl border border-amber-900 bg-amber-950/40 px-4 py-3 text-sm text-amber-200">
+        <div className="mt-6 rounded-xl border border-chip-amarelo-fundo bg-chip-amarelo-fundo px-4 py-3 text-sm text-alerta">
           ⚠️ Mostrando as recomendações de <b>{new Date(diaRecs + "T12:00:00").toLocaleDateString("pt-BR")}</b> — o cálculo de hoje (job ads-recomendacoes, 7h) ainda não rodou ou falhou.
           Os cards de gasto em risco e orçamento ideal seguem esse mesmo dia.
         </div>
@@ -150,35 +150,35 @@ export default async function AdsControlePage({ searchParams }: Props) {
       {alertas.length > 0 && (
         <div className="mt-6 space-y-2">
           {alertas.map((a, i) => (
-            <div key={i} className="rounded-xl border border-red-900 bg-red-950/40 px-4 py-3 text-sm text-red-200">🚨 {a}</div>
+            <div key={i} className="rounded-xl border border-chip-vermelho-fundo bg-chip-vermelho-fundo/40 px-4 py-3 text-sm text-perigo">🚨 {a}</div>
           ))}
         </div>
       )}
 
       <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <Kpi label="ROAS real (semana)" val={`${roasSemana.toFixed(1)}×`} trend={tend} hint={`média 4 semanas: ${n(r.roas_media4s).toFixed(1)}×`} cor="text-emerald-300" />
-        <Kpi label="Gasto (semana)" val={brl(n(r.gasto_semana))} hint={`~${brl(n(r.gasto_medio_dia))}/dia`} cor="text-orange-300" />
-        <Kpi label="Gasto em risco" val={brl(n(r.gasto_risco))} hint="itens abaixo do mínimo" cor="text-red-300" />
-        <Kpi label="Orçamento/dia ideal" val={comOrc.length ? brl(orcIdeal) : "—"} hint={comOrc.length ? `configurado ${brl(orcCfg)}${noTeto ? ` · ${noTeto} no teto` : ""}` : "sem base ainda"} cor="text-amber-300" />
-        <Kpi label="Saldo de créditos" val={brl(n(r.saldo))} hint={`~${saldoDias.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} dia(s) de gasto`} cor={saldoDias < 7 ? "text-red-300" : "text-emerald-300"} />
+        <Kpi label="ROAS real (semana)" val={`${roasSemana.toFixed(1)}×`} trend={tend} hint={`média 4 semanas: ${n(r.roas_media4s).toFixed(1)}×`} cor="text-sucesso" />
+        <Kpi label="Gasto (semana)" val={brl(n(r.gasto_semana))} hint={`~${brl(n(r.gasto_medio_dia))}/dia`} cor="text-alerta" />
+        <Kpi label="Gasto em risco" val={brl(n(r.gasto_risco))} hint="itens abaixo do mínimo" cor="text-perigo" />
+        <Kpi label="Orçamento/dia ideal" val={comOrc.length ? brl(orcIdeal) : "—"} hint={comOrc.length ? `configurado ${brl(orcCfg)}${noTeto ? ` · ${noTeto} no teto` : ""}` : "sem base ainda"} cor="text-alerta" />
+        <Kpi label="Saldo de créditos" val={brl(n(r.saldo))} hint={`~${saldoDias.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} dia(s) de gasto`} cor={saldoDias < 7 ? "text-perigo" : "text-sucesso"} />
       </div>
 
       {diagnostico && <DiagnosticoRoas dg={diagnostico} />}
 
       <div className="mt-4 flex flex-wrap gap-2">
         {porClasse.map((c) => (
-          <span key={c.classificacao} className={`rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs ${COR[c.classificacao] || "text-slate-300"}`}>
+          <span key={c.classificacao} className={`rounded-full border border-borda bg-superficie px-3 py-1 text-xs ${COR[c.classificacao] || "text-texto"}`}>
             {ROTULO[c.classificacao] || c.classificacao}: <b>{c.qtd}</b> · {brl(c.gasto)}
           </span>
         ))}
         {emJanela > 0 && (
-          <span className="rounded-full border border-slate-700 bg-slate-900 px-3 py-1 text-xs text-blue-300">🕐 em janela: <b>{emJanela}</b></span>
+          <span className="rounded-full border border-borda bg-superficie px-3 py-1 text-xs text-primaria">🕐 em janela: <b>{emJanela}</b></span>
         )}
       </div>
 
-      <div className="mt-6 overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900">
+      <div className="mt-6 overflow-x-auto rounded-[14px] border border-borda bg-superficie shadow-cartao">
         <table className="w-full text-left text-sm">
-          <thead className="bg-slate-800 text-xs uppercase text-slate-400">
+          <thead className="bg-superficie-2 text-xs uppercase text-texto-2">
             <tr>
               <th className="p-3">Produto</th>
               {mostrarLoja && <th className="p-3">Loja</th>}
@@ -186,7 +186,7 @@ export default async function AdsControlePage({ searchParams }: Props) {
               <th className="p-3 text-right">ROAS real</th>
               <th className="p-3 text-right">ROAS mín.</th>
               <th className="p-3 text-right">Meta</th>
-              <th className="p-3 text-right">Orç. config → ideal <span className="normal-case text-slate-500">(✎ edita aqui)</span></th>
+              <th className="p-3 text-right">Orç. config → ideal <span className="normal-case text-texto-2">(✎ edita aqui)</span></th>
               <th className="p-3">Janela</th>
               <th className="p-3">Situação</th>
               <th className="p-3">Ação</th>
@@ -194,18 +194,18 @@ export default async function AdsControlePage({ searchParams }: Props) {
           </thead>
           <tbody>
             {recs.length === 0 ? (
-              <tr><td className="p-4 text-slate-400" colSpan={mostrarLoja ? 10 : 9}>Sem recomendações — o coletor roda de madrugada e o cálculo às 7h. Se a loja acabou de ser configurada, rode o backfill.</td></tr>
+              <tr><td className="p-4 text-texto-2" colSpan={mostrarLoja ? 10 : 9}>Sem recomendações — o coletor roda de madrugada e o cálculo às 7h. Se a loja acabou de ser configurada, rode o backfill.</td></tr>
             ) : recs.map((x) => (
-              <tr key={`${x.loja_id}-${x.item_id}`} className="border-t border-slate-800 hover:bg-slate-800/40">
+              <tr key={`${x.loja_id}-${x.item_id}`} className="border-t border-borda hover:bg-superficie-2">
                 <td className="p-3 max-w-xs truncate" title={nomes[String(x.item_id)] || String(x.item_id)}>
-                  <Link href={`/ads-controle/item?loja=${x.loja_id}&item=${x.item_id}`} className="text-white underline decoration-slate-600 underline-offset-2 hover:decoration-emerald-400">
-                    {nomes[String(x.item_id)] || <span className="text-slate-500">item {x.item_id}</span>}
+                  <Link href={`/ads-controle/item?loja=${x.loja_id}&item=${x.item_id}`} className="text-texto underline decoration-slate-600 underline-offset-2 hover:decoration-emerald-400">
+                    {nomes[String(x.item_id)] || <span className="text-texto-2">item {x.item_id}</span>}
                   </Link>
                 </td>
-                {mostrarLoja && <td className="p-3 text-xs text-slate-400">{nomeLoja[x.loja_id] || "—"}</td>}
+                {mostrarLoja && <td className="p-3 text-xs text-texto-2">{nomeLoja[x.loja_id] || "—"}</td>}
                 <td className="p-3 text-right tabular-nums">{brl(n(x.gasto_7d))}</td>
                 <td className="p-3 text-right tabular-nums">{n(x.roas_real).toFixed(1)}×</td>
-                <td className="p-3 text-right tabular-nums text-slate-400">{x.roas_minimo != null ? `${n(x.roas_minimo).toFixed(1)}×` : "—"}</td>
+                <td className="p-3 text-right tabular-nums text-texto-2">{x.roas_minimo != null ? `${n(x.roas_minimo).toFixed(1)}×` : "—"}</td>
                 <AjusteInline
                   lojaId={x.loja_id}
                   campaignId={x.campaign_id}
@@ -221,18 +221,18 @@ export default async function AdsControlePage({ searchParams }: Props) {
                   reforcoBase={x.campaign_id != null ? reforcoBase[`${x.loja_id}-${x.campaign_id}`] ?? null : null}
                 />
                 <td className="p-3 text-xs" title={x.motivo_supressao || undefined}>
-                  <span className={x.estado_janela === "livre" ? "text-slate-500" : "text-blue-300"}>{JANELA[x.estado_janela || "livre"] || x.estado_janela}</span>
-                  {x.estado_janela && x.estado_janela !== "livre" && <span className="text-slate-400"> · faltam {x.dias_restantes_janela ?? 0}d</span>}
+                  <span className={x.estado_janela === "livre" ? "text-texto-2" : "text-primaria"}>{JANELA[x.estado_janela || "livre"] || x.estado_janela}</span>
+                  {x.estado_janela && x.estado_janela !== "livre" && <span className="text-texto-2"> · faltam {x.dias_restantes_janela ?? 0}d</span>}
                 </td>
-                <td className={`p-3 font-semibold ${COR[x.classificacao] || "text-slate-300"}`}>{ROTULO[x.classificacao] || x.classificacao}</td>
-                <td className="p-3 text-xs text-slate-400">{x.acao}</td>
+                <td className={`p-3 font-semibold ${COR[x.classificacao] || "text-texto"}`}>{ROTULO[x.classificacao] || x.classificacao}</td>
+                <td className="p-3 text-xs text-texto-2">{x.acao}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      <p className="mt-4 text-xs text-slate-500">
+      <p className="mt-4 text-xs text-texto-2">
         <b>ROAS real</b> = ROAS Shopee × fator de efetivação. <b>ROAS mínimo</b> = 1 ÷ margem efetiva (taxa real do escrow + custo + 6%).
         <b> Meta desalinhada</b> = sua meta ROAS na Shopee difere mais de 15% da meta calculada (máx. entre 30× e o ROAS mínimo, ÷ fator) — ajuste em degraus de ~15%.
         <b> Meta não entregue</b> = a Shopee entrega ROAS abaixo de 70% da meta: meta alta demais estrangula a entrega; o sistema sugere baixar −15% por vez (↓), nunca abaixo do ponto de empate.
