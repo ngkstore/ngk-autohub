@@ -653,7 +653,7 @@ categoria do app.
   `Get Seller Partner Campaign Detail` alimentam o Calendário (Parte F).
 
 ### [x] E3. Shopee: lives e afiliados
-> **Feito 11/11/2026:** lives da Shopee: lançamento manual na tela (`/api/lives/lancar`), já que a API `v2.livestream` não vale no Brasil; a captura pela extensão fica como evolução. AMS `get_conversion_report`: `lib/shopee/amsConversao.ts` → `afiliados_conversao`, **mas o endpoint recusou todos os nomes de intervalo testados** (purchase_time_from/to, order_create_time, purchase_time_start/end, complete_time, start_date/end_date, unix e YYYYMMDD: “at least one time range pair required”) e a doc da Open Platform não é acessível daqui; os nomes ficam na chave `ams_conversion_params` de `configuracoes` para o Gabriel conferir no API Test Tool do console.
+> **Feito 11/11/2026:** lives da Shopee: lançamento manual na tela (`/api/lives/lancar`), já que a API `v2.livestream` não vale no Brasil; a captura pela extensão fica como evolução. AMS `get_conversion_report`: `lib/shopee/amsConversao.ts` → `afiliados_conversao`. Parâmetros confirmados pelo Gabriel (11/11): `place_order_time_start/end` (unix, inclusivos; também order_completed/conversion_completed/ams_deduction), `page_no`/`page_size` ≤ 500, janela de 3 meses; o fim tem de ser ≤ agora − 3 dias (senão “too late, the data has not been updated”). Resposta `{has_more, list, total_count}` com itens (`purchase_value`, `refund_amount`, `item_brand_commission`, taxa ao afiliado, `seller_service_fee`), canal (`Shopeevideo-Shopee`…), `affiliate_username`. Coletado no cron diário das lives.
 
 - **A API de lives da Shopee (`v2.livestream`) não vale no Brasil.** Ela é só para
   TW, ID, TH, PH, MY, SG e VN, e não lista sessões. Não implemente.
