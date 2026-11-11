@@ -110,61 +110,61 @@ export default async function AnalyticsPage({
       : "0.0";
 
   return (
-    <div className="p-8 text-white">
-      <h1 className="text-4xl font-bold">Analytics</h1>
+    <div className="mx-auto max-w-[1400px] p-6">
+      <h1 className="text-[22px] font-bold tracking-[-0.01em] text-texto">Analytics</h1>
 
-      <p className="mt-2 text-slate-400">
+      <p className="mt-0.5 text-[13px] text-texto-2">
         Indicadores de performance, vendas, atendimento e reputação.
       </p>
 
-      <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-4">
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Pedidos</p>
+      <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-4">
+        <div className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+          <p className="text-sm text-texto-2">Pedidos</p>
           <p className="mt-2 text-4xl font-bold">{totalPedidos ?? 0}</p>
         </div>
 
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Produtos</p>
+        <div className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+          <p className="text-sm text-texto-2">Produtos</p>
           <p className="mt-2 text-4xl font-bold">{totalProdutos ?? 0}</p>
         </div>
 
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Chats</p>
+        <div className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+          <p className="text-sm text-texto-2">Chats</p>
           <p className="mt-2 text-4xl font-bold">{totalChats ?? 0}</p>
         </div>
 
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Média Avaliações</p>
+        <div className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+          <p className="text-sm text-texto-2">Média Avaliações</p>
           <p className="mt-2 text-4xl font-bold">{mediaAvaliacoes}</p>
         </div>
       </div>
 
-      <section className="mt-10 grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <h2 className="text-2xl font-bold">Reputação</h2>
+      <section className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <div className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+          <h2 className="text-[15px] font-semibold text-texto">Reputação</h2>
 
-          <p className="mt-4 text-slate-400">
+          <p className="mt-4 text-texto-2">
             Total de avaliações analisadas:
           </p>
 
           <p className="mt-2 text-4xl font-bold">{totalAvaliacoes ?? 0}</p>
 
-          <p className="mt-4 text-slate-300">
+          <p className="mt-4 text-texto">
             Este módulo futuramente mostrará evolução de notas, produtos com
             maior volume de reclamações e alertas de reputação.
           </p>
         </div>
 
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <h2 className="text-2xl font-bold">Produtos em Análise</h2>
+        <div className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+          <h2 className="text-[15px] font-semibold text-texto">Produtos em Análise</h2>
 
           <div className="mt-6 space-y-4">
             {avaliacoes && avaliacoes.length > 0 ? (
               avaliacoes.slice(0, 5).map((item, index) => (
-                <div key={index} className="rounded-xl bg-slate-800 p-4">
+                <div key={index} className="rounded-[10px] border border-linha bg-superficie-2 p-4">
                   <p className="font-semibold">{item.nome_produto}</p>
 
-                  <p className="text-sm text-orange-300">
+                  <p className="text-sm text-alerta">
                     {item.lojas?.[0]?.apelido || "Sem loja"}
                   </p>
 
@@ -174,7 +174,7 @@ export default async function AnalyticsPage({
                 </div>
               ))
             ) : (
-              <p className="text-slate-400">
+              <p className="text-texto-2">
                 Ainda não há dados suficientes para análise com o filtro
                 selecionado.
               </p>
