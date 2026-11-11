@@ -70,29 +70,29 @@ export default async function SincronizacaoPage({
   const { data: sincronizacoes } = await sincQuery;
 
   return (
-    <div className="p-8 text-white">
-      <h1 className="text-4xl font-bold">Centro de Sincronização</h1>
+    <div className="mx-auto max-w-[1400px] p-6">
+      <h1 className="text-[22px] font-bold tracking-[-0.01em] text-texto">Centro de Sincronização</h1>
 
-      <p className="mt-2 text-slate-400">
+      <p className="mt-0.5 text-[13px] text-texto-2">
         Execute importações por módulo e acompanhe o histórico de sincronizações.
       </p>
 
-      <p className="mt-4 text-sm text-slate-400">
+      <p className="mt-4 text-sm text-texto-2">
         Loja usada na sincronização:
-        <span className="ml-2 font-semibold text-white">
+        <span className="ml-2 font-semibold text-texto">
           {lojaSelecionada?.apelido || "Nenhuma loja encontrada"}
         </span>
       </p>
 
       {(lojas?.length ?? 0) > 1 && (
-        <p className="mt-1 text-xs text-slate-500">
+        <p className="mt-1 text-xs text-texto-2">
           Você tem mais de uma loja — use o seletor de loja no topo para escolher
           qual sincronizar.
         </p>
       )}
 
-      <section className="mt-8 rounded-2xl bg-slate-900 p-6">
-        <h2 className="text-2xl font-bold">Ações de Sincronização</h2>
+      <section className="mt-6 rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+        <h2 className="text-[15px] font-semibold text-texto">Ações de Sincronização</h2>
 
         <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
           <SyncTipoButton
@@ -159,20 +159,20 @@ export default async function SincronizacaoPage({
         <ResponderChatControl />
       </section>
 
-      <section className="mt-8 rounded-2xl bg-slate-900 p-6">
-        <h2 className="text-2xl font-bold">Histórico Recente</h2>
+      <section className="mt-6 rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+        <h2 className="text-[15px] font-semibold text-texto">Histórico Recente</h2>
 
         <div className="mt-6 space-y-4">
           {sincronizacoes && sincronizacoes.length > 0 ? (
             sincronizacoes.map((sync) => (
-              <div key={sync.id} className="rounded-xl bg-slate-800 p-5">
+              <div key={sync.id} className="rounded-[10px] border border-linha bg-superficie-2 p-5">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-bold">
                       {sync.marketplace} / {sync.tipo}
                     </p>
 
-                    <p className="mt-1 text-sm text-orange-300">
+                    <p className="mt-1 text-sm text-alerta">
                       {sync.lojas?.apelido || "Sem loja"}
                     </p>
                   </div>
@@ -180,24 +180,24 @@ export default async function SincronizacaoPage({
                   <span
                     className={`rounded-full px-3 py-1 text-xs font-semibold ${
                       sync.status === "sucesso"
-                        ? "bg-green-900 text-green-300"
-                        : "bg-red-900 text-red-300"
+                        ? "bg-chip-verde-fundo text-sucesso"
+                        : "bg-chip-vermelho-fundo text-perigo"
                     }`}
                   >
                     {sync.status}
                   </span>
                 </div>
 
-                <p className="mt-3 text-sm text-slate-400">
+                <p className="mt-3 text-sm text-texto-2">
                   Registros importados:
-                  <span className="ml-2 text-white">
+                  <span className="ml-2 text-texto">
                     {sync.registros_importados ?? 0}
                   </span>
                 </p>
 
-                <p className="mt-1 text-sm text-slate-400">
+                <p className="mt-1 text-sm text-texto-2">
                   Iniciado em:
-                  <span className="ml-2 text-white">
+                  <span className="ml-2 text-texto">
                     {sync.iniciado_em
                       ? new Date(sync.iniciado_em).toLocaleString("pt-BR")
                       : "-"}
@@ -205,14 +205,14 @@ export default async function SincronizacaoPage({
                 </p>
 
                 {sync.mensagem && (
-                  <p className="mt-3 text-sm text-slate-300">
+                  <p className="mt-3 text-sm text-texto">
                     {sync.mensagem}
                   </p>
                 )}
               </div>
             ))
           ) : (
-            <p className="text-slate-400">
+            <p className="text-texto-2">
               Nenhuma sincronização realizada ainda.
             </p>
           )}
