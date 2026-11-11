@@ -17,6 +17,31 @@ export function upsellerConfigurado(): { mcp: boolean; rest: boolean } {
 }
 
 let mcpId = 1;
+// tools/list: devolve o inputSchema de cada ferramenta (para descobrir os nomes dos parâmetros).
+export async function mcpListaFerramentas(): Promise<J> {
+  const token = process.env.UPSELLER_MCP_TOKEN;
+  if (!token) throw new Error("UPSELLER_MCP_TOKEN ausente na Vercel.");
+  const r = await fetch(`${BASE}/mcp`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, Accept: "text/event-stream, application/json", "Content-Type": "application/json", "X-Upseller-Language": "pt" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: mcpId++, method: "tools/list", params: {} }),
+    cache: "no-store",
+  });
+  const texto = await r.text();
+  if (texto.trimStart().startsWith("{")) return JSON.parse(texto);
+  let payload: J = {};
+  for (const linha of texto.split("\n")) {
+    const m = linha.match(/^data:\s*(\{.*\})\s*$/);
+    if (m) {
+      try {
+        payload = JSON.parse(m[1]);
+      } catch {
+        /* parcial */
+      }
+    }
+  }
+  return payload;
+}
 // Chamada de ferramenta via MCP (JSON-RPC 2.0 sobre streamable-http). Lê JSON ou SSE.
 export async function mcpTool<T = J>(name: string, args: J): Promise<T> {
   const token = process.env.UPSELLER_MCP_TOKEN;

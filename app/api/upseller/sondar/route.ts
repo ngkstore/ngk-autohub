@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { autorizarAdmin } from "@/lib/autorizacao";
-import { listarArmazens, listarSkusArmazem, paginaSkusBruta, upsellerConfigurado } from "@/lib/upseller/cliente";
+import { listarArmazens, listarSkusArmazem, mcpListaFerramentas, paginaSkusBruta, upsellerConfigurado } from "@/lib/upseller/cliente";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -14,6 +14,10 @@ export async function GET(request: NextRequest) {
   const cfg = upsellerConfigurado();
   if (!cfg.mcp && !cfg.rest) return NextResponse.json({ sucesso: false, configurado: cfg, erro: "Crie UPSELLER_MCP_TOKEN (recomendado) ou UPSELLER_CLIENT_ID + UPSELLER_API_TOKEN na Vercel." });
   try {
+    if (request.nextUrl.searchParams.get("tools") === "1") {
+      const lista = await mcpListaFerramentas();
+      return NextResponse.json({ sucesso: true, tools: JSON.stringify(lista).slice(0, 12000) });
+    }
     const armazens = await listarArmazens();
     const sp = request.nextUrl.searchParams;
     const alvo = sp.get("armazem") || armazens[0]?.id;
