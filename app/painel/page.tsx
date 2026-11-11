@@ -6,6 +6,7 @@ import { pendenciasCampanhas } from "@/lib/campanhas/pendencias";
 import { prazoRelativo, data as fmtData } from "@/lib/formato";
 import PainelAcoes from "./PainelAcoes";
 import { Card, CardHeader, Kpi, Chip, ChipCanal, ChipPrazo, BotaoLink, Vazio, LinhaDetalhe } from "../components/ui";
+import { RATING } from "@/lib/shopee/saudeConta";
 
 export const dynamic = "force-dynamic";
 
@@ -39,14 +40,15 @@ export default async function PainelPage({ searchParams }: { searchParams: Promi
   const escopo = await escopoDoUsuario();
   const lojas = filtroLojas(escopo, params.loja);
   const p = await montarPainel(lojas, { estoque: () => pendenciasEstoque(lojas), campanhas: () => pendenciasCampanhas(lojas) });
-  const hoje = new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", day: "numeric", month: "long" });
+  const hojeTxt = new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", day: "numeric", month: "long" });
+  const hoje = hojeTxt.charAt(0).toUpperCase() + hojeTxt.slice(1); // só a primeira letra maiúscula
 
   return (
     <div className="mx-auto max-w-[1400px] p-6">
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-[22px] font-bold tracking-[-0.01em] text-texto">Painel do dia</h1>
-          <p className="mt-0.5 text-[13px] capitalize text-texto-2">{hoje} · tudo que tem prazo, do mais urgente ao menos</p>
+          <p className="mt-0.5 text-[13px] text-texto-2">{hoje} · tudo que tem prazo, do mais urgente ao menos</p>
         </div>
         <PainelAcoes />
       </div>
@@ -100,8 +102,10 @@ export default async function PainelPage({ searchParams }: { searchParams: Promi
                       <span className="flex items-center gap-2 text-[13px] font-medium text-texto">
                         <ChipCanal canal={s.canal} /> {s.nome}
                       </span>
-                      <Chip cor={s.punicoes ? "vermelho" : s.metricas_fora ? "amarelo" : "verde"}>{s.punicoes ? "Punição" : s.metricas_fora ? "Atenção" : s.rating || "Bom"}</Chip>
+                      <Chip cor={s.punicoes ? "vermelho" : s.metricas_fora ? "amarelo" : "verde"}>{s.punicoes ? "Punição" : s.metricas_fora ? "Atenção" : "Em dia"}</Chip>
                     </div>
+                    <LinhaDetalhe rotulo="Nota geral" valor={`${RATING[Number(s.rating)] ?? s.rating ?? "—"}${s.rating ? ` (${s.rating} de 4)` : ""}`} destaque />
+                    <p className="text-[11px] text-texto-2">mede envio, anúncios e atendimento (Shopee)</p>
                     {s.fora.slice(0, 3).map((f, i) => (
                       <LinhaDetalhe key={i} rotulo={f.nome} valor={`${f.atual ?? "-"} / meta ${f.alvo ?? "-"}`} />
                     ))}
