@@ -47,6 +47,12 @@ export async function gravarDevolucao(linha: DevolucaoLinha, eventos: EventoLinh
   return { id, eventos: nEventos, midias: m.novas, novo: !anterior };
 }
 
+// plataforma_id -> plataforma_atualizado_em (para pular o que não mudou)
+async function jaGravados(lojaId: string, canal: "shopee" | "tiktok"): Promise<Map<string, string | null>> {
+  const { data } = await supabase.from("devolucoes").select("plataforma_id, plataforma_atualizado_em").eq("loja_id", lojaId).eq("canal", canal);
+  return new Map((data || []).map((d) => [String(d.plataforma_id), d.plataforma_atualizado_em as string | null]));
+}
+
 async function marcaDagua(lojaId: string, canal: "shopee" | "tiktok"): Promise<Date | null> {
   const { data } = await supabase
     .from("devolucoes")
@@ -78,6 +84,7 @@ export async function sincronizarDevolucoesShopeeLoja(lojaId: string, opts: { di
     campo = "create_time";
   }
   const vistos = new Set<string>();
+  const gravados = await jaGravados(lojaId, "shopee");
   try {
     // janelas de no máximo 15 dias (limite da API), da mais recente para a mais antiga
     for (let ate = agora; ate > de; ate -= JANELA_SHOPEE_DIAS * 86400) {
@@ -89,6 +96,8 @@ export async function sincronizarDevolucoesShopeeLoja(lojaId: string, opts: { di
         vistos.add(sn);
         if (opts.orcamentoMs && Date.now() - inicio > opts.orcamentoMs) break;
         r.vistos++;
+        const upd = Number(item.update_time) > 0 ? new Date(Number(item.update_time) * 1000).toISOString() : null;
+        if (upd && gravados.get(sn) === upd) continue; // nada mudou desde a última coleta
         try {
           const d = (await detalheReturnShopee(lojaId, sn)) || item;
           const g = await gravarDevolucao(mapearDevolucaoShopee(d, lojaId), eventosShopee(d), midiasShopee(d));
@@ -116,6 +125,7 @@ export async function sincronizarDevolucoesTikTokLoja(loja: LojaTikTok, opts: { 
   const marca = await marcaDagua(loja.lojaId, "tiktok");
   const agora = Math.floor(Date.now() / 1000);
   const desde = opts.dias ? agora - opts.dias * 86400 : marca ? Math.floor(marca.getTime() / 1000) - FOLGA_HORAS * 3600 : agora - DIAS_CARGA_INICIAL * 86400;
+  const gravados = await jaGravados(loja.lojaId, "tiktok");
   try {
     // sequencial: o TikTok limita a taxa por API (36009002)
     const returns = await listarReturnsTikTok(loja, desde);
@@ -123,6 +133,8 @@ export async function sincronizarDevolucoesTikTokLoja(loja: LojaTikTok, opts: { 
     for (const ro of returns) {
       if (opts.orcamentoMs && Date.now() - inicio > opts.orcamentoMs) break;
       r.vistos++;
+      const upd = Number(ro.update_time) > 0 ? new Date(Number(ro.update_time) * 1000).toISOString() : null;
+      if (upd && gravados.get(String(ro.return_id)) === upd) continue;
       try {
         const records = await recordsTikTok(loja, String(ro.return_id));
         const { eventos, midias } = eventosTikTok(records);
