@@ -7,7 +7,7 @@ export const maxDuration = 300;
 
 // B2 — coleta de devoluções (Shopee returns + TikTok returns/cancellations).
 //   GET /api/devolucoes/sincronizar                 (cron a cada 15 min: incremental por marca d'água)
-//   GET ?canal=shopee|tiktok&loja=<id>&dias=90      (carga inicial / reprocessar um período)
+//   GET ?canal=shopee|tiktok&loja=<id>&dias=90&forcar=1  (carga inicial / reprocessar um período)
 // Cron (Bearer CRON_SECRET) ou usuário com acesso à loja pedida (lote: só admin).
 export async function GET(request: NextRequest) {
   const sp = request.nextUrl.searchParams;
@@ -16,8 +16,9 @@ export async function GET(request: NextRequest) {
   if (!autz.ok) return autz.resposta;
   const canal = sp.get("canal") === "shopee" || sp.get("canal") === "tiktok" ? (sp.get("canal") as "shopee" | "tiktok") : undefined;
   const dias = Number(sp.get("dias")) || undefined;
+  const forcar = sp.get("forcar") === "1"; // relê mesmo sem mudança (recarga de eventos/mídias)
 
-  const resultados = await sincronizarDevolucoes({ canal, lojaId, dias, orcamentoMs: 250_000 });
+  const resultados = await sincronizarDevolucoes({ canal, lojaId, dias, forcar, orcamentoMs: 250_000 });
   const total = resultados.reduce((s, r) => ({ vistos: s.vistos + r.vistos, gravados: s.gravados + r.gravados, erros: s.erros + r.erros }), { vistos: 0, gravados: 0, erros: 0 });
   return NextResponse.json({ sucesso: true, ...total, lojas: resultados });
 }

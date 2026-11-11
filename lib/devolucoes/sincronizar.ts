@@ -66,7 +66,7 @@ async function marcaDagua(lojaId: string, canal: "shopee" | "tiktok"): Promise<D
 }
 
 // ---- Shopee: uma loja ----
-export async function sincronizarDevolucoesShopeeLoja(lojaId: string, opts: { dias?: number; orcamentoMs?: number } = {}): Promise<ResultadoSync> {
+export async function sincronizarDevolucoesShopeeLoja(lojaId: string, opts: { dias?: number; orcamentoMs?: number; forcar?: boolean } = {}): Promise<ResultadoSync> {
   const inicio = Date.now();
   const r: ResultadoSync = { canal: "shopee", loja_id: lojaId, vistos: 0, gravados: 0, eventos: 0, midias: 0, erros: 0, segundos: 0 };
   const marca = await marcaDagua(lojaId, "shopee");
@@ -97,7 +97,7 @@ export async function sincronizarDevolucoesShopeeLoja(lojaId: string, opts: { di
         if (opts.orcamentoMs && Date.now() - inicio > opts.orcamentoMs) break;
         r.vistos++;
         const upd = Number(item.update_time) > 0 ? new Date(Number(item.update_time) * 1000).toISOString() : null;
-        if (upd && gravados.get(sn) === upd) continue; // nada mudou desde a última coleta
+        if (!opts.forcar && upd && gravados.get(sn) === upd) continue; // nada mudou desde a última coleta
         try {
           const d = (await detalheReturnShopee(lojaId, sn)) || item;
           const g = await gravarDevolucao(mapearDevolucaoShopee(d, lojaId), eventosShopee(d), midiasShopee(d));
@@ -119,7 +119,7 @@ export async function sincronizarDevolucoesShopeeLoja(lojaId: string, opts: { di
 }
 
 // ---- TikTok: uma loja ----
-export async function sincronizarDevolucoesTikTokLoja(loja: LojaTikTok, opts: { dias?: number; orcamentoMs?: number } = {}): Promise<ResultadoSync> {
+export async function sincronizarDevolucoesTikTokLoja(loja: LojaTikTok, opts: { dias?: number; orcamentoMs?: number; forcar?: boolean } = {}): Promise<ResultadoSync> {
   const inicio = Date.now();
   const r: ResultadoSync = { canal: "tiktok", loja_id: loja.lojaId, vistos: 0, gravados: 0, eventos: 0, midias: 0, erros: 0, segundos: 0 };
   const marca = await marcaDagua(loja.lojaId, "tiktok");
@@ -134,7 +134,7 @@ export async function sincronizarDevolucoesTikTokLoja(loja: LojaTikTok, opts: { 
       if (opts.orcamentoMs && Date.now() - inicio > opts.orcamentoMs) break;
       r.vistos++;
       const upd = Number(ro.update_time) > 0 ? new Date(Number(ro.update_time) * 1000).toISOString() : null;
-      if (upd && gravados.get(String(ro.return_id)) === upd) continue;
+      if (!opts.forcar && upd && gravados.get(String(ro.return_id)) === upd) continue;
       try {
         const records = await recordsTikTok(loja, String(ro.return_id));
         const { eventos, midias } = eventosTikTok(records);
@@ -189,7 +189,7 @@ export async function ressincronizarShopee(lojaId: string, returnSn: string) {
 }
 
 // Todas as lojas (cron). `canal` e `loja` opcionais.
-export async function sincronizarDevolucoes(opts: { canal?: "shopee" | "tiktok"; lojaId?: string; dias?: number; orcamentoMs?: number } = {}) {
+export async function sincronizarDevolucoes(opts: { canal?: "shopee" | "tiktok"; lojaId?: string; dias?: number; orcamentoMs?: number; forcar?: boolean } = {}) {
   const inicio = Date.now();
   const resultados: ResultadoSync[] = [];
   const restante = () => (opts.orcamentoMs ? Math.max(5_000, opts.orcamentoMs - (Date.now() - inicio)) : undefined);
@@ -199,12 +199,12 @@ export async function sincronizarDevolucoes(opts: { canal?: "shopee" | "tiktok";
     const { data } = await q;
     for (const t of data || []) {
       if (!t.loja_id) continue;
-      resultados.push(await sincronizarDevolucoesShopeeLoja(String(t.loja_id), { dias: opts.dias, orcamentoMs: restante() }));
+      resultados.push(await sincronizarDevolucoesShopeeLoja(String(t.loja_id), { dias: opts.dias, orcamentoMs: restante(), forcar: opts.forcar }));
     }
   }
   if (!opts.canal || opts.canal === "tiktok") {
     const lojas = (await lojasTikTokAtivas()).filter((l) => !opts.lojaId || l.lojaId === opts.lojaId);
-    for (const l of lojas) resultados.push(await sincronizarDevolucoesTikTokLoja(l, { dias: opts.dias, orcamentoMs: restante() }));
+    for (const l of lojas) resultados.push(await sincronizarDevolucoesTikTokLoja(l, { dias: opts.dias, orcamentoMs: restante(), forcar: opts.forcar }));
   }
   return resultados;
 }
