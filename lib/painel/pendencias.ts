@@ -200,12 +200,12 @@ async function saudeContas(lojaIds: string[] | null, lojas: Map<string, { nome: 
 async function conferencias(lojaIds: string[] | null): Promise<Conferencia[]> {
   const out: Conferencia[] = [];
   try {
-    // últimos 30 dias (a função varre custos_pedido; sem janela passava dos 25 s e voltava vazia)
-    const { data, error } = await supabase.rpc("conferencia_pedido_fecha", { p_loja_ids: lojaIds, p_inicio: new Date(Date.now() - 30 * 86400000).toISOString(), p_fim: null });
+    // últimos 7 dias (a função varre custos_pedido: 30 d leva ~21 s, no limite dos 25 s; 7 d ~8 s)
+    const { data, error } = await supabase.rpc("conferencia_pedido_fecha", { p_loja_ids: lojaIds, p_inicio: new Date(Date.now() - 7 * 86400000).toISOString(), p_fim: null });
     if (error || !data) throw new Error(error?.message || "sem resposta");
     const r = data as J;
     const dif = Number(r.diferenca || 0);
-    out.push({ nome: "Pedido fecha com o repasse (30 d)", ok: dif === 0, texto: dif === 0 ? `OK · ${Number(r.ok || 0).toLocaleString("pt-BR")} pedidos` : `${dif} diferença(s) · R$ ${Number(r.diferenca_valor || 0).toFixed(2)}` });
+    out.push({ nome: "Pedido fecha com o repasse (7 d)", ok: dif === 0, texto: dif === 0 ? `OK · ${Number(r.ok || 0).toLocaleString("pt-BR")} pedidos` : `${dif} diferença(s) · R$ ${Number(r.diferenca_valor || 0).toFixed(2)}` });
     const desconhecidos = Array.isArray(r.campos_desconhecidos) ? (r.campos_desconhecidos as J[]).length : 0;
     out.push({ nome: "Campo novo no escrow", ok: desconhecidos === 0, texto: desconhecidos ? `${desconhecidos} regra(s) de taxa sem categoria` : "nenhum" });
   } catch {
