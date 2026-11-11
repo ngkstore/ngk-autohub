@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { autorizar } from "@/lib/autorizacao";
 import { sincronizarDevolucoes } from "@/lib/devolucoes/sincronizar";
+import { processarDevolucoes } from "@/lib/devolucoes/processar";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -18,7 +19,11 @@ export async function GET(request: NextRequest) {
   const dias = Number(sp.get("dias")) || undefined;
   const forcar = sp.get("forcar") === "1"; // relê mesmo sem mudança (recarga de eventos/mídias)
 
-  const resultados = await sincronizarDevolucoes({ canal, lojaId, dias, forcar, orcamentoMs: 250_000 });
+  const inicio = Date.now();
+  const resultados = await sincronizarDevolucoes({ canal, lojaId, dias, forcar, orcamentoMs: 200_000 });
+  // B4: depois da coleta, o assistente/regras/alertas com o tempo que sobrou (mesmo cron).
+  const semAssistente = sp.get("assistente") === "0";
+  const assistente = semAssistente ? null : await processarDevolucoes({ lojaId, orcamentoMs: Math.max(20_000, 270_000 - (Date.now() - inicio)) });
   const total = resultados.reduce((s, r) => ({ vistos: s.vistos + r.vistos, gravados: s.gravados + r.gravados, erros: s.erros + r.erros }), { vistos: 0, gravados: 0, erros: 0 });
-  return NextResponse.json({ sucesso: true, ...total, lojas: resultados });
+  return NextResponse.json({ sucesso: true, ...total, lojas: resultados, assistente });
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { enviarMensagemChat } from "@/lib/shopee/chatSend";
 import { enviarMensagemTikTokPorLoja } from "@/lib/tiktok/responderChats";
+import { tratarCallbackDevolucao } from "@/lib/devolucoes/telegramCallback";
 import {
   segredoWebhook,
   responderCallback,
@@ -21,6 +22,7 @@ export async function POST(request: NextRequest) {
     callback_query?: {
       id: string;
       data?: string;
+      from?: { id: number; username?: string; first_name?: string };
       message?: { chat?: { id: number }; message_id?: number; text?: string };
     };
   };
@@ -32,6 +34,12 @@ export async function POST(request: NextRequest) {
 
   const cq = update.callback_query;
   if (!cq?.data) return NextResponse.json({ ok: true });
+
+  // Devoluções (B4): "dev:aprovar|editar|recusar|abrir:<id>".
+  if (cq.data.startsWith("dev:")) {
+    await tratarCallbackDevolucao(cq);
+    return NextResponse.json({ ok: true });
+  }
 
   // Formatos: "ap:<id>" / "rj:<id>" (Shopee) e "tkt:ap:<id>" / "tkt:rj:<id>" (TikTok).
   const partes = cq.data.split(":");

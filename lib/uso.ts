@@ -44,7 +44,7 @@ export async function registrarUsoIA({
   usage,
 }: {
   lojaId: string;
-  tipo: "chat" | "avaliacao";
+  tipo: "chat" | "avaliacao" | "devolucao";
   modelo: string;
   marketplace?: string;
   usage: Usage;
