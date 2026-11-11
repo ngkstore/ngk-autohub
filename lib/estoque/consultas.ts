@@ -124,7 +124,8 @@ export async function montarEstoque(lojaIds: string[] | null): Promise<{ linhas:
     let componentes: LinhaEstoque["componentes"];
     if (tipo === "kit" && comps?.length) {
       componentes = comps.map((k) => ({ ...k, disponivel: fisico.get(k.sku)?.disp ?? 0 }));
-      disponivel = disponivelKit(componentes);
+      // o UpSeller informa o estoque do kit montado; sem isso, o menor componente ÷ quantidade
+      disponivel = fis ? fis.disp : disponivelKit(componentes);
     }
     const emTransito = (fis?.transito ?? 0) + (transitoCompras.get(sku) || 0);
     const s7 = m7.get(sku)?.qtd ?? 0;
@@ -135,6 +136,7 @@ export async function montarEstoque(lojaIds: string[] | null): Promise<{ linhas:
     const precoMedio = s30 > 0 ? (m30.get(sku)?.receita ?? 0) / s30 : 0;
     const custo = c?.custo ?? fis?.custo ?? null;
     const status = temUpseller || fis ? statusSku(disponivel, vendaDia, s30, prazoDias, segurancaDias) : vendaDia > 0 ? "ok" : "parado";
+    if (tipo === "kit" && !fis && !componentes?.length) continue; // kit sem estoque próprio e sem composição: nada a mostrar
     const acaba = acabaEm(disponivel, vendaDia, hoje);
     linhas.push({
       sku,
@@ -166,6 +168,10 @@ export async function montarEstoque(lojaIds: string[] | null): Promise<{ linhas:
       componentes,
     });
   }
+  // nomes repetidos (variações com o mesmo título no UpSeller, ex.: 4 cores de MINISKATE): põe o SKU no nome
+  const porNome = new Map<string, number>();
+  for (const l of linhas) if (l.nome) porNome.set(l.nome, (porNome.get(l.nome) || 0) + 1);
+  for (const l of linhas) if (l.nome && (porNome.get(l.nome) || 0) > 1) l.nome = `${l.nome} · ${l.sku}`;
   linhas.sort((a, b) => (a.cobertura ?? 1e9) - (b.cobertura ?? 1e9));
   return { linhas, temUpseller, coletadoEm, fatorAtual, dataMaisAntiga: maisAntigo?.dia ? String(maisAntigo.dia) : null };
 }

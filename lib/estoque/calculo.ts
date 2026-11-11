@@ -1,7 +1,7 @@
 // Cálculo de estoque (D3) — puro e testável.
 export type VendasSku = { v7: number; v28: number; vAnoAnterior: number | null }; // unidades nos períodos
 export type ParametrosSku = { prazoDias: number; segurancaDias: number; diasDesejados: number; caixa: number | null; fatorSazonal: number };
-export type Status = "ruptura" | "critico" | "atencao" | "ok" | "excesso" | "parado";
+export type Status = "ruptura" | "critico" | "atencao" | "ok" | "excesso" | "parado" | "inativo";
 
 /**
  * Venda média por dia: 50% da média de 7 d + 30% da média de 28 d + 20% do mesmo período do
@@ -28,9 +28,11 @@ export function quantidadeComprar(vendaDia: number, disponivel: number, emTransi
   return Math.ceil(bruto);
 }
 
+/** Ruptura e crítico só valem para SKU com venda relevante (≥ 1 unidade nos últimos 30 dias). Estoque zero sem venda = "inativo" (fora dos indicadores). */
 export function statusSku(disponivel: number, vendaDia: number, v30: number, prazoDias: number, segurancaDias: number): Status {
-  if (disponivel <= 0 && vendaDia > 0) return "ruptura";
-  if (v30 <= 0 && vendaDia <= 0) return disponivel > 0 ? "parado" : "ruptura";
+  const vendeRelevante = v30 >= 1;
+  if (disponivel <= 0) return vendeRelevante ? "ruptura" : "inativo";
+  if (!vendeRelevante && vendaDia <= 0) return "parado";
   const cob = coberturaDias(disponivel, vendaDia);
   if (cob === null) return "parado";
   if (cob < prazoDias) return "critico";

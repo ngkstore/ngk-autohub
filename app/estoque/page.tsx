@@ -16,6 +16,7 @@ const STATUS: { id: string; nome: string; cor: "vermelho" | "laranja" | "amarelo
   { id: "ok", nome: "OK", cor: "verde" },
   { id: "excesso", nome: "Excesso", cor: "roxo" },
   { id: "parado", nome: "Parado 30 d", cor: "cinza" },
+  { id: "inativo", nome: "Sem estoque, inativo", cor: "cinza" },
 ];
 const corStatus = (s: string) => STATUS.find((x) => x.id === s)?.cor ?? "cinza";
 
@@ -80,7 +81,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
       {aba === "estoque" && (
         <>
           <div className="grid grid-cols-2 gap-3.5 md:grid-cols-5">
-            <Kpi icone="alertas" cor="vermelho" rotulo="Em ruptura" valor={contagem.ruptura || 0} />
+            <Kpi icone="alertas" cor="vermelho" rotulo="Em ruptura" valor={contagem.ruptura || 0} detalhe="com venda nos últimos 30 dias" />
             <Kpi icone="estoque" cor="laranja" rotulo="Críticos" valor={contagem.critico || 0} detalhe="acabam antes da reposição" />
             <Kpi icone="painel" cor="amarelo" rotulo="Atenção" valor={contagem.atencao || 0} detalhe="abaixo do ponto de pedido" />
             <Kpi icone="financas" cor="roxo" rotulo="Capital em excesso" valor={brl(excesso, 0)} detalhe="mais de 90 dias de estoque" />

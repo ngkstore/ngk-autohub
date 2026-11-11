@@ -28,6 +28,8 @@ describe("cálculo de estoque (D3)", () => {
     expect(statusSku(3000, 96, 2000, 15, 5)).toBe("ok");
     expect(statusSku(610, 4, 100, 15, 5)).toBe("excesso"); // 152 d
     expect(statusSku(120, 0, 0, 15, 5)).toBe("parado");
+    expect(statusSku(0, 0.1, 0.5, 15, 5)).toBe("inativo"); // zero sem venda relevante não é ruptura
+    expect(statusSku(0, 0, 0, 15, 5)).toBe("inativo");
   });
   it("kit: menor componente ÷ quantidade", () => {
     expect(disponivelKit([{ disponivel: 100, quantidade: 4 }, { disponivel: 30, quantidade: 1 }])).toBe(25);
