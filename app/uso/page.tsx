@@ -86,9 +86,9 @@ export default async function Uso({ searchParams }: UsoProps) {
 
   if (!escopo.admin) {
     return (
-      <div className="p-8 text-white">
-        <h1 className="text-4xl font-bold">Consumo de IA</h1>
-        <p className="mt-4 text-slate-400">
+      <div className="mx-auto max-w-[1400px] p-6">
+        <h1 className="text-[22px] font-bold tracking-[-0.01em] text-texto">Consumo de IA</h1>
+        <p className="mt-4 text-texto-2">
           Página exclusiva do administrador (cobrança por conta).
         </p>
       </div>
@@ -112,9 +112,9 @@ export default async function Uso({ searchParams }: UsoProps) {
   const totalChamadas = linhas.reduce((t, l) => t + l.chamadas, 0);
 
   return (
-    <div className="p-8 text-white">
-      <h1 className="text-4xl font-bold">💸 Consumo de IA por conta</h1>
-      <p className="mt-2 text-slate-400">
+    <div className="mx-auto max-w-[1400px] p-6">
+      <h1 className="text-[22px] font-bold tracking-[-0.01em] text-texto">Consumo de IA por conta</h1>
+      <p className="mt-0.5 text-[13px] text-texto-2">
         Custo real de IA (respostas do robô) por cliente, para você cobrar. Chat
         usa Opus, avaliações usam Haiku — cada resposta grava o custo real em
         dólar. A coluna <strong>Cobrança sugerida</strong> é o custo × {MARGEM}.
@@ -130,8 +130,8 @@ export default async function Uso({ searchParams }: UsoProps) {
               href={`/uso?periodo=${p.chave}`}
               className={`rounded-full px-4 py-2 text-sm font-semibold transition-all ${
                 ativo
-                  ? "bg-emerald-600 text-white"
-                  : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                  ? "bg-primaria text-texto"
+                  : "bg-superficie-2 text-texto hover:bg-chip-cinza-fundo"
               }`}
             >
               {p.rotulo}
@@ -141,39 +141,39 @@ export default async function Uso({ searchParams }: UsoProps) {
       </div>
 
       {/* Destaques */}
-      <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
-        <div className="rounded-2xl border border-emerald-700 bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Custo total de IA (real)</p>
-          <p className="mt-2 text-4xl font-bold text-emerald-300">
+      <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="rounded-2xl border border-chip-verde-fundo bg-superficie p-6">
+          <p className="text-sm text-texto-2">Custo total de IA (real)</p>
+          <p className="mt-2 text-4xl font-bold text-sucesso">
             {usd(totalCustoUsd)}
           </p>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-texto-2">
             ≈ {brl(totalCustoUsd * COTACAO_USD_BRL)} (a R$ {COTACAO_USD_BRL}/US$)
           </p>
         </div>
 
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Respostas geradas</p>
+        <div className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+          <p className="text-sm text-texto-2">Respostas geradas</p>
           <p className="mt-2 text-4xl font-bold">{inteiro(totalChamadas)}</p>
-          <p className="mt-1 text-xs text-slate-500">no período selecionado</p>
+          <p className="mt-1 text-xs text-texto-2">no período selecionado</p>
         </div>
 
-        <div className="rounded-2xl bg-slate-900 p-6">
-          <p className="text-sm text-slate-400">Cobrança sugerida (total)</p>
-          <p className="mt-2 text-4xl font-bold text-teal-300">
+        <div className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+          <p className="text-sm text-texto-2">Cobrança sugerida (total)</p>
+          <p className="mt-2 text-4xl font-bold text-sucesso">
             {brl(totalCustoUsd * COTACAO_USD_BRL * MARGEM)}
           </p>
-          <p className="mt-1 text-xs text-slate-500">custo × {MARGEM}</p>
+          <p className="mt-1 text-xs text-texto-2">custo × {MARGEM}</p>
         </div>
       </div>
 
       {/* Tabela por conta */}
-      <section className="mt-10 rounded-2xl bg-slate-900 p-6">
-        <h2 className="text-2xl font-bold">Consumo por conta</h2>
+      <section className="mt-6 rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+        <h2 className="text-[15px] font-semibold text-texto">Consumo por conta</h2>
 
-        <div className="mt-6 overflow-x-auto rounded-xl border border-slate-800">
+        <div className="mt-6 overflow-x-auto rounded-xl border border-borda">
           <table className="w-full text-left">
-            <thead className="bg-slate-800 text-sm text-slate-300">
+            <thead className="bg-superficie-2 text-xs font-semibold text-texto-2">
               <tr>
                 <th className="p-4">Conta</th>
                 <th className="p-4">Respostas</th>
@@ -190,28 +190,28 @@ export default async function Uso({ searchParams }: UsoProps) {
                 linhas.map((l) => (
                   <tr
                     key={l.conta_id || l.conta_nome}
-                    className="border-t border-slate-800"
+                    className="border-t border-borda"
                   >
                     <td className="p-4 font-semibold">{l.conta_nome}</td>
                     <td className="p-4">{inteiro(l.chamadas)}</td>
-                    <td className="p-4 text-slate-300">
+                    <td className="p-4 text-texto">
                       {inteiro(l.chamadas_chat)}
                     </td>
-                    <td className="p-4 text-slate-300">
+                    <td className="p-4 text-texto">
                       {inteiro(l.chamadas_avaliacao)}
                     </td>
-                    <td className="p-4 text-slate-400">
+                    <td className="p-4 text-texto-2">
                       {inteiro(l.tokens_entrada)} / {inteiro(l.tokens_saida)}
                     </td>
-                    <td className="p-4 text-emerald-300">{usd(l.custo_usd)}</td>
-                    <td className="p-4 font-semibold text-teal-300">
+                    <td className="p-4 text-sucesso">{usd(l.custo_usd)}</td>
+                    <td className="p-4 font-semibold text-sucesso">
                       {brl(l.custo_usd * COTACAO_USD_BRL * MARGEM)}
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td className="p-4 text-slate-400" colSpan={7}>
+                  <td className="p-4 text-texto-2" colSpan={7}>
                     Nenhum consumo de IA registrado no período. (A medição começa
                     a partir de agora — respostas antigas não entram.)
                   </td>
@@ -221,7 +221,7 @@ export default async function Uso({ searchParams }: UsoProps) {
           </table>
         </div>
 
-        <p className="mt-4 text-xs text-slate-500">
+        <p className="mt-4 text-xs text-texto-2">
           Preços Anthropic por 1M de tokens: Opus 4.8 = US$5 entrada / US$25
           saída · Haiku 4.5 = US$1 / US$5. Ajuste a cotação e a margem em
           app/uso/page.tsx.
