@@ -159,8 +159,9 @@ export async function listarArmazens(): Promise<ArmazemUp[]> {
 // Tenta as formas abaixo até uma responder sem 4001; a que funcionar fica em cache no processo.
 let formaSku: number | null = null;
 function variantesArgsSku(armazemId: string, pageNo: number, pageSize: number, skus?: string[]): J[] {
-  const base: J = { warehouseIdList: [armazemId], pageNo, pageSize, ...(skus?.length ? { skuList: skus.slice(0, 300) } : {}) };
-  return [{ query: base }, { PageWarehouseSkuQuery: base }, base, { request: base }, { params: base }, { query: { ...base, warehouseIdList: [Number(armazemId)] } }];
+  // Schema real (tools/list, 12/11/2026): { request: { warehouseIdList: string[], pageNo: STRING, pageSize: int, skuList?, updateTime? } }
+  const base: J = { warehouseIdList: [armazemId], pageNo: String(pageNo), pageSize, ...(skus?.length ? { skuList: skus.slice(0, 300) } : {}) };
+  return [{ request: base }, { query: base }, base];
 }
 async function chamarSkus(armazemId: string, pageNo: number, pageSize: number, skus?: string[]): Promise<{ resp: J; forma: number }> {
   const cfg = upsellerConfigurado();
