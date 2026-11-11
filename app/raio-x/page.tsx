@@ -148,15 +148,15 @@ export default async function RaioXPage({ searchParams }: Props) {
   const usandoColetor = itens.length > 0;
 
   return (
-    <div className="p-8 text-white">
-      <h1 className="text-4xl font-bold">🔬 Raio-X do Anúncio</h1>
-      <p className="mt-2 text-slate-400">
+    <div className="mx-auto max-w-[1400px] p-6">
+      <h1 className="text-[22px] font-bold tracking-[-0.01em] text-texto">Raio-X do Anúncio</h1>
+      <p className="mt-0.5 text-[13px] text-texto-2">
         Funil por anúncio, comparado com os <strong>pares do mesmo ticket</strong>.
       </p>
 
       {/* Seletor de janela (a escada 7/15/30) */}
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <span className="text-sm text-slate-400">📅 Janela:</span>
+        <span className="text-sm text-texto-2">📅 Janela:</span>
         {janelasDisponiveis.length > 0 ? (
           janelasDisponiveis.map(([rotulo, d]) => (
             <Link
@@ -164,15 +164,15 @@ export default async function RaioXPage({ searchParams }: Props) {
               href={`/raio-x?janela=${encodeURIComponent(rotulo)}`}
               className={`rounded-full px-3 py-1 text-xs font-semibold ${
                 rotulo === janelaEscolhida
-                  ? "bg-cyan-600 text-white"
-                  : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                  ? "bg-primaria text-texto"
+                  : "bg-chip-cinza-fundo text-texto hover:bg-chip-cinza-fundo"
               }`}
             >
               {rotulo} ({d.itens.length} produtos)
             </Link>
           ))
         ) : (
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-texto-2">
             nenhuma ainda — abra o Seller Center com a extensão ligada
           </span>
         )}
@@ -181,40 +181,40 @@ export default async function RaioXPage({ searchParams }: Props) {
       {/* Cards do painel */}
       {(rankMedio > 0 || sugestoes.length > 0) && (
         <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-3">
-          <div className="rounded-2xl border border-purple-800 bg-slate-900 p-6">
-            <p className="text-sm text-slate-400">📍 Posição média no leilão</p>
-            <p className="mt-2 text-4xl font-bold text-purple-300">
+          <div className="rounded-2xl border border-primaria bg-superficie p-6">
+            <p className="text-sm text-texto-2">📍 Posição média no leilão</p>
+            <p className="mt-2 text-4xl font-bold text-chip-roxo-texto">
               {rankMedio > 0 ? rankMedio.toFixed(0) + "º" : "-"}
             </p>
-            <p className="mt-1 text-xs text-slate-500">menor = mais no topo</p>
+            <p className="mt-1 text-xs text-texto-2">menor = mais no topo</p>
           </div>
-          <div className="rounded-2xl bg-slate-900 p-6">
-            <p className="text-sm text-slate-400">CPC médio</p>
+          <div className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+            <p className="text-sm text-texto-2">CPC médio</p>
             <p className="mt-2 text-4xl font-bold">
               {cpcMedio > 0 ? moeda(cpcMedio) : "-"}
             </p>
           </div>
-          <div className="rounded-2xl bg-slate-900 p-6">
-            <p className="text-sm text-slate-400">Diagnóstico da Shopee</p>
-            <p className="mt-2 text-4xl font-bold text-amber-300">
+          <div className="rounded-[14px] border border-borda bg-superficie p-6 shadow-cartao">
+            <p className="text-sm text-texto-2">Diagnóstico da Shopee</p>
+            <p className="mt-2 text-4xl font-bold text-alerta">
               {vereditosShopee.filter((v) => v.resultado === "poor").length}
-              <span className="text-lg text-slate-500">/{vereditosShopee.length}</span>
+              <span className="text-lg text-texto-2">/{vereditosShopee.length}</span>
             </p>
-            <p className="mt-1 text-xs text-slate-500">campanhas com problema</p>
+            <p className="mt-1 text-xs text-texto-2">campanhas com problema</p>
           </div>
         </div>
       )}
 
       {sugestoes.length > 0 && (
-        <div className="mt-6 rounded-2xl border border-cyan-800 bg-slate-900 p-6">
-          <h2 className="text-xl font-bold">🎯 A própria Shopee sugere mudar o ROAS alvo</h2>
+        <div className="mt-6 rounded-2xl border border-primaria bg-superficie p-6">
+          <h2 className="text-[15px] font-semibold text-texto">A própria Shopee sugere mudar o ROAS alvo</h2>
           <div className="mt-3 space-y-1">
             {sugestoes.map((s) => (
-              <p key={s.campanhaId} className="text-sm text-slate-300">
-                Campanha <span className="text-slate-500">{s.campanhaId}</span> ·{" "}
-                <span className="text-red-300">{s.problema}</span> · alvo{" "}
+              <p key={s.campanhaId} className="text-sm text-texto">
+                Campanha <span className="text-texto-2">{s.campanhaId}</span> ·{" "}
+                <span className="text-perigo">{s.problema}</span> · alvo{" "}
                 <strong>{s.roasAtual?.toFixed(1)}</strong> → sugerido{" "}
-                <strong className="text-green-300">{s.roasSugerido?.toFixed(1)}</strong>
+                <strong className="text-sucesso">{s.roasSugerido?.toFixed(1)}</strong>
               </p>
             ))}
           </div>
@@ -222,30 +222,30 @@ export default async function RaioXPage({ searchParams }: Props) {
       )}
 
       {!usandoColetor ? (
-        <div className="mt-8 rounded-2xl bg-yellow-900/40 p-6 text-yellow-200">
+        <div className="mt-6 rounded-2xl bg-chip-amarelo-fundo p-6 text-alerta">
           <p className="font-semibold">O coletor ainda não trouxe o funil por produto.</p>
           <p className="mt-2 text-sm">
             Com a extensão atualizada, abra o Seller Center →{" "}
             <strong>Informações Gerenciais → ranking de produtos</strong> (período
             30 dias) e espere ~15s. Depois recarregue aqui.
           </p>
-          <p className="mt-2 text-xs text-slate-400">
+          <p className="mt-2 text-xs text-texto-2">
             Capturas de product-rankings encontradas: {capsRanking.length}
             {capsRanking.length > 0 && " (mas nenhuma com produtos legíveis)"}
           </p>
         </div>
       ) : (
         <>
-          <p className="mt-6 text-xs text-slate-500">
+          <p className="mt-6 text-xs text-texto-2">
             Fonte: painel da Shopee (coletor) • janela <strong>{janelaEscolhida}</strong>{" "}
             • {itens.length} produtos • capturado em{" "}
             {new Date(dadosJanela!.quando).toLocaleString("pt-BR")}
             {importAds && ` • gasto/ROAS da planilha ${importAds.periodo_inicio || ""}`}
           </p>
 
-          <div className="mt-8 overflow-x-auto rounded-2xl border border-slate-800">
+          <div className="mt-6 overflow-x-auto rounded-2xl border border-borda">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-800 text-slate-300">
+              <thead className="bg-superficie-2 text-texto">
                 <tr>
                   <th className="p-3">Anúncio</th>
                   <th className="p-3">Veredito</th>
@@ -260,25 +260,25 @@ export default async function RaioXPage({ searchParams }: Props) {
               </thead>
               <tbody>
                 {avaliados.map(({ i, v }) => (
-                  <tr key={i.itemId} className="border-t border-slate-800 align-top">
+                  <tr key={i.itemId} className="border-t border-borda align-top">
                     <td className="max-w-md p-3">
                       <p className="font-semibold">{i.nome.slice(0, 65)}</p>
-                      <p className="mt-1 text-xs text-slate-500">{v.motivo}</p>
+                      <p className="mt-1 text-xs text-texto-2">{v.motivo}</p>
                     </td>
                     <td className="p-3">
                       <span className={`whitespace-nowrap rounded-full px-2 py-1 text-xs font-semibold ${v.cor}`}>
                         {v.acao}
                       </span>
                     </td>
-                    <td className="p-3 text-green-300">{moeda(i.vendasPagas)}</td>
-                    <td className="p-3 text-slate-400">
+                    <td className="p-3 text-sucesso">{moeda(i.vendasPagas)}</td>
+                    <td className="p-3 text-texto-2">
                       {i.impressoes.toLocaleString("pt-BR")}
                     </td>
                     <td className="p-3">{pct(i.ctr)}</td>
-                    <td className="p-3 font-semibold text-cyan-300">{pct(i.taxaCarrinho)}</td>
+                    <td className="p-3 font-semibold text-chip-ceu-texto">{pct(i.taxaCarrinho)}</td>
                     <td className="p-3">{pct(i.taxaConversao)}</td>
-                    <td className="p-3 text-slate-400">{pct(i.bounce)}</td>
-                    <td className="p-3 text-slate-400">{moeda(i.ticket)}</td>
+                    <td className="p-3 text-texto-2">{pct(i.bounce)}</td>
+                    <td className="p-3 text-texto-2">{moeda(i.ticket)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -287,7 +287,7 @@ export default async function RaioXPage({ searchParams }: Props) {
         </>
       )}
 
-      <p className="mt-4 text-xs text-slate-500">
+      <p className="mt-4 text-xs text-texto-2">
         <strong>Como leio:</strong> CTR baixo = aparece mas não clicam → vitrine
         (capa/título/preço). Carrinho baixo = clicam e não adicionam → página
         (fotos/descrição/avaliações). Muito visitante e zero venda = pausar.
