@@ -17,6 +17,11 @@ export function upsellerConfigurado(): { mcp: boolean; rest: boolean } {
 }
 
 let mcpId = 1;
+// Chamada crua de uma ferramenta SÓ DE LEITURA (sondagem): devolve a resposta inteira.
+export async function mcpToolBruto(name: string, args: J): Promise<J> {
+  if (!/^(get_|page_)/.test(name)) throw new Error("só ferramentas de leitura (get_/page_)");
+  return mcpTool<J>(name, args);
+}
 // tools/list: devolve o inputSchema de cada ferramenta (para descobrir os nomes dos parâmetros).
 export async function mcpListaFerramentas(): Promise<J> {
   const token = process.env.UPSELLER_MCP_TOKEN;

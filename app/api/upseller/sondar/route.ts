@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { autorizarAdmin } from "@/lib/autorizacao";
-import { listarArmazens, listarSkusArmazem, mcpListaFerramentas, paginaSkusBruta, upsellerConfigurado } from "@/lib/upseller/cliente";
+import { listarArmazens, listarSkusArmazem, mcpListaFerramentas, mcpToolBruto, paginaSkusBruta, upsellerConfigurado } from "@/lib/upseller/cliente";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -14,6 +14,13 @@ export async function GET(request: NextRequest) {
   const cfg = upsellerConfigurado();
   if (!cfg.mcp && !cfg.rest) return NextResponse.json({ sucesso: false, configurado: cfg, erro: "Crie UPSELLER_MCP_TOKEN (recomendado) ou UPSELLER_CLIENT_ID + UPSELLER_API_TOKEN na Vercel." });
   try {
+    const chamar = request.nextUrl.searchParams.get("chamar");
+    if (chamar) {
+      // ?chamar=<ferramenta de leitura>&args=<json>  → resposta crua (para descobrir o formato)
+      const args = JSON.parse(request.nextUrl.searchParams.get("args") || "{}");
+      const resp = await mcpToolBruto(chamar, args).catch((e) => ({ erro: String(e) }));
+      return NextResponse.json({ sucesso: true, chamar, args, resposta: JSON.stringify(resp).slice(0, 6000) });
+    }
     if (request.nextUrl.searchParams.get("tools") === "1") {
       const lista = await mcpListaFerramentas();
       const nome = request.nextUrl.searchParams.get("tool");
