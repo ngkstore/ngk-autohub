@@ -112,7 +112,7 @@ export default function SincronizarPedidosButton({ lojaId }: Props) {
           <div
             className={`rounded-xl px-4 py-3 text-sm font-semibold ${
               resultado.sucesso
-                ? "bg-chip-verde-fundo text-green-200"
+                ? "bg-chip-verde-fundo text-sucesso"
                 : "bg-chip-vermelho-fundo text-perigo"
             }`}
           >

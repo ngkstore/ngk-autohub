@@ -85,7 +85,7 @@ export default function EnriquecerFinanceiroButton() {
   }
 
   return (
-    <div className="rounded-2xl border border-violet-800 bg-superficie p-6">
+    <div className="rounded-2xl border border-primaria bg-superficie p-6">
       <h2 className="text-2xl font-bold">Conciliar Financeiro (Shopee)</h2>
 
       <p className="mt-2 text-sm text-texto-2">
@@ -97,7 +97,7 @@ export default function EnriquecerFinanceiroButton() {
       <button
         onClick={conciliar}
         disabled={loading}
-        className="mt-4 rounded-xl bg-violet-600 px-5 py-3 text-sm font-semibold text-texto hover:bg-violet-500 disabled:opacity-50"
+        className="mt-4 rounded-xl bg-primaria px-5 py-3 text-sm font-semibold text-texto hover:bg-primaria-hover disabled:opacity-50"
       >
         {loading ? "Conciliando..." : "Conciliar Financeiro"}
       </button>

@@ -22,8 +22,8 @@ type Late = { loja_id: string; dia: string; order_sn: string; shipping_deadline:
 type Iss = { loja_id: string; dia: string; item_id: number; reason: number | null };
 
 const COR_RATING: Record<number, string> = {
-  1: "bg-red-900/60 text-red-200 border-red-800", 2: "bg-orange-900/60 text-orange-200 border-orange-800",
-  3: "bg-emerald-900/50 text-emerald-200 border-emerald-800", 4: "bg-emerald-800/60 text-emerald-100 border-emerald-700",
+  1: "bg-chip-vermelho-fundo/60 text-perigo border-chip-vermelho-fundo", 2: "bg-chip-laranja-fundo/60 text-alerta border-orange-800",
+  3: "bg-chip-verde-fundo text-sucesso border-chip-verde-fundo", 4: "bg-emerald-800/60 text-emerald-100 border-chip-verde-fundo",
 };
 const dt = (s: string | null) => (s ? new Date(s).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "—");
 const dth = (s: string | null) =>
@@ -78,11 +78,11 @@ export default async function SaudePage({ searchParams }: Props) {
   }
 
   return (
-    <div className="p-8 text-white">
+    <div className="mx-auto max-w-[1400px] p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-bold">🩺 Saúde da conta</h1>
-          <p className="mt-2 max-w-2xl text-slate-400">
+          <h1 className="text-[22px] font-bold tracking-[-0.01em] text-texto">Saúde da conta</h1>
+          <p className="mt-2 max-w-2xl text-texto-2">
             Métricas que a Shopee usa pra punir ou premiar a loja (envio, anúncios, atendimento), pontos de penalidade,
             punições em vigor, pedidos atrasados e anúncios com problema. Coleta diária de manhã; alertas vão pro Telegram.
           </p>
@@ -91,7 +91,7 @@ export default async function SaudePage({ searchParams }: Props) {
       </div>
 
       {ids.length === 0 && (
-        <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-5 text-slate-400">
+        <div className="mt-6 rounded-[14px] border border-borda bg-superficie p-5 shadow-cartao text-texto-2">
           Sem coleta ainda — o coletor roda todo dia de manhã. Se acabou de configurar, chame /api/shopee/saude/coletar.
         </div>
       )}
@@ -105,29 +105,29 @@ export default async function SaudePage({ searchParams }: Props) {
         const is = iss.filter((x) => x.loja_id === id);
         const tipos = [1, 2, 3].filter((t) => m.some((x) => x.metric_type === t));
         const cards: [string, string | number | null, string][] = [
-          ["Métricas fora da meta", s.metricas_fora, (s.metricas_fora || 0) > 0 ? "text-red-300" : "text-emerald-300"],
-          ["Punições em vigor", s.punicoes_ativas, (s.punicoes_ativas || 0) > 0 ? "text-red-300" : "text-emerald-300"],
-          ["Pontos (90 dias)", s.pontos_penalidade, (s.pontos_penalidade || 0) > 0 ? "text-orange-300" : "text-emerald-300"],
-          ["Pedidos atrasados", s.pedidos_atrasados, (s.pedidos_atrasados || 0) > 0 ? "text-orange-300" : "text-emerald-300"],
-          ["Anúncios c/ problema", s.anuncios_problema, (s.anuncios_problema || 0) > 0 ? "text-orange-300" : "text-emerald-300"],
-          ["Falhas envio / anúncio / atend.", `${s.falhas_envio ?? 0} / ${s.falhas_anuncio ?? 0} / ${s.falhas_atendimento ?? 0}`, "text-slate-200"],
+          ["Métricas fora da meta", s.metricas_fora, (s.metricas_fora || 0) > 0 ? "text-perigo" : "text-sucesso"],
+          ["Punições em vigor", s.punicoes_ativas, (s.punicoes_ativas || 0) > 0 ? "text-perigo" : "text-sucesso"],
+          ["Pontos (90 dias)", s.pontos_penalidade, (s.pontos_penalidade || 0) > 0 ? "text-alerta" : "text-sucesso"],
+          ["Pedidos atrasados", s.pedidos_atrasados, (s.pedidos_atrasados || 0) > 0 ? "text-alerta" : "text-sucesso"],
+          ["Anúncios c/ problema", s.anuncios_problema, (s.anuncios_problema || 0) > 0 ? "text-alerta" : "text-sucesso"],
+          ["Falhas envio / anúncio / atend.", `${s.falhas_envio ?? 0} / ${s.falhas_anuncio ?? 0} / ${s.falhas_atendimento ?? 0}`, "text-texto"],
         ];
         return (
-          <section key={id} className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-5">
+          <section key={id} className="mt-6 rounded-[14px] border border-borda bg-superficie p-5 shadow-cartao">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <h2 className="text-2xl font-bold">{nomeLoja[id]}</h2>
-                <span className={`rounded-full border px-3 py-1 text-sm font-semibold ${s.rating != null ? COR_RATING[s.rating] || "border-slate-700" : "border-slate-700 text-slate-400"}`}>
+                <h2 className="text-[15px] font-semibold text-texto">{nomeLoja[id]}</h2>
+                <span className={`rounded-full border px-3 py-1 text-sm font-semibold ${s.rating != null ? COR_RATING[s.rating] || "border-borda" : "border-borda text-texto-2"}`}>
                   {s.rating != null ? RATING[s.rating] || s.rating : "sem nota"}
                 </span>
               </div>
-              <p className="text-xs text-slate-500">coletado {dth(s.coletado_em)} · dia {diaLocal(s.dia)}</p>
+              <p className="text-xs text-texto-2">coletado {dth(s.coletado_em)} · dia {diaLocal(s.dia)}</p>
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
               {cards.map(([l, v, c]) => (
-                <div key={l} className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
-                  <p className="text-xs text-slate-400">{l}</p>
+                <div key={l} className="rounded-xl border border-borda bg-fundo/60 p-3">
+                  <p className="text-xs text-texto-2">{l}</p>
                   <p className={`mt-1 text-xl font-bold ${c}`}>{v ?? "—"}</p>
                 </div>
               ))}
@@ -136,7 +136,7 @@ export default async function SaudePage({ searchParams }: Props) {
             {pAtivas.length > 0 && (
               <div className="mt-4 space-y-2">
                 {pAtivas.map((p, i) => (
-                  <div key={i} className="rounded-xl border border-red-900 bg-red-950/40 px-4 py-3 text-sm text-red-200">
+                  <div key={i} className="rounded-xl border border-red-900 bg-chip-vermelho-fundo/40 px-4 py-3 text-sm text-perigo">
                     ⛔ Punição em vigor: <b>{PUNICAO_PT[p.punishment_type] || `tipo ${p.punishment_type}`}</b> desde {dt(p.start_time)}
                     {p.end_time ? ` até ${dt(p.end_time)}` : ""}
                     {p.order_limit ? ` · limite de pedidos ${p.order_limit}%` : ""}
@@ -148,9 +148,9 @@ export default async function SaudePage({ searchParams }: Props) {
 
             <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-3">
               {tipos.map((t) => (
-                <div key={t} className="overflow-x-auto rounded-xl border border-slate-800">
+                <div key={t} className="overflow-x-auto rounded-xl border border-borda">
                   <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-800 text-xs uppercase text-slate-400">
+                    <thead className="bg-superficie-2 text-xs uppercase text-texto-2">
                       <tr>
                         <th className="p-2">{TIPO_METRICA[t]}</th>
                         <th className="p-2 text-right">Atual</th>
@@ -160,17 +160,17 @@ export default async function SaudePage({ searchParams }: Props) {
                     </thead>
                     <tbody>
                       {m.filter((x) => x.metric_type === t).map((x) => (
-                        <tr key={x.metric_id} className={`border-t border-slate-800 ${x.fora_da_meta ? "bg-red-950/30" : ""}`}>
+                        <tr key={x.metric_id} className={`border-t border-borda ${x.fora_da_meta ? "bg-chip-vermelho-fundo/30" : ""}`}>
                           <td className="p-2">
-                            <span className={x.parent_metric_id && x.parent_metric_id > 0 ? "pl-3 text-slate-400" : "text-slate-200"}>
+                            <span className={x.parent_metric_id && x.parent_metric_id > 0 ? "pl-3 text-texto-2" : "text-texto"}>
                               {x.fora_da_meta ? "❌ " : x.fora_da_meta === false ? "✅ " : ""}
                               {METRICA_PT[x.metric_id] || x.nome || x.metric_id}
                             </span>
-                            {x.isencao_ate && <span className="ml-1 text-[10px] text-blue-300">(isento até {x.isencao_ate})</span>}
+                            {x.isencao_ate && <span className="ml-1 text-[10px] text-primaria">(isento até {x.isencao_ate})</span>}
                           </td>
-                          <td className={`p-2 text-right font-semibold ${x.fora_da_meta ? "text-red-300" : "text-white"}`}>{fmtValor(x.atual, x.unidade)}</td>
-                          <td className="p-2 text-right text-slate-400">{fmtMeta(x.alvo, x.comparador, x.unidade)}</td>
-                          <td className="p-2 text-right text-slate-500">{fmtValor(x.anterior, x.unidade)}</td>
+                          <td className={`p-2 text-right font-semibold ${x.fora_da_meta ? "text-perigo" : "text-texto"}`}>{fmtValor(x.atual, x.unidade)}</td>
+                          <td className="p-2 text-right text-texto-2">{fmtMeta(x.alvo, x.comparador, x.unidade)}</td>
+                          <td className="p-2 text-right text-texto-2">{fmtValor(x.anterior, x.unidade)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -180,50 +180,50 @@ export default async function SaudePage({ searchParams }: Props) {
             </div>
 
             <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-3">
-              <div className="rounded-xl border border-slate-800 p-3">
-                <p className="text-xs font-semibold uppercase text-slate-400">Pontos de penalidade (90 dias)</p>
+              <div className="rounded-xl border border-borda p-3">
+                <p className="text-xs font-semibold uppercase text-texto-2">Pontos de penalidade (90 dias)</p>
                 {pen.length === 0 ? (
-                  <p className="mt-2 text-sm text-emerald-300">Nenhum ponto no período.</p>
+                  <p className="mt-2 text-sm text-sucesso">Nenhum ponto no período.</p>
                 ) : (
                   <ul className="mt-2 space-y-1 text-sm">
                     {pen.slice(0, 15).map((p, i) => (
-                      <li key={i} className="text-slate-300">
-                        <span className="text-orange-300">{p.pontos_atual ?? p.pontos_original ?? "?"} pt</span> · {violacaoPt(p.violation_type)} ·{" "}
-                        <span className="text-slate-500">{dt(p.issue_time)}</span>
+                      <li key={i} className="text-texto">
+                        <span className="text-alerta">{p.pontos_atual ?? p.pontos_original ?? "?"} pt</span> · {violacaoPt(p.violation_type)} ·{" "}
+                        <span className="text-texto-2">{dt(p.issue_time)}</span>
                       </li>
                     ))}
                   </ul>
                 )}
               </div>
-              <div className="rounded-xl border border-slate-800 p-3">
-                <p className="text-xs font-semibold uppercase text-slate-400">Pedidos com envio atrasado</p>
+              <div className="rounded-xl border border-borda p-3">
+                <p className="text-xs font-semibold uppercase text-texto-2">Pedidos com envio atrasado</p>
                 {lt.length === 0 ? (
-                  <p className="mt-2 text-sm text-emerald-300">Nenhum pedido atrasado.</p>
+                  <p className="mt-2 text-sm text-sucesso">Nenhum pedido atrasado.</p>
                 ) : (
                   <ul className="mt-2 space-y-1 text-sm">
                     {lt.slice(0, 20).map((o) => (
-                      <li key={o.order_sn} className="text-slate-300">
+                      <li key={o.order_sn} className="text-texto">
                         <span className="font-mono">{o.order_sn}</span> · prazo {dt(o.shipping_deadline)} ·{" "}
-                        <span className="text-red-300">{o.late_by_days ?? "?"} dia(s)</span>
+                        <span className="text-perigo">{o.late_by_days ?? "?"} dia(s)</span>
                       </li>
                     ))}
-                    {lt.length > 20 && <li className="text-slate-500">… e mais {lt.length - 20}</li>}
+                    {lt.length > 20 && <li className="text-texto-2">… e mais {lt.length - 20}</li>}
                   </ul>
                 )}
               </div>
-              <div className="rounded-xl border border-slate-800 p-3">
-                <p className="text-xs font-semibold uppercase text-slate-400">Anúncios com problema</p>
+              <div className="rounded-xl border border-borda p-3">
+                <p className="text-xs font-semibold uppercase text-texto-2">Anúncios com problema</p>
                 {is.length === 0 ? (
-                  <p className="mt-2 text-sm text-emerald-300">Nenhum anúncio apontado.</p>
+                  <p className="mt-2 text-sm text-sucesso">Nenhum anúncio apontado.</p>
                 ) : (
                   <ul className="mt-2 space-y-1 text-sm">
                     {is.slice(0, 20).map((i) => (
-                      <li key={i.item_id} className="truncate text-slate-300" title={nomes[String(i.item_id)] || String(i.item_id)}>
-                        <span className="text-orange-300">{i.reason != null ? MOTIVO_ANUNCIO[i.reason] || `motivo ${i.reason}` : "—"}</span> ·{" "}
+                      <li key={i.item_id} className="truncate text-texto" title={nomes[String(i.item_id)] || String(i.item_id)}>
+                        <span className="text-alerta">{i.reason != null ? MOTIVO_ANUNCIO[i.reason] || `motivo ${i.reason}` : "—"}</span> ·{" "}
                         {nomes[String(i.item_id)] || i.item_id}
                       </li>
                     ))}
-                    {is.length > 20 && <li className="text-slate-500">… e mais {is.length - 20}</li>}
+                    {is.length > 20 && <li className="text-texto-2">… e mais {is.length - 20}</li>}
                   </ul>
                 )}
               </div>
@@ -232,7 +232,7 @@ export default async function SaudePage({ searchParams }: Props) {
         );
       })}
 
-      <p className="mt-6 text-xs text-slate-500">
+      <p className="mt-6 text-xs text-texto-2">
         <b>Nota geral</b> é a classificação da Shopee (Ruim → Excelente). <b>Meta</b> &quot;até&quot; = a métrica precisa ficar abaixo;
         &quot;mín.&quot; = precisa ficar acima. Pontos de penalidade acumulam por trimestre e disparam punições por faixa (anúncios ocultos,
         sem campanhas, limite de pedidos, suspensão). Alertas no Telegram: métrica fora da meta (1x/dia), ponto ou punição nova (1x),

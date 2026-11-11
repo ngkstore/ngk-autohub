@@ -17,7 +17,7 @@ export default function LojaSeletor({
         const v = e.target.value;
         window.location.href = v === "todas" ? base : `${base}?loja=${v}`;
       }}
-      className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm font-semibold text-white focus:border-emerald-500 focus:outline-none"
+      className="rounded-lg border border-borda bg-superficie-2 px-3 py-2 text-sm font-semibold text-texto focus:border-primaria focus:outline-none"
     >
       <option value="todas">Todas as minhas lojas</option>
       {lojas.map((l) => (

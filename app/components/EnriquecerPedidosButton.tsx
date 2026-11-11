@@ -87,7 +87,7 @@ export default function EnriquecerPedidosButton() {
   }
 
   return (
-    <div className="rounded-2xl border border-sky-800 bg-superficie p-6">
+    <div className="rounded-2xl border border-primaria bg-superficie p-6">
       <h2 className="text-2xl font-bold">Enriquecer Pedidos</h2>
 
       <p className="mt-2 text-sm text-texto-2">
@@ -98,7 +98,7 @@ export default function EnriquecerPedidosButton() {
       <button
         onClick={enriquecer}
         disabled={loading}
-        className="mt-4 rounded-xl bg-sky-600 px-5 py-3 text-sm font-semibold text-texto hover:bg-sky-500 disabled:opacity-50"
+        className="mt-4 rounded-xl bg-primaria px-5 py-3 text-sm font-semibold text-texto hover:bg-primaria-hover disabled:opacity-50"
       >
         {loading ? "Enriquecendo..." : "Enriquecer Pedidos"}
       </button>
