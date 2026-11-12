@@ -45,16 +45,8 @@ export type DevolucaoResumo = {
 
 const CAMPOS = "id, loja_id, canal, plataforma_id, pedido_id, tipo, etapa, status_plataforma, motivo_codigo, motivo_texto, texto_comprador, valor_pedido, valor_reembolso_pedido, valor_reembolsado, prazo_resposta, prazo_prova, prazo_contestar, rastreio_reverso, transportadora_reversa, chegou_em, comprador_usuario, comprador_id, sugestao, regra_id, disputa_status, compensacao_status, valor_recuperado, credito_status, credito_esperado_ate, creditado_em, resultado, itens, plataforma_criado_em, plataforma_atualizado_em, atualizado_em, lojas(apelido)";
 
-// Abas da fila → etapas / condições.
-export const ABAS_FILA: { id: string; nome: string; etapas?: string[]; filtro?: (d: DevolucaoResumo) => boolean }[] = [
-  { id: "responder", nome: "Responder", etapas: ["resposta", "solicitado"] },
-  { id: "prova", nome: "Enviar prova", filtro: (d) => d.etapa !== "encerrado" && !!d.prazo_prova && new Date(d.prazo_prova) > new Date() },
-  { id: "transito", nome: "Em trânsito", etapas: ["voltando", "coleta"] },
-  { id: "inspecionar", nome: "Validar / inspecionar", etapas: ["recebido", "validar", "inspecao"] },
-  { id: "disputa", nome: "Em disputa", filtro: (d) => d.etapa === "decisao" && !!(d.disputa_status || d.compensacao_status) },
-  { id: "plataforma", nome: "Aguardando plataforma", filtro: (d) => d.etapa === "decisao" && !(d.disputa_status || d.compensacao_status) },
-  { id: "encerradas", nome: "Encerradas", etapas: ["encerrado"] },
-];
+// Abas da fila → etapas / condições (módulo puro, testável).
+export { ABAS_FILA } from "@/lib/devolucoes/abas";
 
 export async function listarDevolucoes(lojaIds: string[] | null, opts: { encerradas?: boolean; limite?: number } = {}): Promise<DevolucaoResumo[]> {
   let q = supabase.from("devolucoes").select(CAMPOS).order("prazo_resposta", { ascending: true, nullsFirst: false }).limit(opts.limite ?? 500);

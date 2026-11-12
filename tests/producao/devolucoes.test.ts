@@ -3,16 +3,13 @@
 // (conferencia_devolucoes_etapas). Pulado sem acesso ao banco.
 import { describe, expect, it } from "vitest";
 import { banco, rpc, temBanco } from "./banco";
-import { ABAS_FILA, type DevolucaoResumo } from "@/lib/devolucoes/consultas";
+import { casoNaAba, type CasoParaAba } from "@/lib/devolucoes/abas";
 
 describe.skipIf(!temBanco())("Devoluções × banco", () => {
   it("abas da fila = contagem direta por etapa", async () => {
     const { data } = await banco().from("devolucoes").select("id, etapa, prazo_resposta, prazo_prova, disputa_status, compensacao_status").neq("etapa", "encerrado").limit(5000);
-    const abertas = ((data || []) as unknown) as DevolucaoResumo[];
-    const conta = (id: string) => {
-      const aba = ABAS_FILA.find((a) => a.id === id)!;
-      return abertas.filter((d) => (aba.etapas ? aba.etapas.includes(d.etapa) : aba.filtro!(d))).length;
-    };
+    const abertas = ((data || []) as unknown) as CasoParaAba[];
+    const conta = (id: string) => abertas.filter((d) => casoNaAba(id, d)).length;
     const direto = await rpc<Record<string, number>>("conferencia_devolucoes_etapas", { p_loja_ids: null });
     expect(conta("responder")).toBe(Number(direto.responder));
     expect(conta("transito")).toBe(Number(direto.transito));

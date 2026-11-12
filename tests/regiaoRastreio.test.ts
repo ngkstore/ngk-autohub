@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analisarRastreio } from "@/lib/shopee/regiao";
+import { analisarRastreio } from "@/lib/shopee/rastreio";
 
 // Eventos como o get_tracking_info devolve: do mais recente ao mais antigo.
 const emTransito = [
