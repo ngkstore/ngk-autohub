@@ -49,8 +49,8 @@ const CAMPOS = "id, loja_id, canal, plataforma_id, pedido_id, tipo, etapa, statu
 export const ABAS_FILA: { id: string; nome: string; etapas?: string[]; filtro?: (d: DevolucaoResumo) => boolean }[] = [
   { id: "responder", nome: "Responder", etapas: ["resposta", "solicitado"] },
   { id: "prova", nome: "Enviar prova", filtro: (d) => d.etapa !== "encerrado" && !!d.prazo_prova && new Date(d.prazo_prova) > new Date() },
-  { id: "transito", nome: "Em trânsito", etapas: ["voltando"] },
-  { id: "inspecionar", nome: "Inspecionar", etapas: ["recebido", "inspecao"] },
+  { id: "transito", nome: "Em trânsito", etapas: ["voltando", "coleta"] },
+  { id: "inspecionar", nome: "Validar / inspecionar", etapas: ["recebido", "validar", "inspecao"] },
   { id: "disputa", nome: "Em disputa", filtro: (d) => d.etapa === "decisao" && !!(d.disputa_status || d.compensacao_status) },
   { id: "plataforma", nome: "Aguardando plataforma", filtro: (d) => d.etapa === "decisao" && !(d.disputa_status || d.compensacao_status) },
   { id: "encerradas", nome: "Encerradas", etapas: ["encerrado"] },

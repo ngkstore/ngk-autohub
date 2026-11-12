@@ -104,8 +104,8 @@ export const REGRAS_INICIAIS: Omit<Regra, "id">[] = [
   { ordem: 21, ativa: false, nome: "Peso na volta 20% abaixo do envio → disputar", condicao: { chegou: true, peso_abaixo_pct: 20 }, acao: { tipo: "disputar", provas: ["quadros_abertura", "peso"] }, modo: "aprovar" },
   { ordem: 30, ativa: false, nome: "'Não recebido' com entrega confirmada e foto → disputar com comprovante", condicao: { nao_recebido_com_entrega: true }, acao: { tipo: "disputar", provas: ["comprovante_entrega"] }, modo: "aprovar" },
   { ordem: 40, ativa: false, nome: "Defeito em produto até R$ 40 → oferecer 40% sem devolução", condicao: { motivo_in: ["FUNCTIONAL", "DAMAGE", "DEFECT", "ecom_order_delivered_refund_and_return_reason_damaged", "ecom_order_delivered_refund_and_return_reason_defective"], valor_max: 40 }, acao: { tipo: "oferecer_parcial", valor_parcial_pct: 40 }, modo: "aprovar" },
-  { ordem: 50, ativa: false, nome: "Prazo com menos de 4 h → alerta no Telegram", condicao: { prazo_horas_max: 4, etapa_in: ["resposta", "decisao", "recebido"] }, acao: { tipo: "alerta" }, modo: "automatico" },
-  { ordem: 60, ativa: false, nome: "Pacote chegou ao armazém → tarefa de inspeção em até 24 h", condicao: { chegou: true, etapa_in: ["voltando", "recebido"] }, acao: { tipo: "tarefa_inspecao" }, modo: "automatico" },
+  { ordem: 50, ativa: false, nome: "Prazo com menos de 4 h → alerta no Telegram", condicao: { prazo_horas_max: 4, etapa_in: ["resposta", "decisao", "recebido", "validar", "coleta"] }, acao: { tipo: "alerta" }, modo: "automatico" },
+  { ordem: 60, ativa: false, nome: "Pacote chegou ao armazém → tarefa de inspeção em até 24 h", condicao: { chegou: true, etapa_in: ["voltando", "recebido", "validar"] }, acao: { tipo: "tarefa_inspecao" }, modo: "automatico" },
   { ordem: 70, ativa: false, nome: "Comprador com 3+ devoluções em 90 dias → marcar suspeito", condicao: { devolucoes_90d_min: 3 }, acao: { tipo: "marcar_suspeito" }, modo: "automatico" },
   { ordem: 80, ativa: false, nome: "Disputa ganha sem crédito em 3 dias → alerta e texto de cobrança", condicao: { disputa_ganha_sem_credito_dias: 3 }, acao: { tipo: "cobrar_credito" }, modo: "automatico" },
 ];

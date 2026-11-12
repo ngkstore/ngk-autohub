@@ -26,7 +26,7 @@ export async function gerarAlertasAutomaticos() {
   const { data: devolucoes } = await supabase
     .from("devolucoes")
     .select("id, loja_id, canal, plataforma_id, prazo_resposta, valor_reembolso_pedido")
-    .in("etapa", ["resposta", "decisao", "recebido"])
+    .in("etapa", ["resposta", "decisao", "recebido", "validar", "coleta"])
     .lte("prazo_resposta", em24h)
     .limit(20);
   for (const d of devolucoes || []) {

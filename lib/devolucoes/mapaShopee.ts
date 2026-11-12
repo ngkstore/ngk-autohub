@@ -8,18 +8,28 @@ const str = (v: unknown) => (v === null || v === undefined ? null : String(v));
 
 export const JANELA_SHOPEE_DIAS = 15; // limite da API por consulta
 
-// status da Shopee → etapa do caso.
+// status da Shopee → etapa do caso (espelha as filas do Seller Center):
+//   Validar item: pacote devolvido entregue ao vendedor (logistics_status LOGISTICS_DELIVERY_DONE
+//     ou is_arrived_at_warehouse) → "validar", prazo return_seller_due_date.
+//   Analisar reembolso aprovado pela Shopee: ACCEPTED, return_solution 1 (só reembolso),
+//     validation_type seller_validation, logística não iniciada → "validar", prazo due_date.
+//   Agendar coleta: LOGISTICS_PENDING_ARRANGE → "coleta", prazo return_ship_due_date.
+//   Em trânsito: tem rastreio ou logística em andamento → "voltando" (sem ação do vendedor).
 export function etapaShopee(d: J): Etapa {
   const status = String(d.status || "").toUpperCase();
-  const chegou = d.is_arrived_at_warehouse === true;
+  const log = String(d.logistics_status || d.reverse_logistics_status || "").toUpperCase();
+  const chegou = d.is_arrived_at_warehouse === true || log === "LOGISTICS_DELIVERY_DONE";
   const rastreio = !!d.tracking_number;
+  const logisticaAndando = !!log && log !== "LOGISTICS_NOT_STARTED";
   switch (status) {
     case "REQUESTED":
       return "resposta";
     case "PROCESSING":
     case "ACCEPTED":
-      if (chegou) return "recebido";
-      if (rastreio) return "voltando";
+      if (chegou) return "validar";
+      if (log === "LOGISTICS_PENDING_ARRANGE") return "coleta";
+      if (String(d.return_solution ?? "") === "1" && String(d.validation_type || "") === "seller_validation" && !rastreio && !logisticaAndando) return "validar";
+      if (rastreio || logisticaAndando) return "voltando";
       return d.needs_logistics ? "voltando" : "decisao";
     case "JUDGING":
     case "SELLER_DISPUTE":
@@ -30,6 +40,24 @@ export function etapaShopee(d: J): Etapa {
       return "encerrado";
     default:
       return "solicitado";
+  }
+}
+
+const unixOuNull = (v: unknown) => (Number(v) > 0 ? isoDeUnix(v) : null);
+
+// Prazo da PRÓXIMA AÇÃO DO VENDEDOR por etapa (null quando a bola está com a Shopee ou o comprador):
+// entra em "Vencem em 24 h", no Painel do dia e nos alertas.
+export function prazoAcaoShopee(d: J, etapa: Etapa): string | null {
+  switch (etapa) {
+    case "resposta":
+    case "solicitado":
+      return unixOuNull(d.due_date);
+    case "validar":
+      return unixOuNull(d.return_seller_due_date) ?? unixOuNull(d.due_date);
+    case "coleta":
+      return unixOuNull(d.return_ship_due_date) ?? unixOuNull(d.due_date);
+    default:
+      return null;
   }
 }
 
@@ -67,7 +95,8 @@ export function mapearDevolucaoShopee(d: J, lojaId: string, chegouEmAnterior?: s
   const neg = (d.negotiation as J) || {};
   const prova = (d.seller_proof as J) || {};
   const comp = (d.seller_compensation as J) || {};
-  const chegou = d.is_arrived_at_warehouse === true;
+  const chegou = d.is_arrived_at_warehouse === true || String(d.logistics_status || "").toUpperCase() === "LOGISTICS_DELIVERY_DONE";
+  const etapa = etapaShopee(d);
   return {
     loja_id: lojaId,
     canal: "shopee",
@@ -75,14 +104,14 @@ export function mapearDevolucaoShopee(d: J, lojaId: string, chegouEmAnterior?: s
     pedido_id: String(d.order_sn),
     tipo: tipoShopee(d),
     status_plataforma: status,
-    etapa: etapaShopee(d),
+    etapa,
     motivo_codigo: str(d.reason),
     motivo_texto: str(d.reason),
     texto_comprador: str(d.text_reason),
     valor_pedido: num(d.amount_before_discount),
     valor_reembolso_pedido: num(d.refund_amount),
     valor_reembolsado: status === "REFUND_PAID" ? num(d.refund_amount) : null,
-    prazo_resposta: isoDeUnix(d.due_date),
+    prazo_resposta: prazoAcaoShopee(d, etapa),
     prazo_prova: isoDeUnix(prova.seller_proof_deadline ?? d.seller_evidence_deadline),
     prazo_contestar: isoDeUnix(comp.seller_compensation_due_date ?? d.return_seller_due_date),
     prazo_oferta: isoDeUnix(neg.offer_due_date ?? d.offer_due_date),

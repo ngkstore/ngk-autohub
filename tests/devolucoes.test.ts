@@ -73,7 +73,16 @@ describe("Shopee → devolucoes", () => {
   });
   it("etapas e resultados por status", () => {
     expect(etapaShopee({ status: "ACCEPTED", tracking_number: "BR1", needs_logistics: true })).toBe("voltando");
-    expect(etapaShopee({ status: "ACCEPTED", is_arrived_at_warehouse: true })).toBe("recebido");
+    expect(etapaShopee({ status: "ACCEPTED", is_arrived_at_warehouse: true })).toBe("validar");
+    // Seller Center "Validar item": pacote entregue de volta ao vendedor
+    expect(etapaShopee({ status: "PROCESSING", logistics_status: "LOGISTICS_DELIVERY_DONE", tracking_number: "BR2", needs_logistics: true })).toBe("validar");
+    // Seller Center "Analisar reembolso aprovado pela Shopee": só reembolso, pendente validação do vendedor
+    expect(etapaShopee({ status: "ACCEPTED", return_solution: 1, validation_type: "seller_validation", logistics_status: "", reverse_logistics_status: "LOGISTICS_NOT_STARTED", needs_logistics: true })).toBe("validar");
+    // Seller Center "Agendar coleta"
+    expect(etapaShopee({ status: "PROCESSING", logistics_status: "LOGISTICS_PENDING_ARRANGE", needs_logistics: true })).toBe("coleta");
+    // em trânsito de verdade: sem ação do vendedor
+    expect(etapaShopee({ status: "PROCESSING", logistics_status: "LOGISTICS_PICKUP_DONE", tracking_number: "BR3", needs_logistics: true })).toBe("voltando");
+    expect(etapaShopee({ status: "PROCESSING", logistics_status: "LOGISTICS_REQUEST_CREATED", needs_logistics: true })).toBe("voltando");
     expect(etapaShopee({ status: "JUDGING" })).toBe("decisao");
     expect(etapaShopee({ status: "REFUND_PAID" })).toBe("encerrado");
     expect(resultadoShopee({ status: "REFUND_PAID", is_refund_amount_adjusted: true })).toBe("parcial");

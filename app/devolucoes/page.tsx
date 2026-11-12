@@ -65,7 +65,7 @@ export default async function DevolucoesPage({ searchParams }: { searchParams: P
     for (const [k, v] of Object.entries(base)) if (v) p.set(k, v);
     return `/devolucoes?${p.toString()}`;
   };
-  const chegando = abertas.filter((d) => d.etapa === "voltando" || d.etapa === "recebido").sort((a, b) => (a.chegou_em ? -1 : 1) - (b.chegou_em ? -1 : 1)).slice(0, 6);
+  const chegando = abertas.filter((d) => d.etapa === "voltando" || d.etapa === "coleta" || d.etapa === "recebido" || d.etapa === "validar").sort((a, b) => (a.chegou_em ? -1 : 1) - (b.chegou_em ? -1 : 1)).slice(0, 6);
 
   return (
     <>

@@ -18,7 +18,7 @@ import { acompanharCreditos } from "@/lib/devolucoes/credito";
 //  3. alertas de prazo (< N h), tarefa de inspeção (chegou), cobrança de crédito.
 type Linha = CasoAssistente & { sugestao: Sugestao | null; prazo_prova: string | null; resultado: string | null; compensacao_status: string | null; credito_status: string | null; creditado_em: string | null; atualizado_em: string; plataforma_atualizado_em: string | null };
 
-const ETAPAS_DECISAO = ["resposta", "decisao", "recebido", "inspecao"];
+const ETAPAS_DECISAO = ["resposta", "decisao", "recebido", "validar", "inspecao"];
 
 async function regrasDaConta(contaId: string | null): Promise<Regra[]> {
   const { data } = await supabase.from("regras_devolucao").select("id, ordem, ativa, nome, condicao, acao, modo").or(contaId ? `conta_id.eq.${contaId},conta_id.is.null` : "conta_id.is.null").order("ordem");
@@ -137,7 +137,7 @@ export async function processarDevolucoes(opts: { lojaId?: string; orcamentoMs?:
         }
       }
       // 3b. chegou → tarefa de inspeção
-      if (c.chegou_em && (c.etapa === "voltando" || c.etapa === "recebido")) {
+      if (c.chegou_em && (c.etapa === "voltando" || c.etapa === "coleta" || c.etapa === "recebido")) {
         const chave = "tarefa_inspecao";
         if (!(await jaAlertou(c.id, chave))) {
           await supabase.from("devolucoes").update({ etapa: "recebido" }).eq("id", c.id);

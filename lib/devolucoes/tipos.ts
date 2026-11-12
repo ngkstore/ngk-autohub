@@ -1,6 +1,7 @@
 // Tipos do módulo de Devoluções (Parte B). Linha de `devolucoes` como o servidor grava.
 export type Canal = "shopee" | "tiktok";
-export type Etapa = "solicitado" | "resposta" | "voltando" | "recebido" | "inspecao" | "decisao" | "encerrado";
+// coleta = agendar coleta reversa (Shopee LOGISTICS_PENDING_ARRANGE); validar = "Validar item" / "Analisar reembolso aprovado pela Shopee"
+export type Etapa = "solicitado" | "resposta" | "voltando" | "coleta" | "recebido" | "validar" | "inspecao" | "decisao" | "encerrado";
 export type TipoDevolucao = "devolucao_reembolso" | "so_reembolso" | "troca" | "cancelamento";
 export type Resultado = "aprovada" | "recusada" | "parcial" | "ganha" | "perdida" | "cancelada_comprador" | "vencida";
 

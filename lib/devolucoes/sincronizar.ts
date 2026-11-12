@@ -22,7 +22,9 @@ export async function gravarDevolucao(linha: DevolucaoLinha, eventos: EventoLinh
   if (anterior?.chegou_em && !linha.chegou_em) linha.chegou_em = anterior.chegou_em; // nunca "desconfirma" a chegada
   if (anterior?.chegou_em && linha.chegou_em !== anterior.chegou_em) linha.chegou_em = anterior.chegou_em;
   // Equipe já marcou inspeção? Não volta a etapa para trás.
-  if (anterior && (anterior.etapa === "inspecao" || anterior.etapa === "recebido") && (linha.etapa === "voltando" || linha.etapa === "resposta")) linha.etapa = anterior.etapa;
+  // a equipe já está inspecionando: a plataforma não volta o caso para trânsito/resposta/validar
+  if (anterior && anterior.etapa === "inspecao" && (linha.etapa === "voltando" || linha.etapa === "coleta" || linha.etapa === "resposta" || linha.etapa === "validar" || linha.etapa === "recebido")) linha.etapa = anterior.etapa;
+  if (anterior && anterior.etapa === "recebido" && (linha.etapa === "voltando" || linha.etapa === "coleta" || linha.etapa === "resposta")) linha.etapa = anterior.etapa;
 
   const { data: salvo, error } = await supabase
     .from("devolucoes")

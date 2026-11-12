@@ -24,14 +24,14 @@ export function urgencia(prazo: string | null, agora = new Date()): Pendencia["u
   return d <= fimAmanha ? "amanha" : "depois";
 }
 
-const ETAPA_ACAO: Record<string, string> = { resposta: "Responder", decisao: "Decidir", recebido: "Inspecionar", inspecao: "Concluir inspeção", voltando: "Acompanhar volta", solicitado: "Ver caso" };
+const ETAPA_ACAO: Record<string, string> = { resposta: "Responder", decisao: "Decidir", recebido: "Inspecionar", validar: "Validar", coleta: "Agendar coleta", inspecao: "Concluir inspeção", voltando: "Acompanhar volta", solicitado: "Ver caso" };
 
 export async function pendenciasDevolucoes(lojaIds: string[] | null): Promise<Pendencia[]> {
   let q = supabase
     .from("devolucoes")
     .select("id, loja_id, canal, plataforma_id, pedido_id, etapa, motivo_codigo, valor_reembolso_pedido, prazo_resposta, prazo_prova, itens, chegou_em")
     .neq("etapa", "encerrado")
-    .in("etapa", ["resposta", "decisao", "recebido", "inspecao"])
+    .in("etapa", ["resposta", "decisao", "recebido", "validar", "coleta", "inspecao"])
     .order("prazo_resposta", { ascending: true, nullsFirst: false })
     .limit(200);
   if (lojaIds) q = q.in("loja_id", lojaIds);
@@ -59,7 +59,7 @@ export async function pendenciasDevolucoes(lojaIds: string[] | null): Promise<Pe
 export async function contadorDevolucoes(lojaIds: string[] | null): Promise<number> {
   if (lojaIds && lojaIds.length === 0) return 0;
   const limite = new Date(Date.now() + 24 * 3600000).toISOString();
-  let q = supabase.from("devolucoes").select("id", { count: "exact", head: true }).in("etapa", ["resposta", "decisao", "recebido"]).lte("prazo_resposta", limite);
+  let q = supabase.from("devolucoes").select("id", { count: "exact", head: true }).in("etapa", ["resposta", "decisao", "recebido", "validar", "coleta"]).lte("prazo_resposta", limite);
   if (lojaIds) q = q.in("loja_id", lojaIds);
   const { count } = await q;
   return count ?? 0;
