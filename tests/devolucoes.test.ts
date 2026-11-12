@@ -154,3 +154,17 @@ describe("TikTok → devolucoes", () => {
     expect(c.prazo_resposta).toBe(new Date(1794502494 * 1000).toISOString());
   });
 });
+
+describe("Shopee: validação vencida há mais de 2 dias sai da fila de ação", () => {
+  const base = { ...shopee, status: "ACCEPTED", return_solution: 1, validation_type: "seller_validation", logistics_status: "", needs_logistics: true, return_seller_due_date: 0 };
+  it("no prazo: validar com prazo", () => {
+    const l = mapearDevolucaoShopee({ ...base, due_date: 1793309467 }, LOJA, null, new Date(1793309467 * 1000 - 3600 * 1000));
+    expect(l.etapa).toBe("validar");
+    expect(l.prazo_resposta).not.toBeNull();
+  });
+  it("vencida há 3 dias: aguardando plataforma, sem prazo", () => {
+    const l = mapearDevolucaoShopee({ ...base, due_date: 1793309467 }, LOJA, null, new Date(1793309467 * 1000 + 3 * 86400 * 1000));
+    expect(l.etapa).toBe("decisao");
+    expect(l.prazo_resposta).toBeNull();
+  });
+});

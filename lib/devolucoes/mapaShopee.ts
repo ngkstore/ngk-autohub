@@ -81,7 +81,7 @@ export function tipoShopee(d: J): TipoDevolucao {
 }
 
 // Detalhe da API → linha de `devolucoes` (pura; testável com fixture).
-export function mapearDevolucaoShopee(d: J, lojaId: string, chegouEmAnterior?: string | null): DevolucaoLinha {
+export function mapearDevolucaoShopee(d: J, lojaId: string, chegouEmAnterior?: string | null, agora = new Date()): DevolucaoLinha {
   const user = (d.user as J) || {};
   const itens = (Array.isArray(d.item) ? (d.item as J[]) : []).map((it) => ({
     sku: str(it.item_sku),
@@ -96,7 +96,11 @@ export function mapearDevolucaoShopee(d: J, lojaId: string, chegouEmAnterior?: s
   const prova = (d.seller_proof as J) || {};
   const comp = (d.seller_compensation as J) || {};
   const chegou = d.is_arrived_at_warehouse === true || String(d.logistics_status || "").toUpperCase() === "LOGISTICS_DELIVERY_DONE";
-  const etapa = etapaShopee(d);
+  let etapa = etapaShopee(d);
+  // Validação com prazo vencido há mais de 2 dias: a Shopee decide sozinha e o Seller Center tira o caso
+  // da fila de ação; fica em "Aguardando plataforma" (decisao sem disputa) até virar REFUND_PAID/CLOSED.
+  const prazoAcao = prazoAcaoShopee(d, etapa);
+  if (etapa === "validar" && prazoAcao && new Date(prazoAcao).getTime() < agora.getTime() - 2 * 86400000) etapa = "decisao";
   return {
     loja_id: lojaId,
     canal: "shopee",
@@ -111,7 +115,7 @@ export function mapearDevolucaoShopee(d: J, lojaId: string, chegouEmAnterior?: s
     valor_pedido: num(d.amount_before_discount),
     valor_reembolso_pedido: num(d.refund_amount),
     valor_reembolsado: status === "REFUND_PAID" ? num(d.refund_amount) : null,
-    prazo_resposta: prazoAcaoShopee(d, etapa),
+    prazo_resposta: etapa === "decisao" ? null : prazoAcao,
     prazo_prova: isoDeUnix(prova.seller_proof_deadline ?? d.seller_evidence_deadline),
     prazo_contestar: isoDeUnix(comp.seller_compensation_due_date ?? d.return_seller_due_date),
     prazo_oferta: isoDeUnix(neg.offer_due_date ?? d.offer_due_date),
