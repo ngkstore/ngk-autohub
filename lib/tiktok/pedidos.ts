@@ -43,6 +43,11 @@ function mapear(o: Pedido, lojaId: string) {
     (recipient.name as string) ||
     (o.buyer_email as string) ||
     null;
+  // UF do comprador: district_info[address_level = L1].iso_code (ex.: "DF"); o TikTok não mascara.
+  const distritos = Array.isArray(recipient.district_info) ? (recipient.district_info as Record<string, unknown>[]) : [];
+  const l1 = distritos.find((d) => String(d.address_level || "") === "L1");
+  const ufTxt = String(l1?.iso_code || l1?.address_name || "").toUpperCase().replace(/^BR-/, "");
+  const uf = /^[A-Z]{2}$/.test(ufTxt) ? ufTxt : null;
 
   return {
     loja_id: lojaId,
@@ -56,6 +61,7 @@ function mapear(o: Pedido, lojaId: string) {
     pedido_efetivado: !NAO_PAGO.has(status),
     entra_faturamento: FATURAVEL.has(status),
     dados_pedido: o,
+    uf,
     criado_em: iso(o.create_time),
   };
 }
@@ -166,6 +172,7 @@ export async function sincronizarPedidosTikTokLoja(
           pedido_efetivado: r.pedido_efetivado,
           entra_faturamento: r.entra_faturamento,
           dados_pedido: r.dados_pedido,
+          uf: r.uf,
         })
         .eq("loja_id", loja.lojaId)
         .eq("pedido_externo_id", r.pedido_externo_id);

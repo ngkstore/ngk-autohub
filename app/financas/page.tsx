@@ -233,7 +233,7 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
     ...(difal !== 0 ? [{ l: "(−) DIFAL cobrado pela Shopee", v: -difal, tot: false }] : []),
     ...(ajustes !== 0 ? [{ l: "(−) Ajustes da Shopee (volumoso, peso, Full, crédito a maior)", v: -ajustes, tot: false }] : []),
     ...(compens !== 0 ? [{ l: "(+) Compensações da Shopee (perda, devolução, Full)", v: compens, tot: false }] : []),
-    { l: "(−) Imposto lançado", v: -imposto, tot: false },
+    { l: imposto > 0 ? "(−) Imposto lançado" : "(−) Imposto lançado — NENHUM lançado para este período: o lucro abaixo está sem imposto (lançar na aba Impostos)", v: -imposto, tot: false },
     { l: "= Resultado (antes do custo)", v: resultado, tot: true },
     { l: `(−) Custo da mercadoria (CMV${cobertura < 100 ? ` · ${cobertura.toFixed(0)}% dos itens` : ""})`, v: -cmv, tot: false },
     { l: "= Lucro líquido", v: lucro, tot: true },

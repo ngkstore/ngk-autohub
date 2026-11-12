@@ -20,7 +20,7 @@ export async function coletarEstoqueTikTok(): Promise<{ lojas: number; skus: num
     for (let pagina = 0; pagina < 100; pagina++) {
       const query: Record<string, string> = { page_size: "100" };
       if (pageToken) query.page_token = pageToken;
-      const resp = await chamarComRetry("/product/202309/products/search", loja, query, { status: "ACTIVATABLE" });
+      const resp = await chamarComRetry("/product/202309/products/search", loja, query, { status: "ACTIVATE" });
       if (!resp || Number(resp.code) !== 0) {
         erros.push(`${loja.lojaId.slice(0, 8)}: ${resp?.code} ${String(resp?.message ?? "")}`);
         break;

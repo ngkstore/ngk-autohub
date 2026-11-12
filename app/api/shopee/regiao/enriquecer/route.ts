@@ -18,14 +18,14 @@ async function rodar(lojas: { lojaId: string }[], limite: number) {
   return NextResponse.json({ sucesso: true, processados, comUf, lojas: resultados });
 }
 
-// cron usa 30 (todas as lojas, cabe no tempo). Backfill manual de UF:
+// cron: 120 por loja por rodada (a fila agora inclui os entregues-depois; 4 em paralelo ≈ 40 s). Backfill manual de UF:
 //   ?loja=<id>&limite=250   (uma loja por vez, lotes grandes)
 export async function GET(request: NextRequest) {
   // Cron (Bearer CRON_SECRET) ou usuário com acesso à loja; em lote só cron/admin.
   const autz = await autorizar(request, [request.nextUrl.searchParams.get("loja")]);
   if (!autz.ok) return autz.resposta;
   const loja = request.nextUrl.searchParams.get("loja");
-  const limite = Number(request.nextUrl.searchParams.get("limite")) || 30;
+  const limite = Number(request.nextUrl.searchParams.get("limite")) || 120;
   let lojas = await listarLojasShopeeAtivas();
   if (loja) lojas = lojas.filter((l) => l.lojaId === loja);
   return rodar(lojas, limite);

@@ -80,13 +80,20 @@ async function buscarDatas(token: TokenLoja, orderSn: string) {
     `&order_sn=${orderSn}`;
   const r = await fetch(url, { method: "GET", cache: "no-store" });
   const data = await r.json().catch(() => null);
-  const eventos: { update_time?: number; logistics_status?: string; description?: string }[] =
-    data?.response?.tracking_info || [];
+  const eventos: EventoRastreio[] = data?.response?.tracking_info || [];
+  return analisarRastreio(eventos);
+}
+
+export type EventoRastreio = { update_time?: number; logistics_status?: string; description?: string };
+
+// Lê o rastreio (eventos do mais recente ao mais antigo): data de coleta, data de entrega e UF.
+// UF de destino = o "cidade - UF" mais recente SÓ depois que o pacote foi entregue (ou saiu
+// para entrega). Antes disso o evento mais recente é o hub de origem/trânsito — foi assim que
+// 11,6 mil pedidos da NGK viraram "PR" (origem) em vez do estado do comprador (12/11/2026).
+export function analisarRastreio(eventos: EventoRastreio[]): { enviado_em: string | null; entregue_em: string | null; uf: string | null } {
   let enviado: number | null = null;
   let entregue: number | null = null;
-  // UF de destino: as descrições trazem "cidade - UF" (ex.: "último centro
-  // logístico: Curitiba - PR"). Os eventos vêm do mais recente ao mais antigo,
-  // então o 1º "- UF" é o hub mais próximo da entrega = estado do comprador.
+  let chegouNoDestino = false;
   let uf: string | null = null;
   for (const e of eventos) {
     const st = (e.logistics_status || "").toUpperCase();
@@ -95,10 +102,11 @@ async function buscarDatas(token: TokenLoja, orderSn: string) {
     if (!enviado && (st.includes("PICKED_UP") || d.includes("coletado") || d.includes("postado"))) {
       enviado = e.update_time ?? null;
     }
-    if (st.includes("DELIVERED") || d.includes("entregue")) {
-      entregue = e.update_time ?? null;
-    }
-    if (!uf) {
+    const entregueAqui = st.includes("DELIVERED") || /\bentregue\b/.test(d);
+    const saiuParaEntrega = st.includes("OUT_FOR_DELIVERY") || d.includes("saiu para entrega") || d.includes("em rota de entrega");
+    if (entregueAqui && !entregue) entregue = e.update_time ?? null;
+    if (entregueAqui || saiuParaEntrega) chegouNoDestino = true;
+    if (chegouNoDestino && !uf) {
       const m = desc.match(/[-–]\s*([A-Z]{2})\s*$/);
       if (m && UFS.has(m[1])) uf = m[1];
     }
@@ -124,11 +132,10 @@ export async function enriquecerRegiaoLoja({
   const token = await obterToken(lojaId);
   if (!token) return { lojaId, processados: 0, comUf: 0, erro: "sem token ativo" };
 
-  // Re-tenta TODOS os sem-UF recentes (não só os nunca-tentados): o sort_code
-  // muitas vezes não existe quando o pedido é novo (documento de envio ainda
-  // não gerado); tentando de novo depois, ele aparece. Janela de 30 dias
-  // (docs antigos expiram), menos-recentemente-tentado primeiro (nulls = nunca
-  // tentado vêm antes). Só pedidos pagos.
+  // Fila: pedidos pagos dos últimos 30 dias (rastreio antigo expira) ainda SEM ENTREGA
+  // registrada — sem UF ou com UF gravada antes da entrega (pode ser o hub de origem).
+  // Menos-recentemente-tentado primeiro (nunca tentado vem antes); os com mais de 3 dias
+  // de pedido primeiro não: a ordem por regiao_atualizada_em já faz a rotação.
   const desde = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const { data: pedidos } = await supabase
     .from("pedidos")
@@ -136,7 +143,7 @@ export async function enriquecerRegiaoLoja({
     .eq("marketplace", "shopee")
     .eq("loja_id", lojaId)
     .eq("pedido_efetivado", true)
-    .is("uf", null)
+    .is("entregue_em", null)
     .gte("data_pedido", desde)
     .not("pedido_externo_id", "like", "SH-%")
     .order("regiao_atualizada_em", { ascending: true, nullsFirst: true })
@@ -151,10 +158,10 @@ export async function enriquecerRegiaoLoja({
     await Promise.all(
       pedidos.slice(i, i + LOTE).map(async (p) => {
         try {
-          // UF + datas do rastreio (get_tracking_info) numa chamada só — cobre
-          // bem mais que o sort_code do documento de envio (que falhava ~84%).
+          // UF + datas do rastreio (get_tracking_info) numa chamada só.
           const datas = await buscarDatas(token, p.pedido_externo_id);
           // Só grava o que achou — re-try que falhar não apaga o que já existe.
+          // A UF só vem quando o pacote chegou ao destino; aí SOBRESCREVE a antiga (origem).
           const payload: Record<string, unknown> = { regiao_atualizada_em: new Date().toISOString() };
           if (datas.uf) payload.uf = datas.uf;
           if (datas.enviado_em) payload.enviado_em = datas.enviado_em;
