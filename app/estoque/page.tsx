@@ -60,7 +60,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
   let anunciosSemMapa: SemMapa[] = [];
   if (aba === "mapeamento") {
     const { data: sm } = await supabase.rpc("anuncios_sem_mapeamento", { p_dias: 30, p_loja_ids: lojas });
-    anunciosSemMapa = ((sm as SemMapa[]) || []).sort((a, b) => Number(b.qtd) - Number(a.qtd));
+    anunciosSemMapa = ((sm as SemMapa[]) || []).sort((a, b) => Number(b.por_dia) - Number(a.por_dia) || Number(b.qtd) - Number(a.qtd));
   }
   const nomeLoja = new Map<string, string>();
   for (const m of mapeamento || []) nomeLoja.set(m.loja_id, (m.lojas as unknown as { apelido: string } | null)?.apelido ?? m.canal);
@@ -128,7 +128,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
                         </Td>
                         <Td numerica>{temUpseller ? numero(l.fisico) : "—"}</Td>
                         <Td numerica>{l.shopee === null ? "—" : numero(l.shopee)}</Td>
-                        <Td numerica>—</Td>
+                        <Td numerica>{l.tiktok === null ? "—" : numero(l.tiktok)}</Td>
                         <Td numerica>{numero(l.vendaDia, 1)}</Td>
                         <Td numerica>{l.cobertura === null ? (l.v30 > 0 ? "—" : "sem venda") : `${numero(l.cobertura, 0)} d`}</Td>
                         <Td numerica>{numero(l.pontoPedido)}</Td>
