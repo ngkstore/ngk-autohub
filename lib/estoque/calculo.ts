@@ -28,9 +28,10 @@ export function quantidadeComprar(vendaDia: number, disponivel: number, emTransi
   return Math.ceil(bruto);
 }
 
-/** Ruptura e crítico só valem para SKU com venda relevante (≥ 1 unidade nos últimos 30 dias). Estoque zero sem venda = "inativo" (fora dos indicadores). */
+export const VENDA_RELEVANTE_30D = 5;
+/** Ruptura e crítico só valem para SKU com venda relevante (≥ 5 unidades nos últimos 30 dias). Estoque zero sem venda relevante = "inativo" (fora dos indicadores). */
 export function statusSku(disponivel: number, vendaDia: number, v30: number, prazoDias: number, segurancaDias: number): Status {
-  const vendeRelevante = v30 >= 1;
+  const vendeRelevante = v30 >= VENDA_RELEVANTE_30D;
   if (disponivel <= 0) return vendeRelevante ? "ruptura" : "inativo";
   if (!vendeRelevante && vendaDia <= 0) return "parado";
   const cob = coberturaDias(disponivel, vendaDia);

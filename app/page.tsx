@@ -406,6 +406,9 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
         <Kpi icone="avaliacoes" cor="amarelo" rotulo="Nota média" valor={notaMedia} detalhe={`${pctRespondidas}% das avaliações respondidas`} />
       </div>
 
+      <p className="mt-2 text-xs text-texto-2">
+        Receita = pedidos pagos e não cancelados, pelo dia do pagamento. Shopee: subtotal do vendedor (merchant_subtotal). TikTok: preço original − desconto do vendedor, sem frete e com o desconto pago pela plataforma (que o TikTok repassa). Por isso fica abaixo do GMV do Seller Center, que soma o preço pago pelo cliente de todos os pedidos criados no dia, inclusive os cancelados depois.
+      </p>
       {/* Indicadores secundários */}
       <div className="mt-3.5 grid grid-cols-2 gap-3.5 md:grid-cols-3 xl:grid-cols-6">
         <Kpi rotulo="Faturamento geral" valor={formatarMoeda(resumo.faturamentoGeral)} detalhe="inclui pendentes e cancelados" />

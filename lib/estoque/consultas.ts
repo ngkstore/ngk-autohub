@@ -34,10 +34,13 @@ export type LinhaEstoque = {
 };
 
 const DIAS_DESEJADOS = 30;
+// mesma regra do sku_norm() do banco: sem acento/cedilha, maiúsculas, só letras e números
+export const normSku = (s: unknown) => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 const n = (v: unknown) => Number(v || 0);
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
-export async function montarEstoque(lojaIds: string[] | null): Promise<{ linhas: LinhaEstoque[]; temUpseller: boolean; coletadoEm: string | null; fatorAtual: number; dataMaisAntiga: string | null }> {
+// lojaIds = lojas selecionadas (vendas); lojasPlataforma = todas as lojas da conta (estoque Shopee/TikTok é por anúncio, não depende do filtro)
+export async function montarEstoque(lojaIds: string[] | null, lojasPlataforma: string[] | null = lojaIds): Promise<{ linhas: LinhaEstoque[]; temUpseller: boolean; coletadoEm: string | null; fatorAtual: number; dataMaisAntiga: string | null }> {
   const hoje = new Date();
   const d7 = new Date(hoje.getTime() - 7 * 86400000);
   const d28 = new Date(hoje.getTime() - 28 * 86400000);
@@ -86,20 +89,25 @@ export async function montarEstoque(lojaIds: string[] | null): Promise<{ linhas:
   // ligado ao SKU do armazém pelo mapeamento (item/variação do UpSeller ou SKU do anúncio da planilha).
   const canalDaLoja = new Map<string, string>((lojasRows || []).map((l) => [l.id as string, l.marketplace === "tiktok_shop" ? "tiktok" : "shopee"]));
   let qv = supabase.from("produto_variacoes").select("loja_id, item_id, model_id, model_sku, estoque").limit(20000);
-  if (lojaIds) qv = qv.in("loja_id", lojaIds);
+  if (lojasPlataforma) qv = qv.in("loja_id", lojasPlataforma);
   const { data: varia } = await qv;
   const { data: mapeamentos } = await supabase.from("catalogo_mapeamento").select("sku_anuncio, sku_armazem, loja_id, item_id, model_id").limit(20000);
   const mapAnuncio = new Map<string, string>();
   const mapItem = new Map<string, string>();
   for (const m of mapeamentos || []) {
-    if (m.sku_anuncio) mapAnuncio.set(`${m.loja_id}|${m.sku_anuncio}`, m.sku_armazem);
+    if (m.sku_anuncio) mapAnuncio.set(`${m.loja_id}|${normSku(m.sku_anuncio)}`, m.sku_armazem);
     if (m.item_id) mapItem.set(`${m.loja_id}|${m.item_id}|${m.model_id || ""}`, m.sku_armazem);
   }
+  // SKU canônico do armazém pela forma normalizada (BLÇCZN10BR1 → BLCCZN10BR1)
+  const canonico = new Map<string, string>();
+  for (const e of est || []) canonico.set(normSku(e.sku), e.sku);
+  for (const c of cat || []) if (!canonico.has(normSku(c.sku))) canonico.set(normSku(c.sku), c.sku);
   const shopee = new Map<string, number>();
   const tiktok = new Map<string, number>();
   for (const v of varia || []) {
-    const sku = mapItem.get(`${v.loja_id}|${v.item_id}|${v.model_id === "0" ? "" : v.model_id || ""}`) || (v.model_sku ? mapAnuncio.get(`${v.loja_id}|${v.model_sku}`) : null) || v.model_sku;
-    if (!sku) continue;
+    const bruto = mapItem.get(`${v.loja_id}|${v.item_id}|${v.model_id === "0" ? "" : v.model_id || ""}`) || (v.model_sku ? mapAnuncio.get(`${v.loja_id}|${normSku(v.model_sku)}`) : null) || v.model_sku;
+    if (!bruto) continue;
+    const sku = canonico.get(normSku(bruto)) || bruto;
     const alvo = canalDaLoja.get(v.loja_id) === "tiktok" ? tiktok : shopee;
     alvo.set(sku, (alvo.get(sku) || 0) + n(v.estoque));
   }

@@ -67,6 +67,24 @@ async function marcaDagua(lojaId: string, canal: "shopee" | "tiktok"): Promise<D
   return data?.plataforma_atualizado_em ? new Date(data.plataforma_atualizado_em) : null;
 }
 
+// Reprocessa etapa/prazo dos casos abertos a partir do bruto já gravado (sem chamar a API):
+// usado quando a regra de etapas muda e o update_time na plataforma não mudou.
+export async function reprocessarEtapasShopee(lojaId?: string): Promise<{ lidos: number; alterados: number }> {
+  let q = supabase.from("devolucoes").select("id, loja_id, etapa, prazo_resposta, bruto").eq("canal", "shopee").neq("etapa", "encerrado").limit(5000);
+  if (lojaId) q = q.eq("loja_id", lojaId);
+  const { data } = await q;
+  let alterados = 0;
+  for (const d of (data || []) as { id: string; loja_id: string; etapa: string; prazo_resposta: string | null; bruto: Record<string, unknown> | null }[]) {
+    if (!d.bruto || !d.bruto.status) continue;
+    const linha = mapearDevolucaoShopee(d.bruto, d.loja_id);
+    if (d.etapa === "inspecao" || d.etapa === "recebido") continue; // etapas da equipe não voltam
+    if (linha.etapa === d.etapa && (linha.prazo_resposta ?? null) === (d.prazo_resposta ?? null)) continue;
+    const { error } = await supabase.from("devolucoes").update({ etapa: linha.etapa, prazo_resposta: linha.prazo_resposta, atualizado_em: new Date().toISOString() }).eq("id", d.id);
+    if (!error) alterados++;
+  }
+  return { lidos: (data || []).length, alterados };
+}
+
 // ---- Shopee: uma loja ----
 export async function sincronizarDevolucoesShopeeLoja(lojaId: string, opts: { dias?: number; orcamentoMs?: number; forcar?: boolean } = {}): Promise<ResultadoSync> {
   const inicio = Date.now();

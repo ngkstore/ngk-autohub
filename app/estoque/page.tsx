@@ -27,7 +27,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
   const lojas = filtroLojas(escopo, params.loja);
   const aba = params.aba || "estoque";
   const [{ linhas, temUpseller, coletadoEm, fatorAtual, dataMaisAntiga }, { data: fornecedores }, { data: fatores }, { data: compras }, { data: mapeamento }] = await Promise.all([
-    montarEstoque(lojas),
+    montarEstoque(lojas, escopo.lojaIds.length ? escopo.lojaIds : lojas),
     supabase.from("fornecedores").select("id, nome, prazo_dias, seguranca_dias, caixa_padrao, observacao, ativo").order("nome"),
     supabase.from("estoque_fator_sazonal").select("id, nome, inicio, fim, fator").order("inicio"),
     supabase.from("compras_a_caminho").select("id, sku, quantidade, previsao, fornecedor_id, observacao").eq("recebido", false).order("previsao"),
@@ -56,7 +56,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
   const proxima = (compras || []).find((c) => c.previsao)?.previsao as string | undefined;
   const sugestoes = linhas.filter((l) => l.comprar > 0).map((l) => ({ sku: l.sku, nome: l.nome, fornecedor: l.fornecedor, quantidade: l.comprar, caixa: l.caixa, custo: l.custo }));
   // SKUs de anúncio que venderam nos últimos 30 d e não chegam a um SKU do armazém (nem por item/variação, nem por SKU)
-  type SemMapa = { loja_id: string; item_id: string | null; model_id: string; model_sku: string; variacao: string | null; qtd: number };
+  type SemMapa = { loja_id: string; item_id: string | null; model_id: string; model_sku: string; variacao: string | null; qtd: number; por_dia: number };
   let anunciosSemMapa: SemMapa[] = [];
   if (aba === "mapeamento") {
     const { data: sm } = await supabase.rpc("anuncios_sem_mapeamento", { p_dias: 30, p_loja_ids: lojas });
@@ -189,6 +189,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
                     <Th>Item / variação</Th>
                     <Th>SKU do anúncio</Th>
                     <Th numerica>Un. 30 d</Th>
+                    <Th numerica>Un./dia</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -198,6 +199,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
                       <Td className="text-xs text-texto-2">{a.item_id}{a.model_id ? ` / ${a.model_id}` : ""}{a.variacao ? ` · ${a.variacao}` : ""}</Td>
                       <Td>{a.model_sku}</Td>
                       <Td numerica>{Number(a.qtd).toLocaleString("pt-BR")}</Td>
+                      <Td numerica className="font-semibold">{Number(a.por_dia).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}</Td>
                     </Tr>
                   ))}
                 </tbody>

@@ -71,6 +71,8 @@ export default async function LivesPage({ searchParams }: { searchParams: Promis
   const receitaHora = horas > 0 ? receita / horas : 0;
   const pico = Math.max(0, ...lojaPeriodo.map((l) => Number(l.pico ?? 0)));
   const afiliadoLive = afTik.filter((a) => a.conteudo_tipo === "LIVE" && a.criado_em && a.criado_em >= desde).reduce((s, a) => s + Number(a.base_comissao || 0), 0);
+  // receita atribuída pela API de lives (live_attributed_gmv) às lives de criadores no período — é o "Transmissões ao vivo" do Seller Center
+  const criadoresApi = soma(criadores.filter(noPeriodo), (l) => Number(l.receita || 0));
   const afiliadoTotal = afTik.filter((a) => a.criado_em && a.criado_em >= desde).reduce((s, a) => s + Number(a.base_comissao || 0), 0);
   const melhor = [...lojaPeriodo].sort((a, b) => Number(b.receita) - Number(a.receita))[0];
   const maxReceita = Math.max(1, ...lojaPeriodo.map((l) => Number(l.receita)));
@@ -119,7 +121,7 @@ export default async function LivesPage({ searchParams }: { searchParams: Promis
         <Kpi icone="painel" cor="ceu" rotulo="Horas ao vivo (loja)" valor={`${numero(horas, 1)} h`} />
         <Kpi icone="financas" cor="verde" rotulo="Receita por hora (loja)" valor={brl(receitaHora, 0)} />
         <Kpi icone="insights" cor="roxo" rotulo="Pico de espectadores (loja)" valor={numero(pico)} detalhe="simultâneos (pcu)" />
-        <Kpi icone="ads" cor="laranja" rotulo="Receita via afiliados" valor={brl(afiliadoTotal, 0)} detalhe={`${brl(afiliadoLive, 0)} em lives de criadores`} />
+        <Kpi icone="ads" cor="laranja" rotulo="Lives de criadores (atribuído)" valor={brl(criadoresApi, 0)} detalhe={`API de lives · pedidos de afiliado via LIVE: ${brl(afiliadoLive, 0)} · afiliados no total: ${brl(afiliadoTotal, 0)}`} />
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-3">

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { autorizar } from "@/lib/autorizacao";
-import { sincronizarDevolucoes } from "@/lib/devolucoes/sincronizar";
+import { sincronizarDevolucoes, reprocessarEtapasShopee } from "@/lib/devolucoes/sincronizar";
 import { processarDevolucoes } from "@/lib/devolucoes/processar";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +18,8 @@ export async function GET(request: NextRequest) {
   const canal = sp.get("canal") === "shopee" || sp.get("canal") === "tiktok" ? (sp.get("canal") as "shopee" | "tiktok") : undefined;
   const dias = Number(sp.get("dias")) || undefined;
   const forcar = sp.get("forcar") === "1"; // relê mesmo sem mudança (recarga de eventos/mídias)
+  // ?reprocessar=1: só recalcula etapa/prazo dos casos abertos pelo bruto gravado (sem API)
+  if (sp.get("reprocessar") === "1") return NextResponse.json({ sucesso: true, ...(await reprocessarEtapasShopee(lojaId)) });
 
   const inicio = Date.now();
   const resultados = await sincronizarDevolucoes({ canal, lojaId, dias, forcar, orcamentoMs: 200_000 });

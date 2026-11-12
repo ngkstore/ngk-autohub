@@ -24,6 +24,9 @@ describe("cálculo de estoque (D3)", () => {
   it("status", () => {
     expect(statusSku(0, 18, 120, 15, 5)).toBe("ruptura");
     expect(statusSku(190, 96, 2000, 15, 5)).toBe("critico"); // cobertura 2 d < prazo 15
+    expect(statusSku(0, 0.13, 4, 15, 5)).toBe("inativo"); // MINI SKATE: 4 un. em 30 d não é ruptura
+    expect(statusSku(0, 0.2, 5, 15, 5)).toBe("ruptura"); // corte: 5 un. em 30 d
+    expect(statusSku(10, 0.13, 4, 15, 5)).not.toBe("critico");
     expect(statusSku(1800, 96, 2000, 15, 5)).toBe("atencao"); // cobertura 18,8 d ≥ 15 mas < ponto 1920
     expect(statusSku(3000, 96, 2000, 15, 5)).toBe("ok");
     expect(statusSku(610, 4, 100, 15, 5)).toBe("excesso"); // 152 d

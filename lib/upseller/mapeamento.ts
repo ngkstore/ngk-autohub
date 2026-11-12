@@ -17,7 +17,8 @@ export async function importarMapeamentoUpseller(semanas = 4): Promise<{ linhas:
   const hoje = new Date();
   const linhas = new Map<string, J>();
   const semVinculo = new Set<string>();
-  for (let s = 0; s < semanas; s++) {
+  // da semana mais ANTIGA para a mais recente: a última gravada prevalece (o SKU do anúncio pode ter mudado)
+  for (let s = semanas - 1; s >= 0; s--) {
     const fim = new Date(hoje.getTime() - (s * 7 + 1) * 86400000);
     const ini = new Date(fim.getTime() - 6 * 86400000);
     for (let pageNum = 1; pageNum <= 60; pageNum++) {
@@ -35,6 +36,7 @@ export async function importarMapeamentoUpseller(semanas = 4): Promise<{ linhas:
         const itemId = String(row.productId ?? "").trim();
         const modelId = String(row.variationId ?? "").trim();
         const skuArmazem = String(row.variationSku || row.productSku || "").trim().toUpperCase();
+        // modelo sem SKU próprio: o UpSeller repete o SKU do produto
         if (!itemId || !skuArmazem) continue;
         const canal = v.plataforma === "tiktok" ? "tiktok" : "shopee";
         linhas.set(`${canal}|${v.loja_id}|${itemId}|${modelId}`, { canal, loja_id: v.loja_id, item_id: itemId, model_id: modelId, sku_armazem: skuArmazem, nome_produto: String(row.productName ?? "").slice(0, 200) || null });

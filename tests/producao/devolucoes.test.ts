@@ -13,6 +13,7 @@ describe.skipIf(!temBanco())("Devoluções × banco", () => {
     const direto = await rpc<Record<string, number>>("conferencia_devolucoes_etapas", { p_loja_ids: null });
     expect(conta("responder")).toBe(Number(direto.responder));
     expect(conta("transito")).toBe(Number(direto.transito));
+    expect(conta("coleta")).toBe(Number(direto.coleta));
     expect(conta("inspecionar")).toBe(Number(direto.validar));
     expect(conta("disputa")).toBe(Number(direto.disputa));
     expect(conta("plataforma")).toBe(Number(direto.plataforma));
