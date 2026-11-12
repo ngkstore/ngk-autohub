@@ -1,7 +1,7 @@
 // Cálculo de estoque (D3) — puro e testável.
 export type VendasSku = { v7: number; v28: number; vAnoAnterior: number | null }; // unidades nos períodos
 export type ParametrosSku = { prazoDias: number; segurancaDias: number; diasDesejados: number; caixa: number | null; fatorSazonal: number };
-export type Status = "ruptura" | "critico" | "atencao" | "ok" | "excesso" | "parado" | "inativo";
+export type Status = "ruptura" | "critico" | "atencao" | "ok" | "excesso" | "parado" | "inativo" | "mapear";
 
 /**
  * Venda média por dia: 50% da média de 7 d + 30% da média de 28 d + 20% do mesmo período do

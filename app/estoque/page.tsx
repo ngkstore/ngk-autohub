@@ -17,6 +17,7 @@ const STATUS: { id: string; nome: string; cor: "vermelho" | "laranja" | "amarelo
   { id: "excesso", nome: "Excesso", cor: "roxo" },
   { id: "parado", nome: "Parado 30 d", cor: "cinza" },
   { id: "inativo", nome: "Sem estoque, inativo", cor: "cinza" },
+  { id: "mapear", nome: "Sem mapeamento", cor: "amarelo" },
 ];
 const corStatus = (s: string) => STATUS.find((x) => x.id === s)?.cor ?? "cinza";
 
@@ -30,7 +31,7 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
     supabase.from("fornecedores").select("id, nome, prazo_dias, seguranca_dias, caixa_padrao, observacao, ativo").order("nome"),
     supabase.from("estoque_fator_sazonal").select("id, nome, inicio, fim, fator").order("inicio"),
     supabase.from("compras_a_caminho").select("id, sku, quantidade, previsao, fornecedor_id, observacao").eq("recebido", false).order("previsao"),
-    aba === "mapeamento" ? supabase.from("catalogo_mapeamento").select("canal, loja_id, sku_anuncio, sku_armazem, anormal, lojas(apelido)").order("anormal", { ascending: false }).limit(2000) : Promise.resolve({ data: [] }),
+    aba === "mapeamento" ? supabase.from("catalogo_mapeamento").select("canal, loja_id, item_id, model_id, sku_anuncio, sku_armazem, anormal, origem, nome_produto, lojas(apelido)").order("anormal", { ascending: false }).order("atualizado_em", { ascending: false }).limit(2000) : Promise.resolve({ data: [] }),
   ]);
 
   const contagem: Record<string, number> = { todos: linhas.length };
@@ -54,15 +55,15 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
   const aCaminho = (compras || []).reduce((s, c) => s + Number(c.quantidade || 0), 0);
   const proxima = (compras || []).find((c) => c.previsao)?.previsao as string | undefined;
   const sugestoes = linhas.filter((l) => l.comprar > 0).map((l) => ({ sku: l.sku, nome: l.nome, fornecedor: l.fornecedor, quantidade: l.comprar, caixa: l.caixa, custo: l.custo }));
-  const anuncioSemMapa = new Set<string>();
+  // SKUs de anúncio que venderam nos últimos 30 d e não chegam a um SKU do armazém (nem por item/variação, nem por SKU)
+  type SemMapa = { loja_id: string; item_id: string | null; model_id: string; model_sku: string; variacao: string | null; qtd: number };
+  let anunciosSemMapa: SemMapa[] = [];
   if (aba === "mapeamento") {
-    let qv = supabase.from("produto_variacoes").select("model_sku").limit(5000);
-    if (lojas) qv = qv.in("loja_id", lojas);
-    const { data: varia } = await qv;
-    const mapeados = new Set((mapeamento || []).map((m) => m.sku_anuncio));
-    const skusArmazem = new Set(linhas.map((l) => l.sku));
-    for (const v of varia || []) if (v.model_sku && !mapeados.has(v.model_sku) && !skusArmazem.has(v.model_sku)) anuncioSemMapa.add(v.model_sku);
+    const { data: sm } = await supabase.rpc("anuncios_sem_mapeamento", { p_dias: 30, p_loja_ids: lojas });
+    anunciosSemMapa = ((sm as SemMapa[]) || []).sort((a, b) => Number(b.qtd) - Number(a.qtd));
   }
+  const nomeLoja = new Map<string, string>();
+  for (const m of mapeamento || []) nomeLoja.set(m.loja_id, (m.lojas as unknown as { apelido: string } | null)?.apelido ?? m.canal);
 
   return (
     <div className="mx-auto max-w-[1400px] p-6">
@@ -177,24 +178,50 @@ export default async function EstoquePage({ searchParams }: { searchParams: Prom
 
       {aba === "mapeamento" && (
         <Card semPadding>
-          <CardHeader className="px-[18px] pt-4" titulo="Mapeamento anúncio → SKU do armazém" descricao={`${(mapeamento || []).length} mapeados · ${(mapeamento || []).filter((m) => m.anormal).length} anormais · ${anuncioSemMapa.size} SKUs de anúncio sem mapeamento (assumem o mesmo código)`} />
-          {anuncioSemMapa.size > 0 && <div className="px-[18px] pb-3 text-xs text-texto-2">Sem mapeamento (até 60): {[...anuncioSemMapa].slice(0, 60).join(", ")}</div>}
+          <CardHeader className="px-[18px] pt-4" titulo="Mapeamento anúncio → SKU do armazém" descricao={`${(mapeamento || []).length} mapeados (${(mapeamento || []).filter((m) => m.origem === "upseller").length} vindos do UpSeller) · ${anunciosSemMapa.length} SKUs de anúncio vendidos em 30 d sem ligação com o armazém: não contam como ruptura até serem mapeados no UpSeller (Produtos > Gerenciar Mapeamento) ou importados por planilha`} />
+          {anunciosSemMapa.length > 0 && (
+            <div className="px-[18px] pb-4">
+              <p className="mb-2 text-[13px] font-semibold text-texto">Sem mapeamento (vendidos em 30 d)</p>
+              <Tabela>
+                <thead>
+                  <tr>
+                    <Th>Loja</Th>
+                    <Th>Item / variação</Th>
+                    <Th>SKU do anúncio</Th>
+                    <Th numerica>Un. 30 d</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {anunciosSemMapa.slice(0, 200).map((a, i) => (
+                    <Tr key={i}>
+                      <Td>{nomeLoja.get(a.loja_id) ?? a.loja_id.slice(0, 8)}</Td>
+                      <Td className="text-xs text-texto-2">{a.item_id}{a.model_id ? ` / ${a.model_id}` : ""}{a.variacao ? ` · ${a.variacao}` : ""}</Td>
+                      <Td>{a.model_sku}</Td>
+                      <Td numerica>{Number(a.qtd).toLocaleString("pt-BR")}</Td>
+                    </Tr>
+                  ))}
+                </tbody>
+              </Tabela>
+            </div>
+          )}
           <Tabela>
             <thead>
               <tr>
                 <Th>Loja</Th>
+                <Th>Item / variação</Th>
                 <Th>SKU do anúncio</Th>
                 <Th>SKU do armazém</Th>
-                <Th>Situação</Th>
+                <Th>Origem</Th>
               </tr>
             </thead>
             <tbody>
               {(mapeamento || []).slice(0, 500).map((m, i) => (
                 <Tr key={i}>
                   <Td>{(m.lojas as unknown as { apelido: string } | null)?.apelido ?? m.canal}</Td>
-                  <Td>{m.sku_anuncio}</Td>
+                  <Td className="text-xs text-texto-2">{m.item_id}{m.model_id ? ` / ${m.model_id}` : ""}</Td>
+                  <Td>{m.sku_anuncio ?? <span className="text-texto-2">—</span>}</Td>
                   <Td>{m.sku_armazem}</Td>
-                  <Td>{m.anormal ? <Chip cor="vermelho">anormal</Chip> : <Chip cor="verde">ok</Chip>}</Td>
+                  <Td>{m.anormal ? <Chip cor="vermelho">anormal</Chip> : <Chip cor={m.origem === "upseller" ? "azul" : "verde"}>{m.origem === "upseller" ? "UpSeller" : "planilha"}</Chip>}</Td>
                 </Tr>
               ))}
             </tbody>

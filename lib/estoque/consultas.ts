@@ -45,7 +45,7 @@ export async function montarEstoque(lojaIds: string[] | null): Promise<{ linhas:
   const anoIni = new Date(d28.getTime() - 365 * 86400000);
   const anoFim = new Date(hoje.getTime() - 365 * 86400000);
 
-  const [{ data: est }, { data: cat }, { data: kits }, { data: forn }, { data: exc }, { data: fat }, { data: compras }, v7, v28, v30, vAno, { data: maisAntigo }] = await Promise.all([
+  const [{ data: est }, { data: cat }, { data: kits }, { data: forn }, { data: exc }, { data: fat }, { data: compras }, v7, v28, v30, vAno, { data: maisAntigo }, { data: lojasRows }] = await Promise.all([
     supabase.from("estoque_armazem").select("sku, disponivel, ocupado, em_transito, atual, custo_medio, coletado_em").limit(20000),
     supabase.from("catalogo_sku").select("sku, nome, tipo, custo, fornecedor_id, caixa, ativo").limit(20000),
     supabase.from("kit_componentes").select("sku_kit, sku_componente, quantidade").limit(20000),
@@ -58,6 +58,7 @@ export async function montarEstoque(lojaIds: string[] | null): Promise<{ linhas:
     supabase.rpc("vendas_por_sku_armazem", { p_inicio: iso(d30), p_fim: iso(new Date(hoje.getTime() + 86400000)), p_loja_ids: lojaIds }),
     supabase.rpc("vendas_por_sku_armazem", { p_inicio: iso(anoIni), p_fim: iso(anoFim), p_loja_ids: lojaIds }),
     supabase.from("pedido_itens").select("dia").order("dia", { ascending: true }).limit(1).maybeSingle(),
+    supabase.from("lojas").select("id, marketplace"),
   ]);
   const temAnoAnterior = !!maisAntigo?.dia && String(maisAntigo.dia) <= iso(anoIni);
   const fatorAtual = temAnoAnterior ? 1 : fatorDoPeriodo((fat || []) as { inicio: string; fim: string; fator: number }[], hoje);
@@ -81,18 +82,26 @@ export async function montarEstoque(lojaIds: string[] | null): Promise<{ linhas:
   const transitoCompras = new Map<string, number>();
   for (const c of compras || []) transitoCompras.set(c.sku, (transitoCompras.get(c.sku) || 0) + n(c.quantidade));
 
-  // estoque das plataformas (Shopee: produto_variacoes por model_sku; TikTok: ainda sem coleta)
-  let qv = supabase.from("produto_variacoes").select("loja_id, model_sku, estoque").limit(20000);
+  // estoque das plataformas: produto_variacoes (Shopee pelo get_model_list; TikTok pelo inventory/search),
+  // ligado ao SKU do armazém pelo mapeamento (item/variação do UpSeller ou SKU do anúncio da planilha).
+  const canalDaLoja = new Map<string, string>((lojasRows || []).map((l) => [l.id as string, l.marketplace === "tiktok_shop" ? "tiktok" : "shopee"]));
+  let qv = supabase.from("produto_variacoes").select("loja_id, item_id, model_id, model_sku, estoque").limit(20000);
   if (lojaIds) qv = qv.in("loja_id", lojaIds);
   const { data: varia } = await qv;
-  const { data: mapeamentos } = await supabase.from("catalogo_mapeamento").select("sku_anuncio, sku_armazem, loja_id");
+  const { data: mapeamentos } = await supabase.from("catalogo_mapeamento").select("sku_anuncio, sku_armazem, loja_id, item_id, model_id").limit(20000);
   const mapAnuncio = new Map<string, string>();
-  for (const m of mapeamentos || []) mapAnuncio.set(`${m.loja_id}|${m.sku_anuncio}`, m.sku_armazem);
+  const mapItem = new Map<string, string>();
+  for (const m of mapeamentos || []) {
+    if (m.sku_anuncio) mapAnuncio.set(`${m.loja_id}|${m.sku_anuncio}`, m.sku_armazem);
+    if (m.item_id) mapItem.set(`${m.loja_id}|${m.item_id}|${m.model_id || ""}`, m.sku_armazem);
+  }
   const shopee = new Map<string, number>();
+  const tiktok = new Map<string, number>();
   for (const v of varia || []) {
-    if (!v.model_sku) continue;
-    const sku = mapAnuncio.get(`${v.loja_id}|${v.model_sku}`) || v.model_sku;
-    shopee.set(sku, (shopee.get(sku) || 0) + n(v.estoque));
+    const sku = mapItem.get(`${v.loja_id}|${v.item_id}|${v.model_id === "0" ? "" : v.model_id || ""}`) || (v.model_sku ? mapAnuncio.get(`${v.loja_id}|${v.model_sku}`) : null) || v.model_sku;
+    if (!sku) continue;
+    const alvo = canalDaLoja.get(v.loja_id) === "tiktok" ? tiktok : shopee;
+    alvo.set(sku, (alvo.get(sku) || 0) + n(v.estoque));
   }
 
   const fornecedores = new Map((forn || []).map((f) => [f.id, f]));
@@ -135,7 +144,8 @@ export async function montarEstoque(lojaIds: string[] | null): Promise<{ linhas:
     const vendaDia = vendaMediaDia({ v7: s7, v28: s28, vAnoAnterior: sAno }, fatorAtual);
     const precoMedio = s30 > 0 ? (m30.get(sku)?.receita ?? 0) / s30 : 0;
     const custo = c?.custo ?? fis?.custo ?? null;
-    const status = temUpseller || fis ? statusSku(disponivel, vendaDia, s30, prazoDias, segurancaDias) : vendaDia > 0 ? "ok" : "parado";
+    const semLigacao = temUpseller && !fis && !c && !(tipo === "kit" && comps?.length);
+    const status: Status = semLigacao ? "mapear" : temUpseller || fis ? statusSku(disponivel, vendaDia, s30, prazoDias, segurancaDias) : vendaDia > 0 ? "ok" : "parado";
     if (tipo === "kit" && !fis && !componentes?.length) continue; // kit sem estoque próprio e sem composição: nada a mostrar
     const acaba = acabaEm(disponivel, vendaDia, hoje);
     linhas.push({
@@ -145,17 +155,17 @@ export async function montarEstoque(lojaIds: string[] | null): Promise<{ linhas:
       fisico: disponivel,
       emTransito,
       shopee: shopee.has(sku) ? shopee.get(sku)! : null,
-      tiktok: null,
+      tiktok: tiktok.has(sku) ? tiktok.get(sku)! : null,
       vendaDia,
       v7: s7,
       v28: s28,
       v30: s30,
       cobertura: coberturaDias(disponivel, vendaDia),
       pontoPedido: pontoPedido(vendaDia, prazoDias, segurancaDias),
-      comprar: quantidadeComprar(vendaDia, disponivel, emTransito, { prazoDias, segurancaDias, diasDesejados: DIAS_DESEJADOS, caixa, fatorSazonal: fatorAtual }),
+      comprar: status === "mapear" ? 0 : quantidadeComprar(vendaDia, disponivel, emTransito, { prazoDias, segurancaDias, diasDesejados: DIAS_DESEJADOS, caixa, fatorSazonal: fatorAtual }),
       status,
       acabaEm: acaba ? acaba.toISOString() : null,
-      vendaPerdida: vendaPerdida(vendaDia, disponivel, prazoDias, precoMedio),
+      vendaPerdida: status === "mapear" ? 0 : vendaPerdida(vendaDia, disponivel, prazoDias, precoMedio),
       custo,
       valorParado: status === "excesso" || status === "parado" ? disponivel * (custo || 0) : 0,
       fornecedor: f?.nome ?? null,
