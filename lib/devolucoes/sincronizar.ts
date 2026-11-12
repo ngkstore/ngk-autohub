@@ -220,6 +220,9 @@ export async function sincronizarDevolucoes(opts: { canal?: "shopee" | "tiktok";
     for (const t of data || []) {
       if (!t.loja_id) continue;
       resultados.push(await sincronizarDevolucoesShopeeLoja(String(t.loja_id), { dias: opts.dias, orcamentoMs: restante(), forcar: opts.forcar }));
+      // falhas de entrega vêm da API de pedidos (não da de devoluções)
+      const { sincronizarFalhasEntregaShopee } = await import("@/lib/shopee/falhasEntrega");
+      resultados.push({ ...(await sincronizarFalhasEntregaShopee(String(t.loja_id), { dias: opts.dias, orcamentoMs: restante() })), canal: "shopee" });
     }
   }
   if (!opts.canal || opts.canal === "tiktok") {

@@ -83,7 +83,7 @@ export default async function CasoPage({ params }: { params: Promise<{ id: strin
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="space-y-6 xl:col-span-2">
           <Card>
-            <CardHeader titulo="O que o comprador diz" acoes={<Chip cor="azul">{d.tipo.replace("_", " + ")}</Chip>} />
+            <CardHeader titulo="O que o comprador diz" acoes={<Chip cor={d.tipo === "falha_entrega" ? "laranja" : "azul"}>{d.tipo === "falha_entrega" ? "Falha de entrega" : d.tipo.replace("_", " + ")}</Chip>} />
             <div className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
               <LinhaDetalhe rotulo="Motivo" valor={`${motivoLegivel(d.motivo_codigo, d.motivo_texto)}${d.motivo_codigo ? ` (${d.motivo_codigo})` : ""}`} />
               <LinhaDetalhe rotulo="Valor pedido" valor={`${brl(d.valor_reembolso_pedido)}${d.valor_pedido ? ` de ${brl(d.valor_pedido)}` : ""}`} destaque />

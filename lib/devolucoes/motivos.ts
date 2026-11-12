@@ -1,5 +1,6 @@
 // Tradução dos códigos de motivo de devolução (Shopee e TikTok) para a tela.
 const SHOPEE: Record<string, string> = {
+  FAILED_DELIVERY: "Falha de entrega",
   NOT_RECEIPT: "Não recebido",
   NOT_RECEIVED: "Não recebido",
   DAMAGED_OTHERS: "Chegou danificado",

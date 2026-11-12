@@ -42,6 +42,7 @@ export default async function DevolucoesPage({ searchParams }: { searchParams: P
 
   const agora = new Date();
   const em24h = agora.getTime() + 24 * 3600000;
+  const falhasEntrega = abertas.filter((d) => d.tipo === "falha_entrega").length;
   const vencem24 = abertas.filter((d) => d.prazo_resposta && new Date(d.prazo_resposta).getTime() <= em24h && new Date(d.prazo_resposta) > agora).length;
   const vencidas = abertas.filter((d) => d.prazo_resposta && new Date(d.prazo_resposta) <= agora && ["resposta", "decisao"].includes(d.etapa)).length;
   const emDisputa = abertas.reduce((s, d) => s + Number(d.valor_reembolso_pedido || 0), 0);
@@ -74,6 +75,7 @@ export default async function DevolucoesPage({ searchParams }: { searchParams: P
       <div className="grid grid-cols-2 gap-3.5 md:grid-cols-3 xl:grid-cols-5">
         <Kpi icone="devolucoes" cor="indigo" rotulo="Abertas" valor={abertas.length} detalhe={`+${semana} na semana`} />
         <Kpi icone="alertas" cor={vencidas ? "vermelho" : "laranja"} rotulo="Vencem em 24 h" valor={vencem24} detalhe={vencidas ? `${vencidas} vencida(s)` : "nenhuma vencida"} />
+        <Kpi icone="devolucoes" cor="laranja" rotulo="Falhas de entrega" valor={falhasEntrega} detalhe="pacotes voltando ao vendedor (Shopee)" />
         <Kpi icone="financas" cor="roxo" rotulo="Valor em disputa" valor={brl(emDisputa, 0)} detalhe="reembolsos pedidos" />
         <Kpi icone="insights" cor="verde" rotulo="Com sugestão do assistente" valor={abertas.length ? `${Math.round((comSugestao / abertas.length) * 100)}%` : "—"} detalhe="com sua aprovação" />
         <Kpi icone="auditoria" cor="ceu" rotulo="Disputas ganhas" valor={ganhas + perdidas ? `${Math.round((ganhas / (ganhas + perdidas)) * 100)}%` : "—"} detalhe={`${brl(recuperado, 0)} recuperados`} />
@@ -114,7 +116,10 @@ export default async function DevolucoesPage({ searchParams }: { searchParams: P
                       <Tr key={d.id}>
                         <Td>{prazo ? <ChipPrazo urgencia={urgenciaDoPrazo(prazo)}>{prazoRelativo(prazo) || fmtData(prazo)}</ChipPrazo> : <Chip cor="cinza">{d.etapa}</Chip>}</Td>
                         <Td>
-                          <ChipCanal canal={d.canal} />
+                          <div className="flex items-center gap-1.5">
+                            <ChipCanal canal={d.canal} />
+                            {d.tipo === "falha_entrega" && <Chip cor="laranja">Falha de entrega</Chip>}
+                          </div>
                         </Td>
                         <Td className="max-w-[260px]">
                           <div className="flex items-center gap-2.5">
