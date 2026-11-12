@@ -90,7 +90,17 @@ export async function montarEstoque(lojaIds: string[] | null, lojasPlataforma: s
   const canalDaLoja = new Map<string, string>((lojasRows || []).map((l) => [l.id as string, l.marketplace === "tiktok_shop" ? "tiktok" : "shopee"]));
   let qv = supabase.from("produto_variacoes").select("loja_id, item_id, model_id, model_sku, estoque").limit(20000);
   if (lojasPlataforma) qv = qv.in("loja_id", lojasPlataforma);
-  const { data: varia } = await qv;
+  const { data: variaRows } = await qv;
+  // anúncio SEM variação não tem linha em produto_variacoes (get_model_list vem vazio): usa o
+  // estoque do próprio produto (produtos.estoque, do get_item_base_info) com model_id "".
+  let qp = supabase.from("produtos").select("loja_id, item_id, sku, estoque").eq("marketplace", "shopee").not("item_id", "is", null).limit(20000);
+  if (lojasPlataforma) qp = qp.in("loja_id", lojasPlataforma);
+  const { data: prodRows } = await qp;
+  const comVariacao = new Set((variaRows || []).map((v) => `${v.loja_id}|${v.item_id}`));
+  const varia = [
+    ...(variaRows || []),
+    ...((prodRows || []).filter((p) => p.item_id && !comVariacao.has(`${p.loja_id}|${p.item_id}`)).map((p) => ({ loja_id: p.loja_id, item_id: String(p.item_id), model_id: "", model_sku: p.sku, estoque: p.estoque }))),
+  ];
   const { data: mapeamentos } = await supabase.from("catalogo_mapeamento").select("sku_anuncio, sku_armazem, loja_id, item_id, model_id").limit(20000);
   const mapAnuncio = new Map<string, string>();
   const mapItem = new Map<string, string>();
