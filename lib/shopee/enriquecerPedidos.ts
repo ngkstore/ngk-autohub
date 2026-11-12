@@ -296,10 +296,14 @@ export async function enriquecerPedidosPendentes({
     // (boleto/pix), então re-checar os mais novos pega os que viraram pago
     // rápido. Os UNPAID antigos (>2 dias) são abandonados — não precisam de
     // re-checagem. (O backlog histórico já foi limpo.)
-    query = query.eq("status", "UNPAID").order("data_pedido", {
-      ascending: false,
-      nullsFirst: false,
-    }).is("origem", null);
+    // Rotação pelos menos atualizados dos últimos 3 dias: "recentes primeiro" com
+    // limite 200/h re-checava sempre os mesmos ~200 UNPAID de hoje (há 500+ por dia) e
+    // o boleto/pix pago no dia seguinte ficava congelado como UNPAID.
+    query = query
+      .eq("status", "UNPAID")
+      .is("origem", null)
+      .gte("data_pedido", new Date(Date.now() - 3 * 86400000).toISOString())
+      .order("atualizado_em", { ascending: true, nullsFirst: true });
   } else if (revisar) {
     // Revisão de status: pedidos efetivados presos num status NÃO-terminal
     // (ex.: "READY_TO_SHIP" há semanas) — o sistema não re-sincroniza status de
@@ -438,7 +442,7 @@ export async function enriquecerPedidosPendentes({
     .eq("marketplace", "shopee")
     .not("pedido_externo_id", "like", "SH-%");
   if (resync) {
-    countQuery = countQuery.eq("status", "UNPAID").is("origem", null);
+    countQuery = countQuery.eq("status", "UNPAID").is("origem", null).gte("data_pedido", new Date(Date.now() - 3 * 86400000).toISOString());
   } else if (revisar) {
     countQuery = countQuery
       .eq("pedido_efetivado", true)

@@ -3,6 +3,8 @@ import DashboardCharts from "./components/DashboardCharts";
 import GerarRankingButton from "./components/GerarRankingButton";
 import { Card, CardHeader, Kpi, Chip, ChipCanal, ChipStatus, Tabela, Th, Tr, Td, Produto, BotaoLink, Vazio } from "./components/ui";
 import { escopoDoUsuario, filtroLojas } from "@/lib/conta";
+import { calcularResultado } from "@/lib/financas/resultado";
+import { montarEstoque } from "@/lib/estoque/consultas";
 
 export const dynamic = "force-dynamic";
 
@@ -269,15 +271,6 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
     .order("criado_em", { ascending: false })
     .limit(5);
 
-  let produtosSemEstoqueQuery = supabase
-    .from("produtos")
-    .select("*", { count: "exact", head: true })
-    .lte("estoque", 0);
-
-  let financeiroQuery = supabase
-    .from("financeiro")
-    .select("tipo, valor, data_movimento");
-
   let rankingQuery = supabase
     .from("ranking_produtos")
     .select("*, produtos(nome, sku), lojas(apelido)")
@@ -298,8 +291,6 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
   if (lojas) {
     avaliacoesQuery = avaliacoesQuery.in("loja_id", lojas);
     ultimasQuery = ultimasQuery.in("loja_id", lojas);
-    produtosSemEstoqueQuery = produtosSemEstoqueQuery.in("loja_id", lojas);
-    financeiroQuery = financeiroQuery.in("loja_id", lojas);
     rankingQuery = rankingQuery.in("loja_id", lojas);
     recentesQuery = recentesQuery.in("loja_id", lojas);
   }
@@ -311,30 +302,9 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
     ultimasQuery = ultimasQuery
       .gte("criado_em", periodo.inicio)
       .lt("criado_em", periodo.fim);
-    produtosSemEstoqueQuery = produtosSemEstoqueQuery
-      .gte("criado_em", periodo.inicio)
-      .lt("criado_em", periodo.fim);
-    financeiroQuery = financeiroQuery
-      .gte("data_movimento", periodo.inicio)
-      .lt("data_movimento", periodo.fim);
     recentesQuery = recentesQuery
       .gte("data_pedido", periodo.inicio)
       .lt("data_pedido", periodo.fim);
-  }
-
-  let respostasQuery = supabase
-    .from("respostas_ia")
-    .select("*, avaliacoes!inner(loja_id, criado_em)", {
-      count: "exact",
-      head: true,
-    });
-  if (lojas) {
-    respostasQuery = respostasQuery.in("avaliacoes.loja_id", lojas);
-  }
-  if (periodo) {
-    respostasQuery = respostasQuery
-      .gte("avaliacoes.criado_em", periodo.inicio)
-      .lt("avaliacoes.criado_em", periodo.fim);
   }
 
   const lojaScope =
@@ -346,11 +316,11 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
     { count: totalAvaliacoes },
     { data: resumoAvalData },
     { data: ultimasAvaliacoes },
-    { count: produtosSemEstoque },
-    { data: financeiro },
+    estoque,
+    { data: resFinancas },
+    { data: resCmv },
     { data: rankingProdutos },
     { data: efetivadosRecentesData },
-    { count: totalRespostas },
     { count: totalLojas },
     { count: lojasAtivas },
   ] = await Promise.all([
@@ -362,11 +332,13 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
       p_fim: periodo?.fim ?? null,
     }),
     ultimasQuery,
-    produtosSemEstoqueQuery,
-    financeiroQuery,
+    // Mesma fonte da tela Estoque (rupturas = SKU zerado com venda nos últimos 30 d).
+    montarEstoque(lojas).catch(() => null),
+    // Mesma fonte de Finanças > Balanço (resultado e lucro líquido do período).
+    supabase.rpc("resumo_financas", { p_loja_ids: lojas, p_inicio: periodo?.inicio ?? null, p_fim: periodo?.fim ?? null, p_conta: escopo.contaId }),
+    supabase.rpc("resumo_cmv", { p_loja_ids: lojas, p_inicio: periodo?.inicio ?? null, p_fim: periodo?.fim ?? null }),
     rankingQuery,
     recentesQuery,
-    respostasQuery,
     supabase.from("lojas").select("*", { count: "exact", head: true }).in("id", lojaScope),
     supabase
       .from("lojas")
@@ -376,8 +348,8 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
   ]);
 
   const resumoAval = (resumoAvalData as {
-    total: number; media: number; n1: number; n2: number; n3: number; n4: number; n5: number;
-  } | null) || { total: 0, media: 0, n1: 0, n2: 0, n3: 0, n4: 0, n5: 0 };
+    total: number; media: number; n1: number; n2: number; n3: number; n4: number; n5: number; respondidas?: number; pelo_robo?: number;
+  } | null) || { total: 0, media: 0, n1: 0, n2: 0, n3: 0, n4: 0, n5: 0, respondidas: 0, pelo_robo: 0 };
   const efetivadosRecentes = (efetivadosRecentesData as PedidoRow[]) || [];
 
   const ticketMedio =
@@ -390,28 +362,21 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
       ? Math.round((resumo.efetivadosCount / resumo.totalPedidos) * 100)
       : 0;
 
-  const totalReceitas =
-    financeiro
-      ?.filter((item) => item.tipo === "receita")
-      .reduce((total, item) => total + Number(item.valor || 0), 0) || 0;
-
-  const totalDespesas =
-    financeiro
-      ?.filter((item) => item.tipo === "despesa")
-      .reduce((total, item) => total + Number(item.valor || 0), 0) || 0;
-
-  const lucroEstimado = totalReceitas - totalDespesas;
+  // Resultado e lucro líquido: mesma conta de Finanças > Balanço (lib/financas/resultado.ts).
+  const fin = calcularResultado(resFinancas as Record<string, unknown> | null, resCmv as Record<string, unknown> | null);
+  const lucroEstimado = fin.lucro;
+  const produtosSemEstoque = estoque ? estoque.linhas.filter((l) => l.status === "ruptura").length : null;
 
   const notaMedia = Number(resumoAval.media || 0).toFixed(1);
-
-  const taxaAutomacao = totalAvaliacoes
-    ? Math.round(((totalRespostas ?? 0) / totalAvaliacoes) * 100)
-    : 0;
+  const respondidas = Number(resumoAval.respondidas || 0);
+  const peloRobo = Number(resumoAval.pelo_robo || 0);
+  const pctRespondidas = totalAvaliacoes ? Math.round((respondidas / totalAvaliacoes) * 100) : 0;
+  const taxaAutomacao = respondidas ? Math.round((peloRobo / respondidas) * 100) : 0;
 
   const financeiroResumo = [
-    { nome: "Receitas", valor: totalReceitas },
-    { nome: "Despesas", valor: totalDespesas },
-    { nome: "Lucro", valor: lucroEstimado },
+    { nome: "Receita", valor: fin.receita },
+    { nome: "Resultado", valor: fin.resultado },
+    { nome: "Lucro líquido", valor: fin.lucro },
   ];
 
   const avaliacoesPorNota = [1, 2, 3, 4, 5].map((nota) => ({
@@ -437,8 +402,8 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
         <Kpi icone="financas" cor="indigo" rotulo="Faturamento efetivado" valor={formatarMoeda(resumo.faturamentoEfetivado)} detalhe={`${resumo.efetivadosCount} pedido(s) efetivado(s)`} />
         <Kpi icone="pedidos" cor="ceu" rotulo="Pedidos" valor={resumo.totalPedidos.toLocaleString("pt-BR")} detalhe={`${taxaEfetivacao}% efetivados`} />
         <Kpi icone="alvo" cor="roxo" rotulo="Ticket médio (efetivado)" valor={formatarMoeda(ticketMedio)} />
-        <Kpi icone="insights" cor="verde" rotulo="Lucro estimado" valor={formatarMoeda(lucroEstimado)} detalhe="receitas − despesas lançadas" />
-        <Kpi icone="avaliacoes" cor="amarelo" rotulo="Nota média" valor={notaMedia} detalhe={`${taxaAutomacao}% das avaliações respondidas`} />
+        <Kpi icone="insights" cor="verde" rotulo="Lucro líquido" valor={fin.cobertura > 0 ? formatarMoeda(lucroEstimado) : "—"} detalhe={fin.cobertura > 0 ? `margem ${fin.margemLucro.toFixed(1)}% · mesma conta de Finanças` : "cadastre os custos em Finanças"} />
+        <Kpi icone="avaliacoes" cor="amarelo" rotulo="Nota média" valor={notaMedia} detalhe={`${pctRespondidas}% das avaliações respondidas`} />
       </div>
 
       {/* Indicadores secundários */}
@@ -446,9 +411,9 @@ export default async function Dashboard({ searchParams }: DashboardProps) {
         <Kpi rotulo="Faturamento geral" valor={formatarMoeda(resumo.faturamentoGeral)} detalhe="inclui pendentes e cancelados" />
         <Kpi rotulo="Faturamento concluído" valor={formatarMoeda(resumo.faturamentoConcluido)} detalhe={`${resumo.faturadosCount} concluído(s) / a confirmar`} />
         <Kpi rotulo="Cancelados / não efetivados" valor={resumo.canceladosCount.toLocaleString("pt-BR")} />
-        <Kpi rotulo="Produtos sem estoque" valor={(produtosSemEstoque ?? 0).toLocaleString("pt-BR")} />
+        <Kpi rotulo="Produtos em ruptura" valor={produtosSemEstoque === null ? "—" : produtosSemEstoque.toLocaleString("pt-BR")} detalhe="estoque zero com venda em 30 d · tela Estoque" />
         <Kpi rotulo="Lojas ativas" valor={`${lojasAtivas ?? 0}/${totalLojas ?? 0}`} />
-        <Kpi rotulo="Taxa de automação" valor={`${taxaAutomacao}%`} detalhe="avaliações respondidas pelo robô" />
+        <Kpi rotulo="Taxa de automação" valor={`${taxaAutomacao}%`} detalhe={`${peloRobo.toLocaleString("pt-BR")} de ${respondidas.toLocaleString("pt-BR")} respostas pelo robô`} />
       </div>
 
       <DashboardCharts

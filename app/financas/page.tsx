@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Fragment } from "react";
 import { supabase } from "@/lib/supabase";
 import { escopoDoUsuario, filtroLojas } from "@/lib/conta";
+import { calcularResultado } from "@/lib/financas/resultado";
 import CustoInput from "../components/CustoInput";
 import CustoVariacaoInput from "../components/CustoVariacaoInput";
 import UploadCustos from "../components/UploadCustos";
@@ -179,35 +180,8 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
   const c = (dataCmv as Record<string, unknown>) || {};
   const evo = (dataEvo as { mes: string; receita: number; resultado: number; margem_pct: number; pedidos: number }[]) || [];
   const rp = (dataPrev as Record<string, unknown>) || {};
-  const receita = n(r.receita_bruta);
-  const taxaServAfiliado = Math.abs(n(r.taxa_servico_afiliado)); // taxa de serviço de afiliado
-  const taxas = Math.abs(n(r.taxas)) - taxaServAfiliado; // taxas Shopee SEM a de afiliado (separada)
-  const cupom = Math.abs(n(r.cupom_proprio)); // cupom_loja vem negativo no banco
-  const afiliado = Math.abs(n(r.afiliado)); // comissão de afiliado (liquida ~30 dias depois)
-  const liquida = n(r.receita_liquida);
-  const ads = n(r.ads);
-  const reemb = n(r.reembolsos);
-  const imposto = n(r.imposto);
-  const freteCusto = n(r.frete_custo); // TikTok: frete real − subsídio Frete Grátis − pago pelo cliente (já dentro do líquido)
-  const reembTiktok = n(r.reembolsos_tiktok); // TikTok: reembolsos de logística/plataforma (fora do pedido)
-  // Carteira Shopee classificada por tipo (custos_camadas.sql)
-  const acelera = n(r.acelera_taxa); // taxa do Shopee Acelera (antecipação)
-  const estornos = n(r.estornos); // renda do pedido negativa (102)
-  const compens = n(r.compensacoes); // compensações da Shopee (perda, devolução, Full, ajustes a favor)
-  const difal = n(r.difal); // DIFAL cobrado pela Shopee
-  const ajustes = n(r.ajustes); // volumoso, peso cubado, Full, crédito a maior
-  const afilAjuste = n(r.afiliado_ajuste); // afiliado cobrado após o repasse
-  const extrasCarteira = acelera + estornos + difal + ajustes + afilAjuste - compens;
-  const resultado = liquida + reembTiktok - ads - reemb - imposto - extrasCarteira;
-  const margem = receita > 0 ? (resultado / receita) * 100 : 0;
-
-  // CMV: custo da mercadoria vendida no período. Cobertura = % de itens com custo.
-  const cmv = n(c.cmv);
-  const itensTotal = n(c.itens_total);
-  const itensComCusto = n(c.itens_com_custo);
-  const cobertura = itensTotal > 0 ? (itensComCusto / itensTotal) * 100 : 0;
-  const lucro = resultado - cmv;
-  const margemLucro = receita > 0 ? (lucro / receita) * 100 : 0;
+  // Fonte única do resultado (também usada pela Visão geral): lib/financas/resultado.ts
+  const { receita, taxas, taxaServAfiliado, cupom, afiliado, liquida, ads, reemb, imposto, freteCusto, reembTiktok, acelera, estornos, compens, difal, ajustes, afilAjuste, resultado, margem, cmv, cobertura, lucro, margemLucro } = calcularResultado(r, c);
 
   // Comparação com o período anterior (mesma duração).
   const receitaPrev = n(rp.receita_bruta);
