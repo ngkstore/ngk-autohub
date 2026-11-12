@@ -18,6 +18,13 @@ describe("resultado do período (Finanças e Visão geral usam a mesma conta)", 
     expect(x.cobertura).toBe(75);
     expect(x.margemLucro).toBeCloseTo((x.lucro / 1000) * 100, 6);
   });
+  it("pedidos sem extrato: entra o líquido ESTIMADO, nunca 0 − CMV", () => {
+    const x = calcularResultado({ receita_bruta: 11987.52, receita_liquida: 0, receita_liquida_estimada: 8600, qtd_liquidados: 0, qtd_estimados: 167 }, { cmv: 2295.6, itens_total: 10, itens_com_custo: 10 });
+    expect(x.liquidaTotal).toBe(8600);
+    expect(x.resultado).toBe(8600);
+    expect(x.lucro).toBeCloseTo(8600 - 2295.6, 2);
+    expect(x.lucro).toBeGreaterThan(0);
+  });
   it("sem dados: tudo zero (sem NaN)", () => {
     const x = calcularResultado(null, undefined);
     expect(x.receita).toBe(0);

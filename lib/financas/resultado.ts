@@ -8,7 +8,11 @@ export type Resultado = {
   taxaServAfiliado: number;
   cupom: number; // cupom próprio
   afiliado: number; // comissão de afiliado
-  liquida: number; // receita líquida (escrow / extrato)
+  liquida: number; // receita líquida LIQUIDADA (escrow / extrato)
+  liquidaEstimada: number; // receita líquida ESTIMADA dos pedidos ainda sem extrato/escrow (taxas esperadas)
+  liquidaTotal: number; // liquidada + estimada — é a que entra no resultado
+  qtdLiquidados: number;
+  qtdEstimados: number;
   ads: number;
   reemb: number;
   imposto: number;
@@ -42,6 +46,10 @@ export function calcularResultado(r: ResumoFinancas | null | undefined, c: Resum
   const cupom = Math.abs(n(r.cupom_proprio));
   const afiliado = Math.abs(n(r.afiliado));
   const liquida = n(r.receita_liquida);
+  const liquidaEstimada = n(r.receita_liquida_estimada);
+  const liquidaTotal = liquida + liquidaEstimada;
+  const qtdLiquidados = n(r.qtd_liquidados);
+  const qtdEstimados = n(r.qtd_estimados);
   const ads = n(r.ads);
   const reemb = n(r.reembolsos);
   const imposto = n(r.imposto);
@@ -54,7 +62,8 @@ export function calcularResultado(r: ResumoFinancas | null | undefined, c: Resum
   const ajustes = n(r.ajustes);
   const afilAjuste = n(r.afiliado_ajuste);
   const extrasCarteira = acelera + estornos + difal + ajustes + afilAjuste - compens;
-  const resultado = liquida + reembTiktok - ads - reemb - imposto - extrasCarteira;
+  // receita líquida e CMV dos MESMOS pedidos: pedido sem extrato entra com o líquido estimado, nunca com zero
+  const resultado = liquidaTotal + reembTiktok - ads - reemb - imposto - extrasCarteira;
   const margem = receita > 0 ? (resultado / receita) * 100 : 0;
   const cmv = n(c.cmv);
   const itensTotal = n(c.itens_total);
@@ -62,5 +71,5 @@ export function calcularResultado(r: ResumoFinancas | null | undefined, c: Resum
   const cobertura = itensTotal > 0 ? (itensComCusto / itensTotal) * 100 : 0;
   const lucro = resultado - cmv;
   const margemLucro = receita > 0 ? (lucro / receita) * 100 : 0;
-  return { receita, taxas, taxaServAfiliado, cupom, afiliado, liquida, ads, reemb, imposto, freteCusto, reembTiktok, acelera, estornos, compens, difal, ajustes, afilAjuste, extrasCarteira, resultado, margem, cmv, itensTotal, itensComCusto, cobertura, lucro, margemLucro };
+  return { receita, taxas, taxaServAfiliado, cupom, afiliado, liquida, liquidaEstimada, liquidaTotal, qtdLiquidados, qtdEstimados, ads, reemb, imposto, freteCusto, reembTiktok, acelera, estornos, compens, difal, ajustes, afilAjuste, extrasCarteira, resultado, margem, cmv, itensTotal, itensComCusto, cobertura, lucro, margemLucro };
 }

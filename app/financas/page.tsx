@@ -74,6 +74,27 @@ function addDiasBRT(nd: number) {
   return new Date(Date.UTC(y, m - 1, d + nd)).toISOString().slice(0, 10);
 }
 
+// Evolução mensal com a MESMA conta do DRE (lucro líquido ÷ receita), um mês por vez.
+async function evolucaoMensal(lojas: string[] | null, conta: string | null, meses: number): Promise<{ data: { mes: string; receita: number; resultado: number; margem_pct: number; pedidos: number }[] }> {
+  const hoje = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  const janelas: { mes: string; ini: string; fim: string }[] = [];
+  for (let i = meses - 1; i >= 0; i--) {
+    const a = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+    const b = new Date(hoje.getFullYear(), hoje.getMonth() - i + 1, 1);
+    const p = (x: number) => String(x).padStart(2, "0");
+    janelas.push({ mes: `${a.getFullYear()}-${p(a.getMonth() + 1)}`, ini: `${a.getFullYear()}-${p(a.getMonth() + 1)}-01T00:00:00-03:00`, fim: `${b.getFullYear()}-${p(b.getMonth() + 1)}-01T00:00:00-03:00` });
+  }
+  const linhas = await Promise.all(janelas.map(async (j) => {
+    const [{ data: f }, { data: c }] = await Promise.all([
+      supabase.rpc("resumo_financas", { p_loja_ids: lojas, p_inicio: j.ini, p_fim: j.fim, p_conta: conta }),
+      supabase.rpc("resumo_cmv", { p_loja_ids: lojas, p_inicio: j.ini, p_fim: j.fim }),
+    ]);
+    const x = calcularResultado(f as Record<string, unknown> | null, c as Record<string, unknown> | null);
+    return { mes: j.mes, receita: Math.round(x.receita), resultado: Math.round(x.lucro), margem_pct: Math.round(x.margemLucro * 10) / 10, pedidos: Number((f as Record<string, unknown> | null)?.total_pedidos || 0) };
+  }));
+  return { data: linhas.filter((l) => l.receita > 0 || l.pedidos > 0) };
+}
+
 function brl(v: number) {
   return (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
@@ -160,7 +181,7 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
   const [{ data }, { data: dataCmv }, { data: dataEvo }, { data: dataPrev }, { data: dataEmp }] = await Promise.all([
     supabase.rpc("resumo_financas", { p_loja_ids: lojas, p_inicio: periodo?.inicio ?? null, p_fim: periodo?.fim ?? null, p_conta: conta }),
     supabase.rpc("resumo_cmv", { p_loja_ids: lojas, p_inicio: periodo?.inicio ?? null, p_fim: periodo?.fim ?? null }),
-    supabase.rpc("evolucao_mensal", { p_loja_ids: lojas, p_meses: 6 }),
+    evolucaoMensal(lojas, conta, 6),
     prevPer
       ? supabase.rpc("resumo_financas", { p_loja_ids: lojas, p_inicio: prevPer.inicio, p_fim: prevPer.fim, p_conta: conta })
       : Promise.resolve({ data: null }),
@@ -179,9 +200,10 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
   const r = (data as Record<string, unknown>) || {};
   const c = (dataCmv as Record<string, unknown>) || {};
   const evo = (dataEvo as { mes: string; receita: number; resultado: number; margem_pct: number; pedidos: number }[]) || [];
+  void dataEvo;
   const rp = (dataPrev as Record<string, unknown>) || {};
   // Fonte única do resultado (também usada pela Visão geral): lib/financas/resultado.ts
-  const { receita, taxas, taxaServAfiliado, cupom, afiliado, liquida, ads, reemb, imposto, freteCusto, reembTiktok, acelera, estornos, compens, difal, ajustes, afilAjuste, resultado, margem, cmv, cobertura, lucro, margemLucro } = calcularResultado(r, c);
+  const { receita, taxas, taxaServAfiliado, cupom, afiliado, liquida, liquidaEstimada, liquidaTotal, qtdLiquidados, qtdEstimados, ads, reemb, imposto, freteCusto, reembTiktok, acelera, estornos, compens, difal, ajustes, afilAjuste, resultado, margem, cmv, cobertura, lucro, margemLucro } = calcularResultado(r, c);
 
   // Comparação com o período anterior (mesma duração).
   const receitaPrev = n(rp.receita_bruta);
@@ -220,10 +242,14 @@ async function Balanco({ lojas, periodo, conta }: { lojas: string[] | null; peri
         { l: "(−) Taxa de serviço de afiliado", v: -taxaServAfiliado, tot: false },
         { l: "(−) Cupom próprio (o do marketplace não entra)", v: -cupom, tot: false },
         ...(freteCusto !== 0 ? [{ l: "(−) Frete cobrado pelo TikTok (líquido do subsídio e do frete do cliente; detalhe em Conciliação)", v: -freteCusto, tot: false }] : []),
-        { l: "= Receita líquida (escrow / extrato)", v: liquida, tot: true },
+        { l: `= Receita líquida liquidada (escrow / extrato) · ${int(qtdLiquidados)} pedido(s)`, v: liquida, tot: true },
       ];
   const linhas = [
     ...topo,
+    ...(qtdEstimados > 0 ? [
+      { l: `(+) A liquidar — líquido estimado pelas taxas esperadas · ${int(qtdEstimados)} pedido(s) ainda sem extrato/escrow`, v: liquidaEstimada, tot: false },
+      { l: "= Receita líquida total (liquidado + estimado)", v: liquidaTotal, tot: true },
+    ] : []),
     ...(reembTiktok !== 0 ? [{ l: "(+) Reembolsos do TikTok (logística / plataforma)", v: reembTiktok, tot: false }] : []),
     { l: "(−) Ads (saída da carteira)", v: -ads, tot: false },
     { l: "(−) Reembolsos / devoluções após o repasse", v: -reemb, tot: false },
