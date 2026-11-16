@@ -9,10 +9,11 @@ const JANELA = 15 * 86400; // get_order_list aceita no máximo 15 dias por consu
 
 // Falhas de entrega da Shopee → devolucoes (tipo 'falha_entrega'). Fonte: API de pedidos
 // (CANCELLED por "Failed Delivery") + get_tracking_info para saber se o pacote já voltou.
-export async function sincronizarFalhasEntregaShopee(lojaId: string, opts: { dias?: number; orcamentoMs?: number } = {}): Promise<ResultadoSync> {
+export async function sincronizarFalhasEntregaShopee(lojaId: string, opts: { dias?: number; ateDias?: number; orcamentoMs?: number } = {}): Promise<ResultadoSync> {
   const inicio = Date.now();
   const r: ResultadoSync = { canal: "shopee", loja_id: lojaId, vistos: 0, gravados: 0, eventos: 0, midias: 0, erros: 0, segundos: 0 };
-  const agora = Math.floor(Date.now() / 1000);
+  // janela [agora − dias, agora − ateDias]: fatias para a carga manual não estourarem os 300 s
+  const agora = Math.floor(Date.now() / 1000) - (opts.ateDias ?? 0) * 86400;
   const de = agora - (opts.dias ?? 20) * 86400; // 20 d cobre a volta do pacote; a janela de 45 d so na carga manual (?so=falhas&dias=45&loja=...)
   const estourou = () => !!opts.orcamentoMs && Date.now() - inicio > opts.orcamentoMs;
   const conta = await contaDaLoja(lojaId);
