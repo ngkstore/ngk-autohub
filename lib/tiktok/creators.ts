@@ -90,8 +90,10 @@ export async function coletarAmostrasTikTok(loja: LojaTikTok, opts: { orcamentoM
       // criador: cria/atualiza só os campos públicos que vieram na amostra (sem apagar o perfil)
       for (const c of criadores.values()) {
         const { data: ja } = await supabase.from("tiktok_criadores").select("criador_id").eq("criador_id", c.criador_id as string).maybeSingle();
-        if (ja) await supabase.from("tiktok_criadores").update({ usuario: c.usuario, nome: c.nome, seguidores: c.seguidores, taxa_cumprimento: c.taxa_cumprimento, media_views_video: c.media_views_video, ...(c.gmv != null ? { gmv: c.gmv, gmv_moeda: c.gmv_moeda } : {}) }).eq("criador_id", c.criador_id as string);
-        else await supabase.from("tiktok_criadores").insert({ ...c, coletado_em: new Date().toISOString() });
+        // GMV da amostra vem em BRL → gmv_brl (fonte imediata da nota, sem depender da rodada de perfis)
+        const gmvBrl = c.gmv != null && String(c.gmv_moeda ?? "BRL") === "BRL" ? c.gmv : null;
+        if (ja) await supabase.from("tiktok_criadores").update({ usuario: c.usuario, nome: c.nome, seguidores: c.seguidores, taxa_cumprimento: c.taxa_cumprimento, media_views_video: c.media_views_video, ...(c.gmv != null ? { gmv: c.gmv, gmv_moeda: c.gmv_moeda } : {}), ...(gmvBrl != null ? { gmv_brl: gmvBrl } : {}) }).eq("criador_id", c.criador_id as string);
+        else await supabase.from("tiktok_criadores").insert({ ...c, gmv_brl: gmvBrl, coletado_em: new Date().toISOString() });
       }
       amostras += linhas.length;
       token = String(((r.data as J) || {}).next_page_token || "");
@@ -152,7 +154,8 @@ export async function coletarPerfisCriadores(loja: LojaTikTok, opts: { max?: num
       const p = mapearPerfilCriador((r.data as J) || {});
       await supabase
         .from("tiktok_criadores")
-        .update({ nivel: p.nivel, seguidores: p.seguidores ?? undefined, categorias: p.categorias, media_views_video: p.media_views_video ?? undefined, media_views_live: p.media_views_live, demografia: p.demografia, gmv_video: p.gmv_video, gmv_live: p.gmv_live, bruto: r.data, perfil_em: new Date().toISOString(), ultimo_erro: null })
+        // GMV do perfil vem em USD: guarda em gmv_usd (a nota usa gmv_brl da amostra quando existe)
+        .update({ nivel: p.nivel, seguidores: p.seguidores ?? undefined, categorias: p.categorias, media_views_video: p.media_views_video ?? undefined, media_views_live: p.media_views_live, demografia: p.demografia, gmv_video: p.gmv_video, gmv_live: p.gmv_live, ...(p.gmv_perfil != null && String(p.gmv_perfil_moeda ?? "USD") === "USD" ? { gmv_usd: p.gmv_perfil } : {}), bruto: r.data, perfil_em: new Date().toISOString(), ultimo_erro: null })
         .eq("criador_id", c.criador_id);
       perfis++;
     }
