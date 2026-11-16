@@ -13,7 +13,7 @@ export async function sincronizarFalhasEntregaShopee(lojaId: string, opts: { dia
   const inicio = Date.now();
   const r: ResultadoSync = { canal: "shopee", loja_id: lojaId, vistos: 0, gravados: 0, eventos: 0, midias: 0, erros: 0, segundos: 0 };
   const agora = Math.floor(Date.now() / 1000);
-  const de = agora - (opts.dias ?? 45) * 86400;
+  const de = agora - (opts.dias ?? 20) * 86400; // 20 d cobre a volta do pacote; a janela de 45 d so na carga manual (?so=falhas&dias=45&loja=...)
   const estourou = () => !!opts.orcamentoMs && Date.now() - inicio > opts.orcamentoMs;
   const conta = await contaDaLoja(lojaId);
   const metaDias = conta ? (await configDevolucoes(conta)).limites.falha_validacao_dias : undefined;

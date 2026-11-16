@@ -24,7 +24,8 @@ export async function GET(request: NextRequest) {
     const { sincronizarFalhasEntregaShopee } = await import("@/lib/shopee/falhasEntrega");
     const lojasIds = lojaId ? [lojaId] : ((await (await import("@/lib/supabase")).supabase.from("marketplace_tokens").select("loja_id").eq("marketplace", "shopee").eq("status", "ativo")).data || []).map((t) => String(t.loja_id));
     const out = [];
-    for (const l of lojasIds) out.push(await sincronizarFalhasEntregaShopee(l, { dias, orcamentoMs: 250_000 }));
+    const porLoja = Math.floor(250_000 / Math.max(1, lojasIds.length)); // divide o tempo da função entre as lojas (limite 300 s)
+    for (const l of lojasIds) out.push(await sincronizarFalhasEntregaShopee(l, { dias, orcamentoMs: porLoja }));
     return NextResponse.json({ sucesso: true, lojas: out });
   }
   if (sp.get("reprocessar") === "1") return NextResponse.json({ sucesso: true, ...(await reprocessarEtapasShopee(lojaId)) });
