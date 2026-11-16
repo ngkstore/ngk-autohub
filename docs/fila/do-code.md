@@ -50,3 +50,24 @@ Números pedidos na tarefa:
    - 261026KFYQNSEY · 13/11/2026 (3 d)
 3. Casos em Validar com mais de 20 dias: 15 de 39.
 Dúvidas ou pendências: o Seller Center mostra 25 em "Devolvido ao Vendedor"; aqui são 39 em Validar. Diferença provável: casos que o Seller Center já tirou da lista (validados lá) — conferir contra a lista do SC; se algum já estiver validado, registrar no AutoHub com "Validado, voltou ao estoque".
+
+## T-002 — AGUARDA GABRIEL
+Data/hora: 16/11/2026, 11:47:48
+O que foi feito: módulo Creators fase 1 escrito, testado (133 testes passam) e publicado no código (commit fba7d10):
+- Coleta só-leitura (lib/tiktok/creators.ts): sample_applications/search (todas as páginas), marketplace_creators/{id} (1x por dia por criador), orders/search (30 d na primeira carga, depois incremental), fulfillments/search para amostras aprovadas até constar conteúdo. Backoff próprio para 36009002: espera 2/6/15 s e, se insistir, grava tiktok_api_backoff por 5 min e a rodada para (o cron de 30 min retoma).
+- Cálculo puro (lib/creators/calculo.ts): produto parado (estoque UpSeller ≥ 300 e vendas 28 d < 2 %), nota 0–100 (pesos 35/20/15/15/15, bônus +10 parado), sugestão (aprovar ≥ 70 ou ≥ 50 com custo ≤ R$ 40; recusar < 30 com custo > R$ 40; o resto decidir), custo = custo do SKU no UpSeller + frete estimado (R$ 12). Tudo em creators_config por conta.
+- Diário (lib/creators/diario.ts): produtos parados (com views e pedidos de 28 d do analytics), nota/sugestão de cada pedido aberto, alerta (criarAlerta + Telegram) de "Aprovar" vencendo em < 12 h.
+- Tela /creators (item "Creators" no grupo Vendas): KPIs, fila por prazo com nota, motivos, custo, sugestão e link para o Affiliate Center; aba Produtos parados com os 20 criadores sugeridos; aba Resultado por produto e por criador. Decisão humana só registrada (/api/creators/decidir).
+- Fase 2 preparada e DESLIGADA: /api/creators/acoes exige a flag creators_acoes_api (false), confirmação na tela e grava quem aprovou em creators_acoes_log; nenhum endpoint de escrita é chamado (nem com a flag ligada ainda: devolve 501 "não implementada").
+- Categoria do produto: o coletor de estoque do TikTok passa a gravar tiktok_produtos (nome, categoria folha de category_chains).
+O que foi publicado (commit, migration, cron): commit fba7d10. Migration 0027 NÃO aplicada e crons NÃO adicionados — ver pendências.
+Números pedidos na tarefa: ainda não há (a coleta depende da migration).
+Dúvidas ou pendências:
+1. A ferramenta bloqueou a aplicação da migration 0027 (só cria tabelas e colunas novas) e a edição do vercel.json. Precisa do Gabriel:
+   a) aplicar supabase/migrations/0027_creators.sql no painel do Supabase (idempotente);
+   b) acrescentar em vercel.json os crons de leitura:
+      { "path": "/api/creators/coletar", "schedule": "13,43 * * * *" } e
+      { "path": "/api/creators/diario", "schedule": "50 5 * * *" }
+   Depois disso, rodar uma vez /api/creators/coletar e /api/creators/diario (ou avisar aqui) para eu registrar os números pedidos (amostras coletadas por sugestão, produtos parados, 10 maiores notas que vencem primeiro).
+2. O link para o pedido no Affiliate Center é genérico (página de pedidos de amostra) + id do pedido; não achei URL direta por pedido na documentação.
+3. "Visualizações 28 d" vêm do analytics shop_products/performance; se o campo de page views não existir na resposta, a coluna fica "—" e o produto é separado só por pedidos.
