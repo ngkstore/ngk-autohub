@@ -54,3 +54,13 @@ describe("Falha de entrega (Shopee) → devolucoes", () => {
     expect(ev.map((e) => e.chave)).toEqual(["falha_entrega", "retornou"]);
   });
 });
+
+describe("Falha de entrega: pacote descartado pela Shopee", () => {
+  it("FAILED_DELIVERED / Pedido descartado → encerrado, sem prazo", () => {
+    const descartado = [{ update_time: 1794800000, logistics_status: "FAILED_DELIVERED", description: "Pedido descartado" }, ...aCaminho];
+    const l = mapearFalhaEntrega(pedido, descartado, LOJA, new Date(1794800000 * 1000 + 3600 * 1000));
+    expect(l.etapa).toBe("encerrado");
+    expect(l.status_plataforma).toBe("DISCARDED");
+    expect(l.prazo_resposta).toBeNull();
+  });
+});

@@ -19,6 +19,14 @@ export async function GET(request: NextRequest) {
   const dias = Number(sp.get("dias")) || undefined;
   const forcar = sp.get("forcar") === "1"; // relê mesmo sem mudança (recarga de eventos/mídias)
   // ?reprocessar=1: só recalcula etapa/prazo dos casos abertos pelo bruto gravado (sem API)
+  // ?so=falhas: só as falhas de entrega (API de pedidos) da loja/lojas, sem passar pelas devoluções
+  if (sp.get("so") === "falhas") {
+    const { sincronizarFalhasEntregaShopee } = await import("@/lib/shopee/falhasEntrega");
+    const lojasIds = lojaId ? [lojaId] : ((await (await import("@/lib/supabase")).supabase.from("marketplace_tokens").select("loja_id").eq("marketplace", "shopee").eq("status", "ativo")).data || []).map((t) => String(t.loja_id));
+    const out = [];
+    for (const l of lojasIds) out.push(await sincronizarFalhasEntregaShopee(l, { dias, orcamentoMs: 250_000 }));
+    return NextResponse.json({ sucesso: true, lojas: out });
+  }
   if (sp.get("reprocessar") === "1") return NextResponse.json({ sucesso: true, ...(await reprocessarEtapasShopee(lojaId)) });
 
   const inicio = Date.now();

@@ -38,9 +38,11 @@ export function mapearFalhaEntrega(o: J, eventos: EventoRastreio[], lojaId: stri
   const pacotes = Array.isArray(o.package_list) ? (o.package_list as J[]) : [];
   const retorno = eventoRetorno(eventos);
   const retornouEm = retorno?.update_time ? new Date(Number(retorno.update_time) * 1000) : null;
-  let etapa: Etapa = retornouEm ? "validar" : "voltando";
+  // "FAILED_DELIVERED / Pedido descartado": a Shopee descartou o pacote — nada volta, nada a validar
+  const descartado = eventos.some((e) => String(e.logistics_status || "").toUpperCase() === "FAILED_DELIVERED" || /descartado/i.test(String(e.description || "")));
+  let etapa: Etapa = descartado ? "encerrado" : retornouEm ? "validar" : "voltando";
   let prazo: string | null = null;
-  if (retornouEm) {
+  if (retornouEm && !descartado) {
     const p = new Date(retornouEm.getTime() + PRAZO_VALIDACAO_FALHA_DIAS * 86400000);
     prazo = p.toISOString();
     if (agora.getTime() > p.getTime() + FOLGA_ENCERRAR_DIAS * 86400000) {
@@ -63,7 +65,7 @@ export function mapearFalhaEntrega(o: J, eventos: EventoRastreio[], lojaId: stri
     plataforma_id: idFalhaEntrega(String(o.order_sn)),
     pedido_id: String(o.order_sn),
     tipo: "falha_entrega",
-    status_plataforma: retornouEm ? "RETURNED_TO_SELLER" : String(pacotes[0]?.logistics_status || "LOGISTICS_DELIVERY_FAILED"),
+    status_plataforma: descartado ? "DISCARDED" : retornouEm ? "RETURNED_TO_SELLER" : String(pacotes[0]?.logistics_status || "LOGISTICS_DELIVERY_FAILED"),
     etapa,
     motivo_codigo: "FAILED_DELIVERY",
     motivo_texto: str(o.cancel_reason),
