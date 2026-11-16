@@ -43,7 +43,7 @@ export function mapearFalhaEntrega(o: J, eventos: EventoRastreio[], lojaId: stri
   const retornouEm = retorno?.update_time ? new Date(Number(retorno.update_time) * 1000) : null;
   // "FAILED_DELIVERED / Pedido descartado": a Shopee descartou o pacote — nada volta, nada a validar
   const descartado = eventos.some((e) => String(e.logistics_status || "").toUpperCase() === "FAILED_DELIVERED" || /descartado/i.test(String(e.description || "")));
-  let etapa: Etapa = descartado ? "encerrado" : retornouEm ? "validar" : "voltando";
+  const etapa: Etapa = descartado ? "encerrado" : retornouEm ? "validar" : "voltando";
   // sem prazo da plataforma: prazo_resposta fica nulo (não entra em "Vencem em 24 h" nem como urgente no painel);
   // a meta interna (chegada + metaDias) é calculada na tela
   const prazo: string | null = null;
