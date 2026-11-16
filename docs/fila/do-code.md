@@ -71,3 +71,51 @@ Dúvidas ou pendências:
    Depois disso, rodar uma vez /api/creators/coletar e /api/creators/diario (ou avisar aqui) para eu registrar os números pedidos (amostras coletadas por sugestão, produtos parados, 10 maiores notas que vencem primeiro).
 2. O link para o pedido no Affiliate Center é genérico (página de pedidos de amostra) + id do pedido; não achei URL direta por pedido na documentação.
 3. "Visualizações 28 d" vêm do analytics shop_products/performance; se o campo de page views não existir na resposta, a coluna fica "—" e o produto é separado só por pedidos.
+
+## T-002 — PARCIAL
+Data/hora: 16/11/2026, 12:00:32
+O que foi feito: complemento ao bloco anterior. R-002 aplicada: migrations 0027 e 0028 aplicadas (tabelas do módulo + faixas de frete por peso e peso do produto); frete por faixa de peso do SKU (≤1 kg R$ 12, 1–5 kg R$ 25, 5–15 kg R$ 45, >15 kg R$ 80; sem peso R$ 25 com aviso nos motivos), peso vindo do package_weight do products/search; nota, sugestão e alerta calculados a cada rodada do coletor (30 min); diário só com produtos parados e recálculo. Perfil dos criadores com pedido pendente é coletado primeiro (40 por rodada). Coleta, diário e avaliação rodados manualmente uma vez.
+O que foi publicado (commit, migration, cron): commits fba7d10, 2b8a4e5, 52bb24e; migrations 0027 e 0028 aplicadas. Crons NÃO adicionados (ferramenta bloqueia a edição do vercel.json; ver pendências).
+Números pedidos na tarefa:
+- Pedidos de amostra coletados: 1550 (OVERDUE_CANCELLED 1205, PENDING 181, WITHDRAW_CANCELLED 164).
+- Pendentes por sugestão: aprovar 3, recusar 66, decidir 112. Vencem em 24 h: 29; em 72 h: 86. Criadores: 1348 no banco, 40 com perfil já coletado (172 têm pedido pendente; o cron completa em poucas rodadas e as notas sobem quando nível/views entram).
+- Produtos parados (estoque ≥ 300 e vendas 28 d < 2 %): 22
+   - Ngk Store Kit 2 Formas de Pão Antiaderente em Aço Carbono 15 · estoque 13874 · vendas 28 d 196 · views 28 d — · pedidos 28 d 0 · amostras pendentes 19
+   - CLINK Barreira de Água Retenção em Silicone Vedação Area Mol · estoque 9054 · vendas 28 d 29 · views 28 d — · pedidos 28 d 0 · amostras pendentes 0
+   - Kit 4 2 1 Cadeiras Chales Eames Eifell Jantar Wood Desing · estoque 7790 · vendas 28 d 6 · views 28 d — · pedidos 28 d 0 · amostras pendentes 11
+   - bandeja garçom profissional 40cm antiderrapante emborrachada · estoque 4372 · vendas 28 d 1 · views 28 d — · pedidos 28 d 0 · amostras pendentes 0
+   - Mala de viagem Bordo 10KG Padrão Anac  Rodinhas 360 Bagagem  · estoque 2105 · vendas 28 d 0 · views 28 d — · pedidos 28 d 0 · amostras pendentes 1
+   - BOLA MÁGICA VOADORA MALUCA TAMANHO GRANDE ORIGINAL COM LED T · estoque 2055 · vendas 28 d 1 · views 28 d — · pedidos 28 d 0 · amostras pendentes 0
+   - Lixeira banheiro Pedal 5 Litros Retangular moderna Aço Inox · estoque 1906 · vendas 28 d 0 · views 28 d — · pedidos 28 d 0 · amostras pendentes 1
+   - Escova vaso sanitária preta moderna com suporte  Limpeza Hig · estoque 1852 · vendas 28 d 3 · views 28 d — · pedidos 28 d 0 · amostras pendentes 0
+   - Kit 5 2 1 Bandeja Profissional Garçom Emborrachada 40cm Inox · estoque 1422 · vendas 28 d 2 · views 28 d — · pedidos 28 d 0 · amostras pendentes 0
+   - Cubo Didático Elástico Multi Sensorial Entrelaçado Pedagógic · estoque 1159 · vendas 28 d 0 · views 28 d — · pedidos 28 d 0 · amostras pendentes 0
+   - Carrinho de Rolimã Infantil Volante Giratório 360° Rodas Sil · estoque 1048 · vendas 28 d 0 · views 28 d — · pedidos 28 d 0 · amostras pendentes 2
+   - Jogo De Panelas Antiaderente 4 Peças Indução E Gás Conjunto  · estoque 798 · vendas 28 d 1 · views 28 d — · pedidos 28 d 0 · amostras pendentes 0
+   - Spray Borrifador de Azeite 200ML Vinagre Culinário Pulveriza · estoque 792 · vendas 28 d 0 · views 28 d — · pedidos 28 d 0 · amostras pendentes 0
+   - Aparelho de Jantar Porcelana 42 Peças Majesty Silver Jogo Ja · estoque 685 · vendas 28 d 7 · views 28 d — · pedidos 28 d 0 · amostras pendentes 19
+   - Limpa Vidro Magnético Limpador Magnético Limpa Vidro Aquário · estoque 649 · vendas 28 d 1 · views 28 d — · pedidos 28 d 0 · amostras pendentes 0
+   - Xicara Coração Parede Dupla 90ML vidro borossilicato · estoque 617 · vendas 28 d 5 · views 28 d — · pedidos 28 d 0 · amostras pendentes 1
+   - Jogo de Panela Antiaderente Jogo de Panelas Indução Conjunto · estoque 544 · vendas 28 d 2 · views 28 d — · pedidos 28 d 0 · amostras pendentes 5
+   - Ventilador de coluna 6 pas 40cm 126w Turbo Silencioso Otmo O · estoque 533 · vendas 28 d 1 · views 28 d — · pedidos 28 d 0 · amostras pendentes 5
+   - Garrafa Térmica Inox Café 1 Litro Termolar Lumina Chá Quente · estoque 482 · vendas 28 d 3 · views 28 d — · pedidos 28 d 0 · amostras pendentes 6
+   - Frigideira Antiaderente Indução 20 cm Mármore Revestimento c · estoque 470 · vendas 28 d 1 · views 28 d — · pedidos 28 d 0 · amostras pendentes 0
+   - Jogo 6 Taças Champagne Champanhe Cristal Bohemia Gastro 220m · estoque 430 · vendas 28 d 7 · views 28 d — · pedidos 28 d 0 · amostras pendentes 1
+   - Ventilador 6 pas 126w Mesa 40cm Tubo Silencioso OTMO Oscilan · estoque 309 · vendas 28 d 0 · views 28 d — · pedidos 28 d 0 · amostras pendentes 0
+- 10 pedidos de maior nota que vencem primeiro (criador · produto · nota · sugestão · custo · vence):
+   - @maniadete · Jogo de Panela Antiaderente Jogo de Panelas I · 66 · decidir · R$ 229,90 · 22/11 17:48
+   - @cristiellebr · Aparelho de Jantar Porcelana 42 Peças Majesty · 64 · decidir · R$ 575,42 · 22/11 12:34
+   - @dicasdethatah · Garrafa Térmica Inox Café 1 Litro Termolar Lu · 61 · decidir · R$ 74,90 · 22/11 02:13
+   - @ketlyn.crys · Aparelho de Jantar Porcelana 42 Peças Majesty · 58 · decidir · R$ 575,42 · 22/11 06:19
+   - @elaineshopcasa · Aparelho de Jantar Porcelana 42 Peças Majesty · 57 · decidir · R$ 575,42 · 22/11 19:44
+   - @lay_correashop · Carrinho de Rolimã Infantil Volante Giratório · 56 · decidir · R$ 190,07 · 17/11 13:44
+   - @gabyshoopttk · Aparelho de Jantar Porcelana 42 Peças Majesty · 56 · decidir · R$ 575,42 · 19/11 17:35
+   - @dicasdamay62 · Aparelho de Jantar Porcelana 42 Peças Majesty · 56 · decidir · R$ 575,42 · 21/11 14:35
+   - @schirleigarimpodemae · Cozinha infantil grande completa mini fogão p · 56 · decidir · R$ 84,90 · 22/11 09:26
+   - @shopviral.kevilin · Kit 4 2 1 Cadeiras Chales Eames Eifell Jantar · 56 · decidir · R$ 81,00 · 22/11 12:03
+- Tabelas: tiktok_amostras, tiktok_amostra_envios, tiktok_produtos, tiktok_produtos_parados, creators_config, tiktok_api_backoff, creators_acoes_log (+ colunas em tiktok_criadores). Rotas: /api/creators/coletar (cron 30 min), /api/creators/diario (cron diário), /api/creators/decidir (registro), /api/creators/acoes (fase 2, desligada). Tela: /creators.
+Dúvidas ou pendências:
+1. Crons: acrescentar em vercel.json { "path": "/api/creators/coletar", "schedule": "13,43 * * * *" } e { "path": "/api/creators/diario", "schedule": "50 5 * * *" } — a ferramenta nega a edição desse arquivo mesmo com a autorização da fila. Até lá, posso disparar as rotas manualmente a cada tick se quiser.
+2. Visualizações 28 d: o analytics shop_products/performance não traz page views nessa versão; coluna fica "—" e a separação 'sem visita' × 'visita sem compra' usa só pedidos.
+3. Nenhum pedido ficou em 'Aprovar' ainda: as notas estão entre 50 e 66 e o custo das amostras parados (jogo de panelas R$ 229, aparelho de jantar R$ 575) passa de R$ 40; só sobem de faixa quando o perfil (nível, views) entrar. Se quiser, ajusto os cortes em creators_config.
+4. Custo da amostra usa o custo do SKU do UpSeller do primeiro SKU com custo do produto; para kits conferir se é o custo do kit montado.
