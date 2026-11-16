@@ -36,7 +36,10 @@ export async function coletarEstoqueTikTok(): Promise<{ lojas: number; skus: num
         if (!lista.some((s) => Array.isArray(s.inventory))) semInventario.push(itemId);
         const cadeia = Array.isArray(p.category_chains) ? (p.category_chains as J[]) : [];
         const folha = cadeia.find((c) => c.is_leaf === true) || cadeia[cadeia.length - 1];
-        produtosLinhas.push({ loja_id: loja.lojaId, produto_id: itemId, nome: String(p.title ?? "").slice(0, 200) || null, categoria_id: folha ? String(folha.id ?? "") || null : null, categoria_nome: folha ? String(folha.local_name ?? folha.name ?? "") || null : null, status: String(p.status ?? "").toLowerCase() || null, atualizado_em: agora });
+        const pw = (p.package_weight as J) || {};
+        const pesoBruto = Number(pw.value ?? pw.weight ?? 0);
+        const pesoKg = pesoBruto > 0 ? (String(pw.unit ?? "KILOGRAM").toUpperCase().startsWith("G") ? pesoBruto / 1000 : pesoBruto) : null;
+        produtosLinhas.push({ loja_id: loja.lojaId, produto_id: itemId, nome: String(p.title ?? "").slice(0, 200) || null, categoria_id: folha ? String(folha.id ?? "") || null : null, categoria_nome: folha ? String(folha.local_name ?? folha.name ?? "") || null : null, peso_kg: pesoKg, status: String(p.status ?? "").toLowerCase() || null, atualizado_em: agora });
         for (const s of lista) {
           const estoque = ((s.inventory as J[]) || []).reduce((a, w) => a + Number(w.quantity || 0), 0);
           linhas.push({ loja_id: loja.lojaId, item_id: itemId, model_id: String(s.id ?? "") || "0", model_sku: String(s.seller_sku ?? "").trim().toUpperCase() || null, nome: String(p.title ?? "").slice(0, 200) || null, estoque, status: String(p.status ?? "ativo").toLowerCase(), atualizado_em: agora });

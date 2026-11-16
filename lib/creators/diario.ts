@@ -3,7 +3,7 @@ import { criarAlerta } from "@/lib/alertas";
 import { enviarTelegram } from "@/lib/telegram";
 import { chamarComBackoff } from "@/lib/tiktok/creators";
 import type { LojaTikTok } from "@/lib/tiktok/lojas";
-import { custoAmostra, notaCriador, produtoParado, sugestaoAmostra, type CreatorsConfig } from "@/lib/creators/calculo";
+import { custoAmostra, freteEstimado, notaCriador, produtoParado, sugestaoAmostra, type CreatorsConfig } from "@/lib/creators/calculo";
 import { creatorsConfig } from "@/lib/creators/config";
 import { normSku } from "@/lib/estoque/consultas";
 
@@ -102,33 +102,44 @@ export async function calcularProdutosParados(loja: LojaTikTok, cfg: CreatorsCon
   return { produtos: linhas.length, parados };
 }
 
+// Nota e sugestão de todo pedido aberto — roda no coletor (30 min, os pedidos vencem em horas) e no diário.
 export async function calcularNotasESugestoes(loja: LojaTikTok, cfg: CreatorsConfig): Promise<{ avaliadas: number; aprovar: number; recusar: number; decidir: number }> {
-  const [{ data: amostras }, { data: criadores }, { data: parados }, { data: vendedores }, estoque] = await Promise.all([
+  const [{ data: amostras }, { data: criadores }, { data: parados }, { data: vendedores }, estoque, { data: prods }, { data: catalogo }] = await Promise.all([
     supabase.from("tiktok_amostras").select("amostra_id, criador_id, produto_id, sku_id").eq("loja_id", loja.lojaId).eq("status", "PENDING").limit(5000),
     supabase.from("tiktok_criadores").select("criador_id, nivel, gmv, gmv_moeda, taxa_cumprimento, categorias, media_views_video").limit(20000),
     supabase.from("tiktok_produtos_parados").select("produto_id, parado, categoria_id").eq("loja_id", loja.lojaId).limit(5000),
     supabase.from("tiktok_afiliado_pedidos").select("criador_id").eq("loja_id", loja.lojaId).limit(50000),
     estoquePorProduto(loja.lojaId),
+    supabase.from("tiktok_produtos").select("produto_id, categoria_id, peso_kg").eq("loja_id", loja.lojaId).limit(5000),
+    supabase.from("catalogo_sku").select("sku, peso_kg").not("peso_kg", "is", null).limit(20000),
   ]);
   const cri = new Map((criadores || []).map((c) => [c.criador_id, c]));
   const par = new Map((parados || []).map((p) => [p.produto_id, p]));
+  const prodInfo = new Map((prods || []).map((p) => [p.produto_id, p]));
+  const pesoSku = new Map((catalogo || []).map((c) => [normSku(c.sku), Number(c.peso_kg)]));
   const jaVendeu = new Set((vendedores || []).map((v) => v.criador_id).filter(Boolean));
   const cont = { avaliadas: 0, aprovar: 0, recusar: 0, decidir: 0 };
   for (const a of amostras || []) {
     const c = a.criador_id ? cri.get(a.criador_id) : null;
     const p = a.produto_id ? par.get(a.produto_id) : null;
     const e = a.produto_id ? estoque.get(a.produto_id) : null;
+    const info = a.produto_id ? prodInfo.get(a.produto_id) : null;
+    const categoria = p?.categoria_id ?? info?.categoria_id ?? null;
     const r = notaCriador(
       { nivel: c?.nivel ?? null, gmv: c?.gmv != null ? Number(c.gmv) : null, taxa_cumprimento: c?.taxa_cumprimento != null ? Number(c.taxa_cumprimento) : null, categorias: Array.isArray(c?.categorias) ? (c!.categorias as string[]) : [], ja_vendeu_para_loja: !!a.criador_id && jaVendeu.has(a.criador_id), media_views_video: c?.media_views_video != null ? Number(c.media_views_video) : null },
-      p?.categoria_id ?? null,
+      categoria,
       !!p?.parado,
       cfg
     );
-    const custo = custoAmostra(e?.custo ?? null, cfg);
+    // peso: produto do TikTok (package_weight) ou SKU do UpSeller; sem peso → frete padrão e aviso nos motivos
+    const peso = info?.peso_kg != null ? Number(info.peso_kg) : e?.sku ? (pesoSku.get(normSku(e.sku)) ?? null) : null;
+    const frete = freteEstimado(peso, cfg);
+    const custo = custoAmostra(e?.custo ?? null, cfg, peso);
+    const detalhe = [...r.detalhe, `custo: SKU ${e?.custo != null ? "R$ " + e.custo.toFixed(2) : "sem custo"} + frete R$ ${frete.frete.toFixed(2)}${frete.semPeso ? " (frete estimado sem peso)" : ` (${peso} kg)`}`];
     const sug = sugestaoAmostra(r.nota, custo, cfg);
     cont.avaliadas++;
     cont[sug]++;
-    await supabase.from("tiktok_amostras").update({ nota: r.nota, nota_motivos: { pontos: r.motivos, detalhe: r.detalhe }, custo_amostra: custo, sugestao: sug, atualizado_em: new Date().toISOString() }).eq("loja_id", loja.lojaId).eq("amostra_id", a.amostra_id);
+    await supabase.from("tiktok_amostras").update({ nota: r.nota, nota_motivos: { pontos: r.motivos, detalhe }, custo_amostra: custo, peso_kg: peso, sugestao: sug, atualizado_em: new Date().toISOString() }).eq("loja_id", loja.lojaId).eq("amostra_id", a.amostra_id);
   }
   return cont;
 }
@@ -149,6 +160,14 @@ export async function alertarAmostrasVencendo(lojaId: string): Promise<number> {
     enviados++;
   }
   return enviados;
+}
+
+// Usado pelo coletor (30 min): nota/sugestão de todo pedido aberto + alerta de "Aprovar" vencendo em < 12 h.
+export async function avaliarEAlertar(loja: LojaTikTok) {
+  const cfg = await creatorsConfig(await contaDaLoja(loja.lojaId));
+  const notas = await calcularNotasESugestoes(loja, cfg);
+  const alertas = await alertarAmostrasVencendo(loja.lojaId);
+  return { ...notas, alertas };
 }
 
 export async function rodarDiarioCreators(loja: LojaTikTok) {

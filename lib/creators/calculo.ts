@@ -13,7 +13,12 @@ export type CreatorsConfig = {
   aprovar_custo_max: number;
   recusar_nota: number;
   recusar_custo_min: number;
-  frete_amostra: number;
+  frete_amostra: number; // (legado) usado só se as faixas por peso não existirem
+  frete_ate_1kg: number;
+  frete_1_a_5kg: number;
+  frete_5_a_15kg: number;
+  frete_acima_15kg: number;
+  frete_sem_peso: number;
 };
 
 export const CONFIG_PADRAO: CreatorsConfig = {
@@ -31,7 +36,21 @@ export const CONFIG_PADRAO: CreatorsConfig = {
   recusar_nota: 30,
   recusar_custo_min: 40,
   frete_amostra: 12,
+  frete_ate_1kg: 12,
+  frete_1_a_5kg: 25,
+  frete_5_a_15kg: 45,
+  frete_acima_15kg: 80,
+  frete_sem_peso: 25,
 };
+
+/** Frete estimado da amostra por faixa de peso do SKU (R-002): até 1 kg, 1–5 kg, 5–15 kg, acima de 15 kg; sem peso usa frete_sem_peso. */
+export function freteEstimado(pesoKg: number | null, cfg: CreatorsConfig = CONFIG_PADRAO): { frete: number; semPeso: boolean } {
+  if (pesoKg == null || !(pesoKg > 0)) return { frete: cfg.frete_sem_peso, semPeso: true };
+  if (pesoKg <= 1) return { frete: cfg.frete_ate_1kg, semPeso: false };
+  if (pesoKg <= 5) return { frete: cfg.frete_1_a_5kg, semPeso: false };
+  if (pesoKg <= 15) return { frete: cfg.frete_5_a_15kg, semPeso: false };
+  return { frete: cfg.frete_acima_15kg, semPeso: false };
+}
 
 export type CriadorParaNota = {
   nivel: number | null; // 1–6 (creator_level do marketplace)
@@ -91,5 +110,5 @@ export function sugestaoAmostra(nota: number, custo: number | null, cfg: Creator
   return "decidir";
 }
 
-/** Custo da amostra = custo do SKU no UpSeller + frete estimado (null sem custo cadastrado). */
-export const custoAmostra = (custoSku: number | null, cfg: CreatorsConfig = CONFIG_PADRAO): number | null => (custoSku == null ? null : Math.round((custoSku + cfg.frete_amostra) * 100) / 100);
+/** Custo da amostra = custo do SKU no UpSeller + frete estimado pela faixa de peso (null sem custo cadastrado). */
+export const custoAmostra = (custoSku: number | null, cfg: CreatorsConfig = CONFIG_PADRAO, pesoKg: number | null = null): number | null => (custoSku == null ? null : Math.round((custoSku + freteEstimado(pesoKg, cfg).frete) * 100) / 100);
