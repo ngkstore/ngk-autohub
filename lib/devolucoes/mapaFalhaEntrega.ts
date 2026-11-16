@@ -47,7 +47,11 @@ export function mapearFalhaEntrega(o: J, eventos: EventoRastreio[], lojaId: stri
   // sem prazo da plataforma: prazo_resposta fica nulo (não entra em "Vencem em 24 h" nem como urgente no painel);
   // a meta interna (chegada + metaDias) é calculada na tela
   const prazo: string | null = null;
-  if (retornouEm && !descartado && agora.getTime() > retornouEm.getTime() + (metaDias + FOLGA_ENCERRAR_DIAS) * 86400000) etapa = "encerrado";
+  // Regra (16/11/2026): caso em "validar" só sai da fila quando for inspecionado no AutoHub ou encerrado pela
+  // Shopee (descartado) — NUNCA por tempo, mesmo fora da janela do cron. A meta interna é só aviso na tela.
+  void agora;
+  void metaDias;
+  void FOLGA_ENCERRAR_DIAS;
   const itens = (Array.isArray(o.item_list) ? (o.item_list as J[]) : []).map((it) => ({
     sku: str(it.model_sku) || str(it.item_sku),
     variacao: str(it.model_name),

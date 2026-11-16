@@ -46,9 +46,9 @@ describe("Falha de entrega (Shopee) → devolucoes", () => {
     expect(l.prazo_resposta).toBeNull(); // não entra em "Vencem em 24 h" nem como urgente no painel
     expect(metaValidacaoFalha(l.chegou_em)).toBe(new Date(1794700000 * 1000 + PRAZO_VALIDACAO_FALHA_DIAS * 86400000).toISOString());
   });
-  it("meta + 7 dias sem ação: encerrado (meta configurável)", () => {
-    expect(mapearFalhaEntrega(pedido, voltou, LOJA, new Date(1794700000 * 1000 + (PRAZO_VALIDACAO_FALHA_DIAS + 8) * 86400000)).etapa).toBe("encerrado");
-    expect(mapearFalhaEntrega(pedido, voltou, LOJA, new Date(1794700000 * 1000 + (PRAZO_VALIDACAO_FALHA_DIAS + 8) * 86400000), 10).etapa).toBe("validar");
+  it("em validar NUNCA sai por tempo (só inspeção no AutoHub ou encerramento pela Shopee)", () => {
+    expect(mapearFalhaEntrega(pedido, voltou, LOJA, new Date(1794700000 * 1000 + (PRAZO_VALIDACAO_FALHA_DIAS + 8) * 86400000)).etapa).toBe("validar");
+    expect(mapearFalhaEntrega(pedido, voltou, LOJA, new Date(1794700000 * 1000 + 90 * 86400000), 10).etapa).toBe("validar");
   });
   it("eventos idempotentes", () => {
     const ev = eventosFalhaEntrega(pedido, voltou);
