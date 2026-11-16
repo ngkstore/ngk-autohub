@@ -126,12 +126,18 @@ export function mapearPerfilCriador(d: J) {
 export async function coletarPerfisCriadores(loja: LojaTikTok, opts: { max?: number; orcamentoMs?: number } = {}): Promise<{ perfis: number; erros: number; erro?: string }> {
   const inicio = Date.now();
   const ontem = new Date(Date.now() - 86400000).toISOString();
-  const { data: pendentes } = await supabase
-    .from("tiktok_criadores")
-    .select("criador_id, perfil_em")
-    .or(`perfil_em.is.null,perfil_em.lt.${ontem}`)
-    .order("perfil_em", { ascending: true, nullsFirst: true })
-    .limit(opts.max ?? 40);
+  // prioridade: criadores com pedido de amostra PENDENTE (a nota depende do perfil); depois os demais
+  const { data: comPedido } = await supabase.from("tiktok_amostras").select("criador_id").eq("loja_id", loja.lojaId).eq("status", "PENDING").not("criador_id", "is", null);
+  const prioridade = [...new Set((comPedido || []).map((a) => a.criador_id as string))];
+  const { data: pendentesPrio } = prioridade.length
+    ? await supabase.from("tiktok_criadores").select("criador_id, perfil_em").in("criador_id", prioridade.slice(0, 500)).or(`perfil_em.is.null,perfil_em.lt.${ontem}`).order("perfil_em", { ascending: true, nullsFirst: true }).limit(opts.max ?? 40)
+    : { data: [] as { criador_id: string; perfil_em: string | null }[] };
+  const faltam = Math.max(0, (opts.max ?? 40) - (pendentesPrio || []).length);
+  const { data: pendentesResto } = faltam
+    ? await supabase.from("tiktok_criadores").select("criador_id, perfil_em").or(`perfil_em.is.null,perfil_em.lt.${ontem}`).order("perfil_em", { ascending: true, nullsFirst: true }).limit(faltam + (pendentesPrio || []).length)
+    : { data: [] as { criador_id: string; perfil_em: string | null }[] };
+  const vistos = new Set((pendentesPrio || []).map((c) => c.criador_id));
+  const pendentes = [...(pendentesPrio || []), ...(pendentesResto || []).filter((c) => !vistos.has(c.criador_id))].slice(0, opts.max ?? 40);
   let perfis = 0;
   let erros = 0;
   try {
