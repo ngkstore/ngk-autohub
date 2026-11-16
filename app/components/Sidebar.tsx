@@ -27,6 +27,7 @@ function grupos(admin: boolean, contador?: number): GrupoMenu[] {
       titulo: "Vendas",
       itens: [
         { nome: "Lives e afiliados", href: "/lives", icone: "lives" },
+        { nome: "Creators", href: "/creators", icone: "lives" },
         { nome: "Campanhas", href: "/campanhas", icone: "campanhas" },
         { nome: "Ads", href: "/ads", icone: "ads" },
         { nome: "Controle GMV Max", href: "/ads-controle", icone: "alvo" },

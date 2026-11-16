@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
 
-async function criarAlerta({
+export async function criarAlerta({
   lojaId,
   tipo,
   titulo,

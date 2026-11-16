@@ -15,6 +15,7 @@ export async function coletarEstoqueTikTok(): Promise<{ lojas: number; skus: num
   for (const loja of lojas) {
     const agora = new Date().toISOString();
     const linhas: J[] = [];
+    const produtosLinhas: J[] = []; // tiktok_produtos (nome e categoria) para o módulo Creators
     const semInventario: string[] = [];
     let pageToken = "";
     for (let pagina = 0; pagina < 100; pagina++) {
@@ -33,6 +34,9 @@ export async function coletarEstoqueTikTok(): Promise<{ lojas: number; skus: num
         const lista = (p.skus as J[]) || [];
         if (!lista.length) continue;
         if (!lista.some((s) => Array.isArray(s.inventory))) semInventario.push(itemId);
+        const cadeia = Array.isArray(p.category_chains) ? (p.category_chains as J[]) : [];
+        const folha = cadeia.find((c) => c.is_leaf === true) || cadeia[cadeia.length - 1];
+        produtosLinhas.push({ loja_id: loja.lojaId, produto_id: itemId, nome: String(p.title ?? "").slice(0, 200) || null, categoria_id: folha ? String(folha.id ?? "") || null : null, categoria_nome: folha ? String(folha.local_name ?? folha.name ?? "") || null : null, status: String(p.status ?? "").toLowerCase() || null, atualizado_em: agora });
         for (const s of lista) {
           const estoque = ((s.inventory as J[]) || []).reduce((a, w) => a + Number(w.quantity || 0), 0);
           linhas.push({ loja_id: loja.lojaId, item_id: itemId, model_id: String(s.id ?? "") || "0", model_sku: String(s.seller_sku ?? "").trim().toUpperCase() || null, nome: String(p.title ?? "").slice(0, 200) || null, estoque, status: String(p.status ?? "ativo").toLowerCase(), atualizado_em: agora });
@@ -58,6 +62,7 @@ export async function coletarEstoqueTikTok(): Promise<{ lojas: number; skus: num
         }
       }
     }
+    for (let i = 0; i < produtosLinhas.length; i += 500) await supabase.from("tiktok_produtos").upsert(produtosLinhas.slice(i, i + 500), { onConflict: "loja_id,produto_id" });
     for (let i = 0; i < linhas.length; i += 500) {
       const { error } = await supabase.from("produto_variacoes").upsert(linhas.slice(i, i + 500), { onConflict: "loja_id,item_id,model_id" });
       if (error) {
