@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardHeader, Switch, Botao, Aviso, Dica } from "./ui";
 
-type Limites = { auto_caso_max: number; auto_dia_max: number; alerta_horas: number; suspeito_devolucoes_90d: number; credito_dias: number };
+type Limites = { auto_caso_max: number; auto_dia_max: number; alerta_horas: number; suspeito_devolucoes_90d: number; credito_dias: number; falha_validacao_dias: number };
 type Cfg = { acoes_api: boolean; email_disputa: string | null; limites: Limites };
 
 // Configurações → Devoluções (B3/B4): flag das ações pela API (desligada por padrão),
@@ -80,6 +80,7 @@ export default function DevolucoesConfigForm() {
           {campo("alerta_horas", "Alerta de prazo com menos de", "horas")}
           {campo("suspeito_devolucoes_90d", "Comprador suspeito a partir de", "devoluções em 90 d")}
           {campo("credito_dias", "Cobrar crédito da disputa após", "dias")}
+          {campo("falha_validacao_dias", "Falha de entrega: meta interna para validar o pacote", "dias após a chegada")}
         </div>
       </div>
       <div className="mt-4 flex items-center gap-3">

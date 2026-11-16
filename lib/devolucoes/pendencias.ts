@@ -29,10 +29,11 @@ const ETAPA_ACAO: Record<string, string> = { resposta: "Responder", decisao: "De
 export async function pendenciasDevolucoes(lojaIds: string[] | null): Promise<Pendencia[]> {
   let q = supabase
     .from("devolucoes")
-    .select("id, loja_id, canal, plataforma_id, pedido_id, etapa, motivo_codigo, valor_reembolso_pedido, prazo_resposta, prazo_prova, itens, chegou_em")
+    .select("id, loja_id, canal, plataforma_id, pedido_id, etapa, tipo, motivo_codigo, valor_reembolso_pedido, prazo_resposta, prazo_prova, itens, chegou_em")
     .neq("etapa", "encerrado")
     .in("etapa", ["resposta", "decisao", "recebido", "validar", "coleta", "inspecao"])
     .order("prazo_resposta", { ascending: true, nullsFirst: false })
+    .order("chegou_em", { ascending: true, nullsFirst: false })
     .limit(200);
   if (lojaIds) q = q.in("loja_id", lojaIds);
   const { data } = await q;
@@ -41,6 +42,10 @@ export async function pendenciasDevolucoes(lojaIds: string[] | null): Promise<Pe
     const prazo = (d.prazo_resposta as string | null) ?? (d.prazo_prova as string | null) ?? null;
     const vencidaHaDias = !!prazo && new Date(prazo).getTime() < limiteConferir;
     const item = (Array.isArray(d.itens) ? (d.itens as { nome: string | null }[])[0]?.nome : null) || d.pedido_id;
+    if (d.tipo === "falha_entrega") {
+      // tarefa de inspeção na ordem de chegada; nunca urgente (não há prazo da plataforma)
+      return { prazo: null, urgencia: "depois" as const, canal: d.canal, loja_id: d.loja_id, titulo: `Inspecionar pacote devolvido (falha de entrega) · ${item}`, detalhe: `${d.chegou_em ? "chegou " + new Date(d.chegou_em).toLocaleDateString("pt-BR") : "pacote voltando"} · R$ ${Number(d.valor_reembolso_pedido || 0).toFixed(2)}`, link: `/devolucoes/${d.id}`, acao: "Inspecionar" };
+    }
     return {
       prazo,
       urgencia: urgencia(prazo),

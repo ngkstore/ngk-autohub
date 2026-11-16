@@ -114,7 +114,7 @@ export default async function DevolucoesPage({ searchParams }: { searchParams: P
                     const item = d.itens?.[0];
                     return (
                       <Tr key={d.id}>
-                        <Td>{prazo ? <ChipPrazo urgencia={urgenciaDoPrazo(prazo)}>{prazoRelativo(prazo) || fmtData(prazo)}</ChipPrazo> : <Chip cor="cinza">{d.etapa}</Chip>}</Td>
+                        <Td>{d.tipo === "falha_entrega" ? <Chip cor={d.chegou_em ? "amarelo" : "cinza"}>{d.chegou_em ? `chegou ${fmtData(d.chegou_em)}` : "voltando"}</Chip> : prazo ? <ChipPrazo urgencia={urgenciaDoPrazo(prazo)}>{prazoRelativo(prazo) || fmtData(prazo)}</ChipPrazo> : <Chip cor="cinza">{d.etapa}</Chip>}</Td>
                         <Td>
                           <div className="flex items-center gap-1.5">
                             <ChipCanal canal={d.canal} />

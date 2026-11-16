@@ -8,10 +8,13 @@ import type { EventoRastreio } from "@/lib/shopee/rastreio";
 type J = Record<string, unknown>;
 const str = (v: unknown) => (v === null || v === undefined ? null : String(v));
 
-/** Prazo (dias) para validar o item devolvido depois que ele chega de volta — confirmar com o Seller Center. */
+/** META INTERNA (dias) para validar o pacote depois que ele chega — o Seller Center não mostra prazo nem botão
+ *  para falhas de entrega (conferido 12/11/2026). Configurável em Configurações (limites.falha_validacao_dias). */
 export const PRAZO_VALIDACAO_FALHA_DIAS = 5;
-/** Depois do prazo + esta folga sem ação registrada, o caso sai da fila (a Shopee já encerrou). */
+/** Depois da meta + esta folga sem ação registrada, o caso sai da fila. */
 const FOLGA_ENCERRAR_DIAS = 7;
+/** Meta interna de validação (data) para a tela. */
+export const metaValidacaoFalha = (chegouEm: string | null, dias = PRAZO_VALIDACAO_FALHA_DIAS): string | null => (chegouEm ? new Date(new Date(chegouEm).getTime() + dias * 86400000).toISOString() : null);
 
 export const idFalhaEntrega = (orderSn: string) => `FE-${orderSn}`;
 
@@ -34,22 +37,17 @@ export function eventoRetorno(eventos: EventoRastreio[]): EventoRastreio | null 
   );
 }
 
-export function mapearFalhaEntrega(o: J, eventos: EventoRastreio[], lojaId: string, agora = new Date()): DevolucaoLinha {
+export function mapearFalhaEntrega(o: J, eventos: EventoRastreio[], lojaId: string, agora = new Date(), metaDias = PRAZO_VALIDACAO_FALHA_DIAS): DevolucaoLinha {
   const pacotes = Array.isArray(o.package_list) ? (o.package_list as J[]) : [];
   const retorno = eventoRetorno(eventos);
   const retornouEm = retorno?.update_time ? new Date(Number(retorno.update_time) * 1000) : null;
   // "FAILED_DELIVERED / Pedido descartado": a Shopee descartou o pacote — nada volta, nada a validar
   const descartado = eventos.some((e) => String(e.logistics_status || "").toUpperCase() === "FAILED_DELIVERED" || /descartado/i.test(String(e.description || "")));
   let etapa: Etapa = descartado ? "encerrado" : retornouEm ? "validar" : "voltando";
-  let prazo: string | null = null;
-  if (retornouEm && !descartado) {
-    const p = new Date(retornouEm.getTime() + PRAZO_VALIDACAO_FALHA_DIAS * 86400000);
-    prazo = p.toISOString();
-    if (agora.getTime() > p.getTime() + FOLGA_ENCERRAR_DIAS * 86400000) {
-      etapa = "encerrado";
-      prazo = null;
-    }
-  }
+  // sem prazo da plataforma: prazo_resposta fica nulo (não entra em "Vencem em 24 h" nem como urgente no painel);
+  // a meta interna (chegada + metaDias) é calculada na tela
+  const prazo: string | null = null;
+  if (retornouEm && !descartado && agora.getTime() > retornouEm.getTime() + (metaDias + FOLGA_ENCERRAR_DIAS) * 86400000) etapa = "encerrado";
   const itens = (Array.isArray(o.item_list) ? (o.item_list as J[]) : []).map((it) => ({
     sku: str(it.model_sku) || str(it.item_sku),
     variacao: str(it.model_name),

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { validarAcao, prazoCritico, type ContextoValidacao } from "@/lib/devolucoes/validar";
 
-const limites = { auto_caso_max: 100, auto_dia_max: 500, alerta_horas: 4, suspeito_devolucoes_90d: 3, credito_dias: 3 };
+const limites = { auto_caso_max: 100, auto_dia_max: 500, alerta_horas: 4, suspeito_devolucoes_90d: 3, credito_dias: 3, falha_validacao_dias: 5 };
 const base: ContextoValidacao = { flagLigada: true, valorCaso: 60, somaAutomaticaHoje: 0, compradorSuspeito: false, limites, modo: "automatico" };
 
 describe("limites fixos do módulo de Devoluções", () => {

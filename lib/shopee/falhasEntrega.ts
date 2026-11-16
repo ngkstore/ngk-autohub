@@ -2,6 +2,7 @@ import { chamarShopee } from "@/lib/shopee/chamar";
 import { gravarDevolucao, type ResultadoSync } from "@/lib/devolucoes/sincronizar";
 import { ehFalhaEntrega, eventosFalhaEntrega, mapearFalhaEntrega } from "@/lib/devolucoes/mapaFalhaEntrega";
 import type { EventoRastreio } from "@/lib/shopee/rastreio";
+import { configDevolucoes, contaDaLoja } from "@/lib/devolucoes/config";
 
 type J = Record<string, unknown>;
 const JANELA = 15 * 86400; // get_order_list aceita no máximo 15 dias por consulta
@@ -14,6 +15,8 @@ export async function sincronizarFalhasEntregaShopee(lojaId: string, opts: { dia
   const agora = Math.floor(Date.now() / 1000);
   const de = agora - (opts.dias ?? 45) * 86400;
   const estourou = () => !!opts.orcamentoMs && Date.now() - inicio > opts.orcamentoMs;
+  const conta = await contaDaLoja(lojaId);
+  const metaDias = conta ? (await configDevolucoes(conta)).limites.falha_validacao_dias : undefined;
   try {
     const sns: string[] = [];
     for (let ate = agora; ate > de && !estourou(); ate -= JANELA) {
@@ -40,7 +43,7 @@ export async function sincronizarFalhasEntregaShopee(lojaId: string, opts: { dia
       try {
         const t = await chamarShopee<{ tracking_info?: EventoRastreio[] }>({ lojaId, path: "/api/v2/logistics/get_tracking_info", query: { order_sn: String(o.order_sn) } });
         const eventos = (t.response?.tracking_info || []) as EventoRastreio[];
-        const g = await gravarDevolucao(mapearFalhaEntrega(o, eventos, lojaId), eventosFalhaEntrega(o, eventos), []);
+        const g = await gravarDevolucao(mapearFalhaEntrega(o, eventos, lojaId, new Date(), metaDias), eventosFalhaEntrega(o, eventos), []);
         r.gravados++;
         r.eventos += g.eventos;
       } catch (e) {

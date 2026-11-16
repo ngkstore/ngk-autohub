@@ -13,6 +13,7 @@ export const LIMITES_PADRAO = {
   alerta_horas: 4, // prazo com menos de 4 h → alerta
   suspeito_devolucoes_90d: 3, // 3+ devoluções em 90 dias → suspeito
   credito_dias: 3, // disputa ganha sem crédito em 3 dias → alerta
+  falha_validacao_dias: 5, // falha de entrega: META INTERNA para validar o pacote após a chegada (a Shopee não mostra prazo)
 };
 
 export type ConfigDevolucoes = {

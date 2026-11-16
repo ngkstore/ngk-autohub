@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ehFalhaEntrega, eventoRetorno, mapearFalhaEntrega, eventosFalhaEntrega, PRAZO_VALIDACAO_FALHA_DIAS } from "@/lib/devolucoes/mapaFalhaEntrega";
+import { ehFalhaEntrega, eventoRetorno, mapearFalhaEntrega, eventosFalhaEntrega, metaValidacaoFalha, PRAZO_VALIDACAO_FALHA_DIAS } from "@/lib/devolucoes/mapaFalhaEntrega";
 
 // Forma real da API de pedidos (sondagem 12/11/2026), anonimizada.
 const LOJA = "00000000-0000-4000-8000-00000000000a";
@@ -38,16 +38,17 @@ describe("Falha de entrega (Shopee) → devolucoes", () => {
     expect(l.itens[0].sku).toBe("FORPAO27");
     expect(l.bruto.recipient_address).toBeUndefined();
   });
-  it("chegou de volta: validar com prazo de validação", () => {
+  it("chegou de volta: validar SEM prazo da plataforma (meta interna só na tela)", () => {
     const l = mapearFalhaEntrega(pedido, voltou, LOJA, new Date(1794700000 * 1000 + 3600 * 1000));
     expect(eventoRetorno(voltou)?.logistics_status).toBe("RETURNED");
     expect(l.etapa).toBe("validar");
     expect(l.chegou_em).toBe(new Date(1794700000 * 1000).toISOString());
-    expect(l.prazo_resposta).toBe(new Date(1794700000 * 1000 + PRAZO_VALIDACAO_FALHA_DIAS * 86400000).toISOString());
+    expect(l.prazo_resposta).toBeNull(); // não entra em "Vencem em 24 h" nem como urgente no painel
+    expect(metaValidacaoFalha(l.chegou_em)).toBe(new Date(1794700000 * 1000 + PRAZO_VALIDACAO_FALHA_DIAS * 86400000).toISOString());
   });
-  it("prazo vencido há mais de 7 dias: encerrado", () => {
-    const l = mapearFalhaEntrega(pedido, voltou, LOJA, new Date(1794700000 * 1000 + (PRAZO_VALIDACAO_FALHA_DIAS + 8) * 86400000));
-    expect(l.etapa).toBe("encerrado");
+  it("meta + 7 dias sem ação: encerrado (meta configurável)", () => {
+    expect(mapearFalhaEntrega(pedido, voltou, LOJA, new Date(1794700000 * 1000 + (PRAZO_VALIDACAO_FALHA_DIAS + 8) * 86400000)).etapa).toBe("encerrado");
+    expect(mapearFalhaEntrega(pedido, voltou, LOJA, new Date(1794700000 * 1000 + (PRAZO_VALIDACAO_FALHA_DIAS + 8) * 86400000), 10).etapa).toBe("validar");
   });
   it("eventos idempotentes", () => {
     const ev = eventosFalhaEntrega(pedido, voltou);

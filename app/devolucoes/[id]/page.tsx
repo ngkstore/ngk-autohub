@@ -7,6 +7,9 @@ import { riscoDoComprador } from "@/lib/devolucoes/risco";
 import { textoCobranca } from "@/lib/devolucoes/credito";
 import { brl, data as fmtData, prazoRelativo, urgenciaDoPrazo } from "@/lib/formato";
 import ResponderCaso from "./ResponderCaso";
+import AcoesFalhaEntrega from "./AcoesFalhaEntrega";
+import { metaValidacaoFalha } from "@/lib/devolucoes/mapaFalhaEntrega";
+import { configDevolucoes, contaDaLoja } from "@/lib/devolucoes/config";
 import { motivoLegivel } from "@/lib/devolucoes/motivos";
 import { Card, CardHeader, Chip, ChipCanal, ChipPrazo, Tabela, Th, Tr, Td, BotaoLink, Dica, Aviso, LinhaDetalhe } from "../../components/ui";
 
@@ -44,6 +47,10 @@ export default async function CasoPage({ params }: { params: Promise<{ id: strin
   const s = d.sugestao;
   const item = d.itens?.[0];
   const prazo = d.prazo_resposta ?? d.prazo_prova;
+  const falha = d.tipo === "falha_entrega";
+  const contaId = falha ? await contaDaLoja(d.loja_id) : null;
+  const metaDias = contaId ? (await configDevolucoes(contaId)).limites.falha_validacao_dias : 5;
+  const meta = falha ? metaValidacaoFalha(d.chegou_em, metaDias) : null;
   const pendente = aprovacoes.find((a) => !a.decisao && !a.executada_em);
 
   return (
@@ -66,6 +73,9 @@ export default async function CasoPage({ params }: { params: Promise<{ id: strin
         <div className="flex flex-wrap items-center gap-2">
           <ChipCanal canal={d.canal} />
           {prazo && <ChipPrazo urgencia={urgenciaDoPrazo(prazo)}>{d.etapa === "encerrado" ? fmtData(prazo) : `responder ${prazoRelativo(prazo)}`}</ChipPrazo>}
+          {falha && <Chip cor="laranja">Falha de entrega</Chip>}
+          {falha && meta && d.etapa !== "encerrado" && <Chip cor="amarelo">meta interna: validar em até {metaDias} dias após a chegada ({fmtData(meta)})</Chip>}
+          {falha && !d.chegou_em && d.etapa !== "encerrado" && <Chip cor="cinza">pacote voltando</Chip>}
           {risco.suspeito && <Chip cor="vermelho">comprador suspeito</Chip>}
           {d.resultado && <Chip cor={d.resultado === "ganha" || d.resultado === "recusada" ? "verde" : d.resultado === "perdida" ? "vermelho" : "cinza"}>{d.resultado}</Chip>}
         </div>
@@ -210,7 +220,11 @@ export default async function CasoPage({ params }: { params: Promise<{ id: strin
             </Card>
           )}
 
+          {falha ? (
+            <AcoesFalhaEntrega id={d.id} pedido={d.pedido_id} rastreio={d.rastreio_reverso} transportadora={d.transportadora_reversa} chegouEm={d.chegou_em} fotos={nossas.filter((m) => m.tipo === "foto" && m.url).map((m) => m.url as string)} pesoEnvioKg={insp?.peso_envio_kg != null ? Number(insp.peso_envio_kg) : null} metaDias={metaDias} encerrado={d.etapa === "encerrado"} />
+          ) : (
           <ResponderCaso id={d.id} canal={d.canal} etapa={d.etapa} sugestao={s ? { decisao: s.decisao, motivo_plataforma: s.motivo_plataforma, valor_parcial: s.valor_parcial, mensagem: s.mensagem_comprador } : null} valorReembolso={Number(d.valor_reembolso_pedido || 0)} quadros={nossas.filter((m) => m.tipo === "quadro" || m.tipo === "foto").map((m) => ({ id: m.id, storage_path: m.storage_path, legenda: m.legenda, url: m.url }))} pendente={pendente ? { id: pendente.id as string, acao: (pendente.acao as { tipo: string }).tipo, via: pendente.via as string } : null} />
+          )}
         </div>
       </div>
     </>
