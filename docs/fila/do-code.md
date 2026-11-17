@@ -276,3 +276,16 @@ Dúvidas ou pendências: nenhuma.
 Observações da T-004 para conferência:
 - Validar 183 é bem mais do que o Seller Center mostra: 87 casos voltaram nos últimos 45 dias, 94 entre 45 e 90 dias e 2 há mais de 90 dias. Os mais antigos provavelmente já saíram da lista "aguardando validação" do Seller Center (validados lá ou fora do prazo). Pela regra da R-003 eles só saem daqui por inspeção no AutoHub; se o Gabriel quiser, uma próxima tarefa pode encerrar em lote os que voltaram há mais de 45 dias.
 - Item C: 20 dos 25 viraram "pacote não retornou" (PNR) e entram na aba de Disputas; 5 (250618SWU3YAK2, 250904KJXN3M0S, 251012TAB9VXHK, 251011RUTF82J4, 251112GS2W98CC) têm no rastreio da API o evento "Pedido descartado" (FAILED_DELIVERED) e por isso ficaram encerrados como descartados, embora o Seller Center ainda os mostre como "voltará para você". Conferir esses 5 no Seller Center: se o pacote foi descartado pela transportadora, também cabe pedido de ressarcimento.
+
+## T-007 — CONCLUÍDA
+Data/hora: 17/11/2026, 11:16:27
+O que foi feito:
+1. Correção do relatório da T-004, item C: o certo é 13 "pacote não retornou" (PNR) e 12 falha de entrega encerrada como "descartado pela transportadora" (DISCARDED), conferido no banco. O texto "20 viraram PNR e 5 encerrados" estava errado; a lista linha a linha e o total de 13 PNR estavam certos. Descartados: 260309P72HPCB8, 251216FKACS033, 251204EKKR1DYM, 251012TAB9VXHK, 251209U8H9BMEY, 2511086X1VHCFY, 251011RUTF82J4, 250904KJXN3M0S, 251218MRQE5CEQ, 251112GS2W98CC, 250618SWU3YAK2, 251203CHJ6DR94.
+2. A aba "Pacote não retornou" (Devoluções > Disputas) agora mostra também as falhas de entrega descartadas pela transportadora, com o selo "descartado pela transportadora" (os PNR têm o selo "nunca retornou"). O status deles não foi alterado (continuam falha_entrega/encerrado/DISCARDED); a aba os inclui por regra de tela.
+3. A aba ganhou tabela própria com as colunas "Pago pelo comprador" (total do pedido) e "Custo do SKU" (catalogo_sku do UpSeller × quantidade), dias parado e rastreio, com linha de total e as duas somas no topo.
+4. Nenhum encerramento em lote: os 183 em Validar continuam como estavam.
+O que foi publicado (commit, migration, cron): commit 7c9a58f; sem migration nem cron.
+Números pedidos na tarefa:
+- Item C (25): pago pelo comprador R$ 1177,57 · custo do SKU R$ 514,21 (7 sem custo cadastrado). PNR 13: pago R$ 547,40 · custo R$ 232,71. Descartados 12: pago R$ 630,17 · custo R$ 281,50.
+- Aba completa (NGK, todos os PNR + todos os descartados da carga de 90 dias): 45 pacotes · pago R$ 2144,59 · custo do SKU R$ 1165,20 (9 sem custo cadastrado).
+Dúvidas ou pendências: nenhuma.
