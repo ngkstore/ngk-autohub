@@ -174,3 +174,10 @@ Números pedidos na tarefa:
    - Frigideira Antiaderente Indução 20 cm Mármore Reve · estoque 470 · vendas 28 d 1 · pedidos 28 d 1 · views 28 d 4465 · amostras 0
    - Ventilador 6 pas 126w Mesa 40cm Tubo Silencioso OT · estoque 308 · vendas 28 d 0 · pedidos 28 d 0 · views 28 d 3173 · amostras 0
 Dúvidas ou pendências: os dois crons do vercel.json (coletar 13,43 * * * *; diario 50 5 * * *). Enquanto não entram, a fila só atualiza quando eu disparo a coleta a cada volta do loop.
+
+## T-006 — CONCLUÍDA
+Data/hora: 17/11/2026, 09:47:44
+O que foi feito: conferido o diff do vercel.json (só as 8 linhas dos dois crons do Creators, no fim do bloco crons), commitado e publicado. Parei de disparar a coleta manual.
+O que foi publicado (commit, migration, cron): commit 75aaa96 "crons do Creators (coletar 30 min, diario 05h50)"; /api/creators/coletar em 13,43 * * * * e /api/creators/diario em 50 5 * * *. Total de crons no vercel.json: 36.
+Números pedidos na tarefa: a Vercel registrou e executou o cron de coleta: no primeiro horário depois da publicação (09:43) a rota rodou sozinha e atualizou as 1.750 amostras às 09:46:42, sem disparo manual. O diário roda às 05h50 (primeira execução amanhã).
+Dúvidas ou pendências: o limite de crons do plano não é legível daqui (precisa do painel da Vercel); com 36 crons publicados e aceitos no deploy, o plano atual comporta pelo menos esse número.
