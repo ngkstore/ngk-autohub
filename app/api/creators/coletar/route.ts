@@ -38,8 +38,9 @@ export async function GET(request: NextRequest) {
     // T-003: categoria (cadeia e 1º nível) e peso vêm só do detalhe do produto; 40 por rodada, pendentes primeiro
     if (roda("produtos")) {
       r.produtos = await coletarDetalheProdutosTikTok(loja, { max: 40, orcamentoMs: Math.min(60_000, restante()) });
+      // árvore completa (centenas de categorias); as cadeias dos produtos sozinhas (~70) não cobrem as categorias dos criadores
       const { count } = await supabase.from("tiktok_categorias").select("*", { count: "exact", head: true });
-      if (!count) r.categorias = await coletarArvoreCategoriasTikTok(loja).catch(() => 0);
+      if (!count || count < 500) r.categorias = await coletarArvoreCategoriasTikTok(loja).catch(() => 0);
     }
     if (roda("envios")) r.envios = await coletarEnviosAmostras(loja, { max: 40, orcamentoMs: Math.min(60_000, restante()) });
     // R-002: os pedidos vencem em horas — nota, sugestão e alerta a cada rodada (não só no diário)

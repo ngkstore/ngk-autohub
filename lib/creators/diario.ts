@@ -12,6 +12,18 @@ type J = Record<string, unknown>;
 const n = (v: unknown) => Number(v || 0);
 const BASE_URL = process.env.APP_URL || "https://ngk-autohub.vercel.app";
 
+// PostgREST devolve no máximo 1000 linhas por chamada: pagina com range.
+async function todas<T>(monta: (de: number, ate: number) => PromiseLike<{ data: T[] | null; error: unknown }>, max = 50000): Promise<T[]> {
+  const saida: T[] = [];
+  for (let de = 0; de < max; de += 1000) {
+    const { data } = await monta(de, de + 999);
+    if (!data?.length) break;
+    saida.push(...data);
+    if (data.length < 1000) break;
+  }
+  return saida;
+}
+
 async function contaDaLoja(lojaId: string): Promise<string | null> {
   const { data } = await supabase.from("lojas").select("conta_id").eq("id", lojaId).maybeSingle();
   return (data?.conta_id as string | null) ?? null;
@@ -21,11 +33,12 @@ async function contaDaLoja(lojaId: string): Promise<string | null> {
 // variação (item_id, model_id) → mapeamento item/variação → SKU do armazém; senão SKU do anúncio normalizado.
 type Fisico = { estoque: number; sku: string | null; custo: number | null; peso: number | null };
 async function fisicoTikTok(lojaId: string): Promise<{ porProduto: Map<string, Fisico>; porSku: Map<string, Fisico> }> {
-  const [{ data: varia }, { data: mapa }, { data: arm }, { data: cat }] = await Promise.all([
-    supabase.from("produto_variacoes").select("item_id, model_id, model_sku").eq("loja_id", lojaId).limit(20000),
-    supabase.from("catalogo_mapeamento").select("item_id, model_id, sku_armazem").eq("loja_id", lojaId).limit(20000),
-    supabase.from("estoque_armazem").select("sku, disponivel").limit(20000),
-    supabase.from("catalogo_sku").select("sku, custo, peso_kg").limit(20000),
+  // item_id/model_id são bigint: sem ::text o JS perde precisão (> 2^53) e as chaves não casam
+  const [varia, mapa, arm, cat] = await Promise.all([
+    todas<{ item_id: string; model_id: string | null; model_sku: string | null }>((de, ate) => supabase.from("produto_variacoes").select("item_id::text, model_id::text, model_sku").eq("loja_id", lojaId).range(de, ate)),
+    todas<{ item_id: string | null; model_id: string | null; sku_armazem: string }>((de, ate) => supabase.from("catalogo_mapeamento").select("item_id, model_id, sku_armazem").eq("loja_id", lojaId).range(de, ate)),
+    todas<{ sku: string; disponivel: number | null }>((de, ate) => supabase.from("estoque_armazem").select("sku, disponivel").range(de, ate)),
+    todas<{ sku: string; custo: number | null; peso_kg: number | null }>((de, ate) => supabase.from("catalogo_sku").select("sku, custo, peso_kg").range(de, ate)),
   ]);
   const disp = new Map<string, { estoque: number; sku: string }>();
   for (const e of arm || []) {
@@ -41,13 +54,13 @@ async function fisicoTikTok(lojaId: string): Promise<{ porProduto: Map<string, F
   const porProduto = new Map<string, Fisico>();
   const porSku = new Map<string, Fisico>();
   for (const v of varia || []) {
-    const modelId = v.model_id === "0" ? "" : v.model_id || "";
+    const modelId = String(v.model_id ?? "") === "0" ? "" : String(v.model_id ?? "");
     const skuTxt = porItem.get(`${v.item_id}|${modelId}`) || porItem.get(`${v.item_id}|`) || v.model_sku;
     if (!skuTxt) continue;
     const d = disp.get(normSku(skuTxt));
     const c = catalogo.get(normSku(skuTxt));
     const f: Fisico = { estoque: d?.estoque ?? 0, sku: d?.sku ?? skuTxt, custo: c?.custo ?? null, peso: c?.peso ?? null };
-    porSku.set(`${v.item_id}|${v.model_id || ""}`, f);
+    porSku.set(`${v.item_id}|${String(v.model_id ?? "")}`, f);
     const atual = porProduto.get(v.item_id) || { estoque: 0, sku: null, custo: null, peso: null };
     atual.estoque += f.estoque;
     atual.sku = atual.sku ?? f.sku;
@@ -81,13 +94,14 @@ async function desempenho28d(loja: LojaTikTok): Promise<Map<string, { views: num
 }
 
 export async function calcularProdutosParados(loja: LojaTikTok, cfg: CreatorsConfig): Promise<{ produtos: number; parados: number }> {
-  const [{ porProduto }, desempenho, { data: prods }, { data: vendas }, { data: amostras }] = await Promise.all([
+  const dia28 = new Date(Date.now() - 28 * 86400000).toISOString().slice(0, 10);
+  const [{ porProduto }, desempenho, prods, vendas, amostras] = await Promise.all([
     fisicoTikTok(loja.lojaId),
     desempenho28d(loja).catch(() => new Map<string, { views: number | null; pedidos: number | null }>()),
-    supabase.from("tiktok_produtos").select("produto_id, nome, categoria_id").eq("loja_id", loja.lojaId).limit(5000),
+    todas<{ produto_id: string; nome: string | null; categoria_id: string | null }>((de, ate) => supabase.from("tiktok_produtos").select("produto_id, nome, categoria_id").eq("loja_id", loja.lojaId).range(de, ate)),
     // "vendas 28 d" = unidades vendidas nos pedidos do TikTok que o AutoHub tem (pedido_itens, pelo product_id)
-    supabase.from("pedido_itens").select("item_id, qtd").eq("loja_id", loja.lojaId).gte("dia", new Date(Date.now() - 28 * 86400000).toISOString().slice(0, 10)).limit(50000),
-    supabase.from("tiktok_amostras").select("produto_id").eq("loja_id", loja.lojaId).eq("status", "PENDING"),
+    todas<{ item_id: string | null; qtd: number | null }>((de, ate) => supabase.from("pedido_itens").select("item_id, qtd").eq("loja_id", loja.lojaId).gte("dia", dia28).range(de, ate)),
+    todas<{ produto_id: string | null }>((de, ate) => supabase.from("tiktok_amostras").select("produto_id").eq("loja_id", loja.lojaId).eq("status", "PENDING").range(de, ate)),
   ]);
   const vendas28 = new Map<string, number>();
   for (const v of vendas || []) if (v.item_id) vendas28.set(v.item_id, (vendas28.get(v.item_id) || 0) + n(v.qtd));
@@ -111,14 +125,16 @@ export async function calcularProdutosParados(loja: LojaTikTok, cfg: CreatorsCon
 
 // Nota e sugestão de todo pedido aberto — roda no coletor (30 min, os pedidos vencem em horas) e no diário.
 export async function calcularNotasESugestoes(loja: LojaTikTok, cfg: CreatorsConfig): Promise<{ avaliadas: number; aprovar: number; recusar: number; decidir: number }> {
-  const [{ data: amostras }, { data: criadores }, { data: parados }, { data: vendedores }, fisico, { data: prods }, { data: cats }] = await Promise.all([
-    supabase.from("tiktok_amostras").select("amostra_id, criador_id, produto_id, sku_id").eq("loja_id", loja.lojaId).eq("status", "PENDING").limit(5000),
-    supabase.from("tiktok_criadores").select("criador_id, nivel, gmv, gmv_moeda, gmv_brl, gmv_usd, taxa_cumprimento, categorias, media_views_video").limit(20000),
-    supabase.from("tiktok_produtos_parados").select("produto_id, parado").eq("loja_id", loja.lojaId).limit(5000),
-    supabase.from("tiktok_afiliado_pedidos").select("criador_id").eq("loja_id", loja.lojaId).limit(50000),
+  type Cri = { criador_id: string; nivel: number | null; gmv: number | null; gmv_moeda: string | null; gmv_brl: number | null; gmv_usd: number | null; taxa_cumprimento: number | null; categorias: unknown; media_views_video: number | null };
+  type Prod = { produto_id: string; categoria_id: string | null; categoria_nivel1_id: string | null; categoria_nivel1_nome: string | null; categoria_cadeia: unknown; peso_kg: number | null };
+  const [amostras, criadores, parados, vendedores, fisico, prods, cats] = await Promise.all([
+    todas<{ amostra_id: string; criador_id: string | null; produto_id: string | null; sku_id: string | null }>((de, ate) => supabase.from("tiktok_amostras").select("amostra_id, criador_id, produto_id, sku_id").eq("loja_id", loja.lojaId).eq("status", "PENDING").range(de, ate)),
+    todas<Cri>((de, ate) => supabase.from("tiktok_criadores").select("criador_id, nivel, gmv, gmv_moeda, gmv_brl, gmv_usd, taxa_cumprimento, categorias, media_views_video").range(de, ate)),
+    todas<{ produto_id: string; parado: boolean }>((de, ate) => supabase.from("tiktok_produtos_parados").select("produto_id, parado").eq("loja_id", loja.lojaId).range(de, ate)),
+    todas<{ criador_id: string | null }>((de, ate) => supabase.from("tiktok_afiliado_pedidos").select("criador_id").eq("loja_id", loja.lojaId).not("criador_id", "is", null).range(de, ate)),
     fisicoTikTok(loja.lojaId),
-    supabase.from("tiktok_produtos").select("produto_id, categoria_id, categoria_nivel1_id, categoria_nivel1_nome, categoria_cadeia, peso_kg").eq("loja_id", loja.lojaId).limit(5000),
-    supabase.from("tiktok_categorias").select("id, nivel1_id, nivel1_nome").limit(20000),
+    todas<Prod>((de, ate) => supabase.from("tiktok_produtos").select("produto_id, categoria_id, categoria_nivel1_id, categoria_nivel1_nome, categoria_cadeia, peso_kg").eq("loja_id", loja.lojaId).range(de, ate)),
+    todas<{ id: string; nivel1_id: string | null; nivel1_nome: string | null }>((de, ate) => supabase.from("tiktok_categorias").select("id, nivel1_id, nivel1_nome").range(de, ate)),
   ]);
   const cri = new Map((criadores || []).map((c) => [c.criador_id, c]));
   const par = new Map((parados || []).map((p) => [p.produto_id, p]));
