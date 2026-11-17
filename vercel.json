@@ -135,6 +135,14 @@
     {
       "path": "/api/campanhas/sincronizar",
       "schedule": "30 6 * * *"
+    },
+    {
+      "path": "/api/creators/coletar",
+      "schedule": "13,43 * * * *"
+    },
+    {
+      "path": "/api/creators/diario",
+      "schedule": "50 5 * * *"
     }
   ]
 }
