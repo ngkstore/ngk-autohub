@@ -181,3 +181,98 @@ O que foi feito: conferido o diff do vercel.json (só as 8 linhas dos dois crons
 O que foi publicado (commit, migration, cron): commit 75aaa96 "crons do Creators (coletar 30 min, diario 05h50)"; /api/creators/coletar em 13,43 * * * * e /api/creators/diario em 50 5 * * *. Total de crons no vercel.json: 36.
 Números pedidos na tarefa: a Vercel registrou e executou o cron de coleta: no primeiro horário depois da publicação (09:43) a rota rodou sozinha e atualizou as 1.750 amostras às 09:46:42, sem disparo manual. O diário roda às 05h50 (primeira execução amanhã).
 Dúvidas ou pendências: o limite de crons do plano não é legível daqui (precisa do painel da Vercel); com 36 crons publicados e aceitos no deploy, o plano atual comporta pelo menos esse número.
+
+## T-004 — CONCLUÍDA
+Data/hora: 17/11/2026, 11:09:12
+O que foi feito:
+- Causa da falta no item B: a coleta listava só pedidos CANCELLED (cancel_reason "Failed Delivery"). Quando o pacote volta ao vendedor, a Shopee muda o pedido para COMPLETED com o pacote em LOGISTICS_DELIVERY_FAILED (conferido pela API nos 29 casos: todos COMPLETED, pacote LOGISTICS_DELIVERY_FAILED, update_time entre 05/10 e 28/10). Correção: a coleta passa a ler CANCELLED (janela de 20 d) e COMPLETED (janela de 1 d no cron, pelo update_time, que muda quando o pacote volta); o detalhe identifica a falha pelo pacote, não pelo status.
+- Tipo novo "pacote não retornou" (pacote_nao_retornou, id PNR-<pedido>): falha há mais de 60 dias sem retorno nem descarte; guarda valor, rastreio e dias parado; aba própria "Pacote não retornou" em Devoluções > Disputas. Só leitura e registro: nada foi aberto na Shopee.
+- Rota manual: /api/devolucoes/sincronizar?so=falhas aceita status=CANCELLED|COMPLETED, completed=<dias>, ate=<dias> e pedidos=<sn,sn>.
+O que foi publicado (commit, migration, cron): commit 6db7f7f; migration 0030 (tipo pacote_nao_retornou, coluna dias_parado). Sem cron novo (o de devoluções de 15 min já chama a coleta de falhas).
+Números pedidos na tarefa:
+1. Item B: os 29 casos entraram; validar 29.
+   Item A (3 sem confirmação no SC): 260921MD36RG73 → falha_entrega/validar (RETURNED_TO_SELLER, voltou 16/10/2026); 260929BBJXC8BW → falha_entrega/validar (RETURNED_TO_SELLER, voltou 13/10/2026); 261001GC74B0XY → falha_entrega/validar (RETURNED_TO_SELLER, voltou 09/10/2026).
+2. Totais NGK depois da correção — falha de entrega: Validar 183 · Em trânsito 12 · Encerrados 32; pacote não retornou: 13.
+3. Carga de 90 dias (COMPLETED em fatias de 1–3 d; CANCELLED em fatias de 15 d até 95 d): 167 casos além dos listados nos itens A, B e C.
+4. Item C (25 de 25 encontrados), por dias parado:
+   - 250116KTSRRQ21 · PNR · R$ 19,99 · 647 d · rastreio OFG190681617129261 · BLÇCZN10BR
+   - 250117PF5AEFJ7 · PNR · R$ 25,06 · 637 d · rastreio OFG190772200147797 · BLÇCZN10BR
+   - 250416DGQKXTNH · PNR · R$ 56,41 · 573 d · rastreio OFG198464649106286 · PORCONINXPTDOLHOM
+   - 250503TPA8KY7S · PNR · R$ 19,99 · 558 d · rastreio OFG199917321134067 · MÇCCLNBC
+   - 250522J4KXTKMW · PNR · R$ 27,82 · 522 d · rastreio OFG201623441143154 · BLÇCZN10BR
+   - 250618SWU3YAK2 · falha_entrega/encerrado · R$ 332,45 · 499 d · rastreio OFG203891042186440 · JARVID
+   - 250824NAM202FR · PNR · R$ 88,73 · 445 d · rastreio OFG209732966117623 · LIXINXTAMBAMCLV4
+   - 2508172RCVS52Y · PNR · R$ 28,71 · 441 d · rastreio OFG209094922110519 · FORPAO27
+   - 250904KJXN3M0S · falha_entrega/encerrado · R$ 19,90 · 424 d · rastreio OFG210673192144557 · KCOP6PA
+   - 251012TAB9VXHK · falha_entrega/encerrado · R$ 19,90 · 387 d · rastreio OFG213904471117669 · ASSVID
+   - 251011RUTF82J4 · falha_entrega/encerrado · R$ 36,17 · 386 d · rastreio OFG213854514180554 · KCOP6PA
+   - 251112GS2W98CC · falha_entrega/encerrado · R$ 44,90 · 363 d · rastreio OFG216576697159487 · PORCONINXPTDOLHOM
+   - 2511086X1VHCFY · falha_entrega/encerrado · R$ 19,90 · 362 d · rastreio OFG216238434192044 · ASSVID
+   - 251203CHJ6DR94 · falha_entrega/encerrado · R$ 20,33 · 336 d · rastreio OFG218431181153940 · BLÇCZN10BR
+   - 251209U8H9BMEY · falha_entrega/encerrado · R$ 19,90 · 333 d · rastreio OFG218936883165704 · ASSVID
+   - 251216FKACS033 · falha_entrega/encerrado · R$ 28,02 · 324 d · rastreio OFG219536147115664 · ASSVID
+   - 251204EKKR1DYM · falha_entrega/encerrado · R$ 19,90 · 323 d · rastreio OFG218502101163958 · ASSVID
+   - 251218M0F1YSGR · PNR · R$ 39,90 · 315 d · rastreio OFG219687700144724 · BATINF5PÇVMV1
+   - 251218MRQE5CEQ · falha_entrega/encerrado · R$ 50,90 · 315 d · rastreio OFG219713751126497 · PORCONINXPTDOLHOM
+   - 251217KSRFF124 · PNR · R$ 38,05 · 315 d · rastreio OFG219680501152359 · FITBAR
+   - 251218N3Q1KQH2 · PNR · R$ 114,93 · 313 d · rastreio OFG219725549122700 · COZBRIGD
+   - 251220T75NX3UK · PNR · R$ 19,94 · 311 d · rastreio OFG219901060124106 · BLÇCZN10BR1
+   - 2512222HV49P3V · PNR · R$ 29,90 · 300 d · rastreio OFG220087917146077 · FITBAR
+   - 2601261P9G8Y0E · PNR · R$ 37,97 · 272 d · rastreio OFG223058301185393 · JGFREDREM3UN
+   - 260309P72HPCB8 · falha_entrega/encerrado · R$ 17,90 · 241 d · rastreio OFG226763516119021 · BLÇCZN10BR
+   Soma: R$ 1177,57.
+Dúvidas ou pendências: valor do item C = total pago pelo comprador no pedido (total_amount); se o ressarcimento for pelo custo, troco para o custo do SKU.
+
+## T-005 — CONCLUÍDA
+Data/hora: 17/11/2026, 11:09:12
+O que foi feito:
+1. Crons: substituído pela T-006 (relatada).
+2. Grupo de categoria: o mapa usava nomes genéricos; trocado pelos nomes reais do 1º nível do TikTok BR ("Artigos para casa", "Utensílios de cozinha", "Móveis", "Eletrodomésticos", "Têxteis e artigos de decoração", "Melhorias para o lar" | "Brinquedos e hobbies", "Bebê e maternidade", "Kids' Fashion"). As categorias do criador agora juntam as declaradas (category_ids, as que o Affiliate Center mostra) com as de venda (category_gmv_distribution).
+   @dicasdamay62: o TikTok devolve para ela Calçados, Sports & Outdoor e Acessórios de moda (category_ids 603014, 601352, 605248); não há Utensílios de cozinha no perfil pela API, então "outra" é o resultado correto com os dados que a API entrega. Hoje: Aparelho de Jantar Porcelana 42 Peças Ma nota 66 (decidir).
+   1º nível dos produtos (parados e com amostra pendente):
+   - Artigos para casa · Escova vaso sanitária preta moderna com supor · PARADO
+   - Artigos para casa · Limpa Vidro Magnético Limpador Magnético Limp · PARADO
+   - Artigos para casa · Lixeira Anti Odor Bebê 12 Litros Lixo Anti Od · 3 amostra(s) pendente(s)
+   - Artigos para casa · Lixeira banheiro Pedal 5 Litros Retangular mo · PARADO · 1 amostra(s) pendente(s)
+   - Brinquedos e hobbies · Bicicleta Bicicletinha Menino Infantil Aro 12 · 55 amostra(s) pendente(s)
+   - Brinquedos e hobbies · BOLA MÁGICA VOADORA MALUCA TAMANHO GRANDE ORI · PARADO
+   - Brinquedos e hobbies · Caminhão Brinquedo Iveco Plataforma Trator Re · 2 amostra(s) pendente(s)
+   - Brinquedos e hobbies · Caminhão de Controle Remoto Grande Caminhão I · 1 amostra(s) pendente(s)
+   - Brinquedos e hobbies · Caminhão Iveco Caminhão Graneleiro Iveco Mini · 1 amostra(s) pendente(s)
+   - Brinquedos e hobbies · Carrinho de Rolimã Infantil Volante Giratório · PARADO · 2 amostra(s) pendente(s)
+   - Brinquedos e hobbies · Cozinha infantil grande completa mini fogão p · 33 amostra(s) pendente(s)
+   - Brinquedos e hobbies · Cubo Didático Elástico Multi Sensorial Entrel · PARADO
+   - Brinquedos e hobbies · Kit Trave Golzinho Futebol Infantil – 2 Trave · PARADO
+   - Eletrodomésticos · Ventilador 6 pas 126w Mesa 40cm Tubo Silencio · PARADO
+   - Eletrodomésticos · Ventilador de coluna 6 pas 40cm 126w Turbo Si · PARADO · 4 amostra(s) pendente(s)
+   - Eletrodomésticos · Ventilador de parede 200W Bivolt 3 pas potent · 1 amostra(s) pendente(s)
+   - Malas e bolsas · Mala de viagem Bordo 10KG Padrão Anac  Rodinh · PARADO · 1 amostra(s) pendente(s)
+   - Melhorias para o lar · CLINK Barreira de Água Retenção em Silicone V · PARADO
+   - Móveis · Kit 4 2 1 Cadeiras Chales Eames Eifell Jantar · PARADO · 14 amostra(s) pendente(s)
+   - Utensílios de cozinha · Aparelho de Jantar Porcelana 42 Peças Majesty · 26 amostra(s) pendente(s)
+   - Utensílios de cozinha · Balança digital cozinha precisão pilhas inclu · 7 amostra(s) pendente(s)
+   - Utensílios de cozinha · bandeja garçom profissional 40cm antiderrapan · PARADO
+   - Utensílios de cozinha · Frigideira Antiaderente Indução 20 cm Mármore · PARADO
+   - Utensílios de cozinha · Garrafa Térmica Café 1 Litro Termolar Magic P · 2 amostra(s) pendente(s)
+   - Utensílios de cozinha · Garrafa Térmica Inox Café 1 Litro Termolar Lu · 6 amostra(s) pendente(s)
+   - Utensílios de cozinha · Jogo 6 Taças Água Cristal Bohemia Gastro 580m · 4 amostra(s) pendente(s)
+   - Utensílios de cozinha · Jogo 6 Taças Cerveja Cristal Bohemia Colibri  · 1 amostra(s) pendente(s)
+   - Utensílios de cozinha · Jogo 6 Taças Champagne Champanhe Cristal Bohe · 1 amostra(s) pendente(s)
+   - Utensílios de cozinha · Jogo de Panela Antiaderente Jogo de Panelas I · PARADO · 5 amostra(s) pendente(s)
+   - Utensílios de cozinha · Jogo De Panelas Antiaderente 4 Peças Indução  · PARADO
+   - Utensílios de cozinha · Jogo Refresco 7 Peças Cristal Jarra de suco 1 · 1 amostra(s) pendente(s)
+   - Utensílios de cozinha · Kit 3 potes hérmeticos vidro marmita 4 travas · 1 amostra(s) pendente(s)
+   - Utensílios de cozinha · Kit 5 2 1 Bandeja Profissional Garçom Emborra · PARADO
+   - Utensílios de cozinha · Kit Churrasco de Aço Inox 19 Peças com Maleta · 1 amostra(s) pendente(s)
+   - Utensílios de cozinha · L'Hermitage Jogo de chá porcelana completo 23 · 2 amostra(s) pendente(s)
+   - Utensílios de cozinha · Ngk Store Kit 2 Formas de Pão Antiaderente em · 19 amostra(s) pendente(s)
+   - Utensílios de cozinha · Panela Pressão Indução 4,2 Litros Mimo Style  · 1 amostra(s) pendente(s)
+   - Utensílios de cozinha · Spray Borrifador de Azeite 200ML Vinagre Culi · PARADO
+   - Utensílios de cozinha · Xicara Coração Parede Dupla 90ML vidro boross · 1 amostra(s) pendente(s)
+3. Alerta de @luizfelipeshopcreator (nota 81, venceu 17/11 00:48) e @isabela.marchesi (nota 69, venceu 17/11 07:06): não foi disparado. Causa: a avaliação não rodou entre 16/11 ~12h e 17/11 08:40 (sem cron e sem disparo manual nesse intervalo) e o alerta só considera pedidos ainda não vencidos. O primeiro alerta do Creators saiu às 08:52 de 17/11. Com o cron de 30 min no ar (T-006) isso não se repete.
+O que foi publicado (commit, migration, cron): commit 6db7f7f (grupos de categoria e categorias declaradas).
+Números pedidos na tarefa: acima.
+Dúvidas ou pendências: nenhuma.
+Observações da T-004 para conferência:
+- Validar 183 é bem mais do que o Seller Center mostra: 87 casos voltaram nos últimos 45 dias, 94 entre 45 e 90 dias e 2 há mais de 90 dias. Os mais antigos provavelmente já saíram da lista "aguardando validação" do Seller Center (validados lá ou fora do prazo). Pela regra da R-003 eles só saem daqui por inspeção no AutoHub; se o Gabriel quiser, uma próxima tarefa pode encerrar em lote os que voltaram há mais de 45 dias.
+- Item C: 20 dos 25 viraram "pacote não retornou" (PNR) e entram na aba de Disputas; 5 (250618SWU3YAK2, 250904KJXN3M0S, 251012TAB9VXHK, 251011RUTF82J4, 251112GS2W98CC) têm no rastreio da API o evento "Pedido descartado" (FAILED_DELIVERED) e por isso ficaram encerrados como descartados, embora o Seller Center ainda os mostre como "voltará para você". Conferir esses 5 no Seller Center: se o pacote foi descartado pela transportadora, também cabe pedido de ressarcimento.
