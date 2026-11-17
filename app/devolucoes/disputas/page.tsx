@@ -10,7 +10,11 @@ import { Card, CardHeader, Kpi, Chip, ChipCanal, Tabs, Tabela, Th, Tr, Td, Vazio
 
 export const dynamic = "force-dynamic";
 
-type D = { id: string; loja_id: string; canal: "shopee" | "tiktok"; plataforma_id: string; pedido_id: string; tipo: string; dias_parado: number | null; rastreio_reverso: string | null; motivo_codigo: string | null; motivo_texto: string | null; etapa: string; disputa_status: string | null; compensacao_status: string | null; resultado: string | null; valor_reembolso_pedido: number | null; valor_recuperado: number | null; credito_status: string | null; credito_esperado_ate: string | null; creditado_em: string | null; plataforma_criado_em: string | null; plataforma_atualizado_em: string | null; itens: { nome: string | null }[] | null; lojas: { apelido: string } | null };
+type D = { id: string; loja_id: string; canal: "shopee" | "tiktok"; plataforma_id: string; pedido_id: string; tipo: string; dias_parado: number | null; rastreio_reverso: string | null; status_plataforma: string | null; valor_pedido: number | null; motivo_codigo: string | null; motivo_texto: string | null; etapa: string; disputa_status: string | null; compensacao_status: string | null; resultado: string | null; valor_reembolso_pedido: number | null; valor_recuperado: number | null; credito_status: string | null; credito_esperado_ate: string | null; creditado_em: string | null; plataforma_criado_em: string | null; plataforma_atualizado_em: string | null; itens: { nome: string | null; sku?: string | null; quantidade?: number | null }[] | null; lojas: { apelido: string } | null };
+
+// T-007: pacote pago ao comprador que não voltou — PNR (nunca retornou) ou falha de entrega descartada pela transportadora
+const naoRetornou = (d: D) => (d.tipo === "pacote_nao_retornou" && d.etapa !== "encerrado") || (d.tipo === "falha_entrega" && d.status_plataforma === "DISCARDED");
+const normSkuTela = (s: unknown) => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 
 const ABAS = [
   { id: "todas", nome: "Todas" },
@@ -26,7 +30,7 @@ const ABAS = [
 function classificar(d: D): string[] {
   const s: string[] = ["todas"];
   // falha de entrega cujo pacote nunca voltou (reembolso pago): lista própria para pedir ressarcimento à Shopee
-  if (d.tipo === "pacote_nao_retornou" && d.etapa !== "encerrado") s.push("nao_retornou");
+  if (naoRetornou(d)) s.push("nao_retornou");
   if (d.etapa !== "encerrado" && (d.disputa_status || d.compensacao_status)) s.push("analise");
   if (d.resultado === "ganha" && d.credito_status === "aguardando") s.push("aguardando");
   if (d.credito_status === "nao_creditado") s.push("nao_creditado");
@@ -44,10 +48,10 @@ export default async function DisputasPage({ searchParams }: { searchParams: Pro
   const lojas = filtroLojas(escopo, params.loja);
   let q = supabase
     .from("devolucoes")
-    .select("id, loja_id, canal, plataforma_id, pedido_id, tipo, dias_parado, rastreio_reverso, motivo_codigo, motivo_texto, etapa, disputa_status, compensacao_status, resultado, valor_reembolso_pedido, valor_recuperado, credito_status, credito_esperado_ate, creditado_em, plataforma_criado_em, plataforma_atualizado_em, itens, lojas(apelido)")
-    .or("disputa_status.not.is.null,compensacao_status.not.is.null,resultado.in.(ganha,perdida),credito_status.in.(aguardando,creditado,nao_creditado),tipo.eq.pacote_nao_retornou")
+    .select("id, loja_id, canal, plataforma_id, pedido_id, tipo, dias_parado, rastreio_reverso, status_plataforma, valor_pedido, motivo_codigo, motivo_texto, etapa, disputa_status, compensacao_status, resultado, valor_reembolso_pedido, valor_recuperado, credito_status, credito_esperado_ate, creditado_em, plataforma_criado_em, plataforma_atualizado_em, itens, lojas(apelido)")
+    .or("disputa_status.not.is.null,compensacao_status.not.is.null,resultado.in.(ganha,perdida),credito_status.in.(aguardando,creditado,nao_creditado),tipo.eq.pacote_nao_retornou,and(tipo.eq.falha_entrega,status_plataforma.eq.DISCARDED)")
     .order("plataforma_atualizado_em", { ascending: false })
-    .limit(300);
+    .limit(1000);
   if (lojas) q = q.in("loja_id", lojas);
   const { data } = await q;
   const todas = ((data || []) as unknown) as D[];
@@ -56,6 +60,26 @@ export default async function DisputasPage({ searchParams }: { searchParams: Pro
   for (const d of todas) for (const k of classificar(d)) contagem[k] = (contagem[k] || 0) + 1;
   const lista = todas.filter((d) => classificar(d).includes(aba));
   const sel = todas.find((d) => d.id === params.caso) ?? lista[0] ?? null;
+  const custoPorCaso = new Map<string, number | null>();
+  if (aba === "nao_retornou") {
+    const { data: cat } = await supabase.from("catalogo_sku").select("sku, custo").not("custo", "is", null).limit(20000);
+    const custo = new Map((cat || []).map((c) => [normSkuTela(c.sku), Number(c.custo)]));
+    for (const d of lista) {
+      let soma = 0;
+      let achou = false;
+      for (const it of d.itens || []) {
+        const c = custo.get(normSkuTela(it.sku));
+        if (c != null) {
+          soma += c * Number(it.quantidade || 1);
+          achou = true;
+        }
+      }
+      custoPorCaso.set(d.id, achou ? Math.round(soma * 100) / 100 : null);
+    }
+  }
+  const somaPago = lista.reduce((s, d) => s + Number(d.valor_pedido ?? d.valor_reembolso_pedido ?? 0), 0);
+  const somaCusto = lista.reduce((s, d) => s + Number(custoPorCaso.get(d.id) ?? 0), 0);
+  const semCusto = lista.filter((d) => custoPorCaso.get(d.id) == null).length;
 
   const trinta = agoraMs() - 30 * 86400000;
   const decididas30 = todas.filter((d) => (d.resultado === "ganha" || d.resultado === "perdida") && d.plataforma_atualizado_em && new Date(d.plataforma_atualizado_em).getTime() > trinta);
@@ -82,7 +106,53 @@ export default async function DisputasPage({ searchParams }: { searchParams: Pro
       <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-3">
         <Card className="xl:col-span-2" semPadding>
           <Tabs className="px-[18px]" abas={ABAS.map((a) => ({ id: a.id, nome: a.nome, contador: contagem[a.id] || 0, href: link(a.id) }))} ativa={aba} />
-          {lista.length === 0 ? (
+          {aba === "nao_retornou" && lista.length > 0 ? (
+            <>
+              <p className="px-[18px] pt-3 text-[13px] text-texto-2">
+                {lista.length} pacote(s) pagos ao comprador que não voltaram · pago pelo comprador <b className="text-texto">{brl(somaPago)}</b> · custo do SKU (UpSeller) <b className="text-texto">{brl(somaCusto)}</b>
+                {semCusto ? ` (${semCusto} sem custo cadastrado)` : ""} · só registro: o pedido de ressarcimento é aberto no Seller Center
+              </p>
+              <Tabela>
+                <thead>
+                  <tr>
+                    <Th>Pedido</Th>
+                    <Th>Situação</Th>
+                    <Th numerica>Dias parado</Th>
+                    <Th>Rastreio</Th>
+                    <Th numerica>Pago pelo comprador</Th>
+                    <Th numerica>Custo do SKU</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lista.map((d) => (
+                    <Tr key={d.id} selecionada={sel?.id === d.id}>
+                      <Td>
+                        <Link href={link(aba, d.id)} className="font-medium text-texto hover:underline">
+                          {d.itens?.[0]?.nome ?? d.pedido_id}
+                        </Link>
+                        <p className="text-xs text-texto-2">
+                          {d.pedido_id} · {d.itens?.[0]?.sku ?? ""} · {d.lojas?.apelido ?? ""}
+                        </p>
+                      </Td>
+                      <Td>{d.tipo === "pacote_nao_retornou" ? <Chip cor="vermelho">nunca retornou</Chip> : <Chip cor="laranja">descartado pela transportadora</Chip>}</Td>
+                      <Td numerica>{d.dias_parado ?? "—"}</Td>
+                      <Td className="text-xs text-texto-2">{d.rastreio_reverso ?? "—"}</Td>
+                      <Td numerica className="font-semibold">{brl(d.valor_pedido ?? d.valor_reembolso_pedido)}</Td>
+                      <Td numerica>{custoPorCaso.get(d.id) != null ? brl(custoPorCaso.get(d.id)!) : <span className="text-texto-2">sem custo</span>}</Td>
+                    </Tr>
+                  ))}
+                  <Tr>
+                    <Td className="font-semibold">Total ({lista.length})</Td>
+                    <Td />
+                    <Td />
+                    <Td />
+                    <Td numerica className="font-semibold">{brl(somaPago)}</Td>
+                    <Td numerica className="font-semibold">{brl(somaCusto)}</Td>
+                  </Tr>
+                </tbody>
+              </Tabela>
+            </>
+          ) : lista.length === 0 ? (
             <div className="p-[18px]">
               <Vazio titulo="Nenhuma disputa aqui" texto="Disputas aparecem quando um caso é contestado ou decidido." />
             </div>
