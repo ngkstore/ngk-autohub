@@ -3,7 +3,8 @@ export type Canal = "shopee" | "tiktok";
 // coleta = agendar coleta reversa (Shopee LOGISTICS_PENDING_ARRANGE); validar = "Validar item" / "Analisar reembolso aprovado pela Shopee"
 export type Etapa = "solicitado" | "resposta" | "voltando" | "coleta" | "recebido" | "validar" | "inspecao" | "decisao" | "encerrado";
 // falha_entrega = pacote que a transportadora não entregou e volta ao vendedor (API de pedidos da Shopee)
-export type TipoDevolucao = "devolucao_reembolso" | "so_reembolso" | "troca" | "cancelamento" | "falha_entrega";
+// pacote_nao_retornou = falha de entrega cujo pacote nunca voltou (reembolso pago; pedir ressarcimento à Shopee)
+export type TipoDevolucao = "devolucao_reembolso" | "so_reembolso" | "troca" | "cancelamento" | "falha_entrega" | "pacote_nao_retornou";
 export type Resultado = "aprovada" | "recusada" | "parcial" | "ganha" | "perdida" | "cancelada_comprador" | "vencida";
 
 export type ItemDevolucao = { sku: string | null; variacao?: string | null; nome: string | null; quantidade: number; valor: number | null; imagem?: string | null };
@@ -38,6 +39,7 @@ export type DevolucaoLinha = {
   bruto: Record<string, unknown>;
   plataforma_criado_em: string | null;
   plataforma_atualizado_em: string | null;
+  dias_parado?: number | null; // falha de entrega: dias desde a falha sem o pacote voltar
 };
 
 export type MidiaComprador = { tipo: "foto" | "video"; url: string; thumb?: string | null; legenda?: string | null };

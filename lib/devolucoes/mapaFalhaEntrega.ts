@@ -17,6 +17,9 @@ const FOLGA_ENCERRAR_DIAS = 7;
 export const metaValidacaoFalha = (chegouEm: string | null, dias = PRAZO_VALIDACAO_FALHA_DIAS): string | null => (chegouEm ? new Date(new Date(chegouEm).getTime() + dias * 86400000).toISOString() : null);
 
 export const idFalhaEntrega = (orderSn: string) => `FE-${orderSn}`;
+export const idPacoteNaoRetornou = (orderSn: string) => `PNR-${orderSn}`;
+/** Falha há mais de 60 dias sem o pacote voltar nem ser descartado = "pacote não retornou" (ressarcimento). */
+export const PNR_DIAS = 60;
 
 export function ehFalhaEntrega(o: J): boolean {
   const motivo = String(o.cancel_reason || "").toLowerCase();
@@ -43,13 +46,19 @@ export function mapearFalhaEntrega(o: J, eventos: EventoRastreio[], lojaId: stri
   const retornouEm = retorno?.update_time ? new Date(Number(retorno.update_time) * 1000) : null;
   // "FAILED_DELIVERED / Pedido descartado": a Shopee descartou o pacote — nada volta, nada a validar
   const descartado = eventos.some((e) => String(e.logistics_status || "").toUpperCase() === "FAILED_DELIVERED" || /descartado/i.test(String(e.description || "")));
-  const etapa: Etapa = descartado ? "encerrado" : retornouEm ? "validar" : "voltando";
+  // T-004: pacote que NUNCA voltou — falha há mais de PNR_DIAS dias, sem retorno e sem descarte
+  // (reembolso pago ao comprador, rastreio parado em "sendo postado e voltará para você"): tipo próprio
+  // 'pacote_nao_retornou' (id PNR-<pedido>), lista em Devoluções > Disputas para pedir ressarcimento à Shopee.
+  const falhaEm = eventos.find((e) => /RETURN_STARTED|DELIVERY_FAILED/.test(String(e.logistics_status || "").toUpperCase()))?.update_time ?? o.update_time;
+  const falhaData = Number(falhaEm) > 0 ? new Date(Number(falhaEm) * 1000) : null;
+  const diasParado = falhaData ? Math.floor((agora.getTime() - falhaData.getTime()) / 86400000) : null;
+  const naoRetornou = !descartado && !retornouEm && diasParado != null && diasParado >= PNR_DIAS;
+  const etapa: Etapa = descartado ? "encerrado" : retornouEm ? "validar" : naoRetornou ? "decisao" : "voltando";
   // sem prazo da plataforma: prazo_resposta fica nulo (não entra em "Vencem em 24 h" nem como urgente no painel);
   // a meta interna (chegada + metaDias) é calculada na tela
   const prazo: string | null = null;
   // Regra (16/11/2026): caso em "validar" só sai da fila quando for inspecionado no AutoHub ou encerrado pela
   // Shopee (descartado) — NUNCA por tempo, mesmo fora da janela do cron. A meta interna é só aviso na tela.
-  void agora;
   void metaDias;
   void FOLGA_ENCERRAR_DIAS;
   const itens = (Array.isArray(o.item_list) ? (o.item_list as J[]) : []).map((it) => ({
@@ -64,10 +73,11 @@ export function mapearFalhaEntrega(o: J, eventos: EventoRastreio[], lojaId: stri
   return {
     loja_id: lojaId,
     canal: "shopee",
-    plataforma_id: idFalhaEntrega(String(o.order_sn)),
+    plataforma_id: naoRetornou ? idPacoteNaoRetornou(String(o.order_sn)) : idFalhaEntrega(String(o.order_sn)),
     pedido_id: String(o.order_sn),
-    tipo: "falha_entrega",
-    status_plataforma: descartado ? "DISCARDED" : retornouEm ? "RETURNED_TO_SELLER" : String(pacotes[0]?.logistics_status || "LOGISTICS_DELIVERY_FAILED"),
+    tipo: naoRetornou ? "pacote_nao_retornou" : "falha_entrega",
+    status_plataforma: descartado ? "DISCARDED" : retornouEm ? "RETURNED_TO_SELLER" : naoRetornou ? "NEVER_RETURNED" : String(pacotes[0]?.logistics_status || "LOGISTICS_DELIVERY_FAILED"),
+    dias_parado: diasParado,
     etapa,
     motivo_codigo: "FAILED_DELIVERY",
     motivo_texto: str(o.cancel_reason),

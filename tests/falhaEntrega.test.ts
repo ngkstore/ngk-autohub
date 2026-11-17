@@ -65,3 +65,23 @@ describe("Falha de entrega: pacote descartado pela Shopee", () => {
     expect(l.prazo_resposta).toBeNull();
   });
 });
+
+describe("Falha de entrega (T-004): pedido COMPLETED e pacote que nunca voltou", () => {
+  it("pedido COMPLETED com pacote LOGISTICS_DELIVERY_FAILED também é falha de entrega", () => {
+    expect(ehFalhaEntrega({ order_sn: "X", order_status: "COMPLETED", cancel_reason: "", package_list: [{ logistics_status: "LOGISTICS_DELIVERY_FAILED" }] })).toBe(true);
+    expect(ehFalhaEntrega({ order_sn: "Y", order_status: "COMPLETED", package_list: [{ logistics_status: "LOGISTICS_DELIVERY_DONE" }] })).toBe(false);
+  });
+  it("sem retorno nem descarte há mais de 60 dias: pacote_nao_retornou (PNR-), com dias parado", () => {
+    const parado = [{ update_time: 1794478100, logistics_status: "RETURN_STARTED", description: "O pedido está sendo postado e voltará para você" }];
+    const l = mapearFalhaEntrega(pedido, parado, LOJA, new Date(1794478100 * 1000 + 90 * 86400000));
+    expect(l.tipo).toBe("pacote_nao_retornou");
+    expect(l.plataforma_id).toBe("PNR-261109S3GDVAT8");
+    expect(l.etapa).toBe("decisao");
+    expect(l.dias_parado).toBe(90);
+    expect(l.status_plataforma).toBe("NEVER_RETURNED");
+  });
+  it("menos de 60 dias voltando continua falha_entrega em trânsito; se voltou, validar", () => {
+    expect(mapearFalhaEntrega(pedido, aCaminho, LOJA, new Date(1794478100 * 1000 + 30 * 86400000)).tipo).toBe("falha_entrega");
+    expect(mapearFalhaEntrega(pedido, voltou, LOJA, new Date(1794700000 * 1000 + 90 * 86400000)).etapa).toBe("validar");
+  });
+});

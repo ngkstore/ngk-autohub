@@ -108,7 +108,10 @@ export async function coletarAmostrasTikTok(loja: LojaTikTok, opts: { orcamentoM
 export function mapearPerfilCriador(d: J) {
   const c = (d.creator as J) || d;
   const perfil = (c.creator_profile as J) || {};
-  const cats = Array.isArray(c.category_gmv_distribution) ? (c.category_gmv_distribution as J[]).map((x) => String(x.category_id)) : Array.isArray(c.category_ids) ? (c.category_ids as unknown[]).map(String) : [];
+  // categorias declaradas do criador (category_ids, as que o Affiliate Center mostra) + onde ele vende (category_gmv_distribution)
+  const declaradas = Array.isArray(c.category_ids) ? (c.category_ids as unknown[]).map(String) : [];
+  const vende = Array.isArray(c.category_gmv_distribution) ? (c.category_gmv_distribution as J[]).map((x) => String(x.category_id)) : [];
+  const cats = [...new Set([...declaradas, ...vende])].filter((id) => id && id !== "-1");
   const demo = (c.top_follower_demographics as J) || (c.follower_demographics as J) || null;
   return {
     nivel: num(perfil.creator_level ?? c.creator_level ?? c.level),

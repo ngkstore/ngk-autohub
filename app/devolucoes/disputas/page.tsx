@@ -10,7 +10,7 @@ import { Card, CardHeader, Kpi, Chip, ChipCanal, Tabs, Tabela, Th, Tr, Td, Vazio
 
 export const dynamic = "force-dynamic";
 
-type D = { id: string; loja_id: string; canal: "shopee" | "tiktok"; plataforma_id: string; pedido_id: string; motivo_codigo: string | null; motivo_texto: string | null; etapa: string; disputa_status: string | null; compensacao_status: string | null; resultado: string | null; valor_reembolso_pedido: number | null; valor_recuperado: number | null; credito_status: string | null; credito_esperado_ate: string | null; creditado_em: string | null; plataforma_criado_em: string | null; plataforma_atualizado_em: string | null; itens: { nome: string | null }[] | null; lojas: { apelido: string } | null };
+type D = { id: string; loja_id: string; canal: "shopee" | "tiktok"; plataforma_id: string; pedido_id: string; tipo: string; dias_parado: number | null; rastreio_reverso: string | null; motivo_codigo: string | null; motivo_texto: string | null; etapa: string; disputa_status: string | null; compensacao_status: string | null; resultado: string | null; valor_reembolso_pedido: number | null; valor_recuperado: number | null; credito_status: string | null; credito_esperado_ate: string | null; creditado_em: string | null; plataforma_criado_em: string | null; plataforma_atualizado_em: string | null; itens: { nome: string | null }[] | null; lojas: { apelido: string } | null };
 
 const ABAS = [
   { id: "todas", nome: "Todas" },
@@ -20,10 +20,13 @@ const ABAS = [
   { id: "creditadas", nome: "Creditadas" },
   { id: "perdidas", nome: "Perdidas" },
   { id: "recorrer", nome: "Dá para recorrer" },
+  { id: "nao_retornou", nome: "Pacote não retornou" },
 ];
 
 function classificar(d: D): string[] {
   const s: string[] = ["todas"];
+  // falha de entrega cujo pacote nunca voltou (reembolso pago): lista própria para pedir ressarcimento à Shopee
+  if (d.tipo === "pacote_nao_retornou" && d.etapa !== "encerrado") s.push("nao_retornou");
   if (d.etapa !== "encerrado" && (d.disputa_status || d.compensacao_status)) s.push("analise");
   if (d.resultado === "ganha" && d.credito_status === "aguardando") s.push("aguardando");
   if (d.credito_status === "nao_creditado") s.push("nao_creditado");
@@ -41,8 +44,8 @@ export default async function DisputasPage({ searchParams }: { searchParams: Pro
   const lojas = filtroLojas(escopo, params.loja);
   let q = supabase
     .from("devolucoes")
-    .select("id, loja_id, canal, plataforma_id, pedido_id, motivo_codigo, motivo_texto, etapa, disputa_status, compensacao_status, resultado, valor_reembolso_pedido, valor_recuperado, credito_status, credito_esperado_ate, creditado_em, plataforma_criado_em, plataforma_atualizado_em, itens, lojas(apelido)")
-    .or("disputa_status.not.is.null,compensacao_status.not.is.null,resultado.in.(ganha,perdida),credito_status.in.(aguardando,creditado,nao_creditado)")
+    .select("id, loja_id, canal, plataforma_id, pedido_id, tipo, dias_parado, rastreio_reverso, motivo_codigo, motivo_texto, etapa, disputa_status, compensacao_status, resultado, valor_reembolso_pedido, valor_recuperado, credito_status, credito_esperado_ate, creditado_em, plataforma_criado_em, plataforma_atualizado_em, itens, lojas(apelido)")
+    .or("disputa_status.not.is.null,compensacao_status.not.is.null,resultado.in.(ganha,perdida),credito_status.in.(aguardando,creditado,nao_creditado),tipo.eq.pacote_nao_retornou")
     .order("plataforma_atualizado_em", { ascending: false })
     .limit(300);
   if (lojas) q = q.in("loja_id", lojas);

@@ -96,9 +96,12 @@ export function pontosNivelGmv(nivel: number | null, gmvBrl: number | null, cfg:
 }
 
 // Grupos de categorias vizinhas (nomes de primeiro nível do TikTok, sem acento e em minúsculas)
+// 1º nível do TikTok BR (conferido 17/11/2026): "Artigos para casa", "Utensílios de cozinha", "Móveis",
+// "Eletrodomésticos", "Têxteis e artigos de decoração", "Melhorias para o lar" | "Brinquedos e hobbies",
+// "Bebê e maternidade", "Kids' Fashion"
 const GRUPOS_VIZINHOS: string[][] = [
-  ["casa", "cozinha", "moveis", "eletrodomesticos", "texteis", "utilidades domesticas", "suprimentos para casa", "home", "kitchenware", "furniture", "household appliances", "textiles"],
-  ["brinquedos", "bebe", "moda infantil", "toys", "baby", "kids", "maternidade"],
+  ["artigos para casa", "casa", "cozinha", "moveis", "eletrodomesticos", "texteis", "melhorias para o lar", "utilidades domesticas", "home", "kitchenware", "furniture", "household appliances", "textiles"],
+  ["brinquedos", "bebe", "maternidade", "kids", "moda infantil", "toys", "baby"],
 ];
 export const normCat = (s: string | null | undefined) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 const grupoDe = (nome: string | null | undefined): number => {

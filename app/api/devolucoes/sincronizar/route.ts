@@ -26,7 +26,11 @@ export async function GET(request: NextRequest) {
     const out = [];
     const porLoja = Math.floor(250_000 / Math.max(1, lojasIds.length)); // divide o tempo da função entre as lojas (limite 300 s)
     const ateDias = Number(sp.get("ate")) || 0; // ?ate=20 com ?dias=45: só a fatia de 45 a 20 dias atrás
-    for (const l of lojasIds) out.push(await sincronizarFalhasEntregaShopee(l, { dias, ateDias, orcamentoMs: porLoja }));
+    // ?status=CANCELLED|COMPLETED (padrão: os dois); ?completed=<dias> (janela própria dos COMPLETED); ?pedidos=sn,sn (casos específicos)
+    const status = (sp.get("status") || "").split(",").filter((s) => s === "CANCELLED" || s === "COMPLETED") as ("CANCELLED" | "COMPLETED")[];
+    const diasCompleted = Number(sp.get("completed")) || undefined;
+    const pedidos = (sp.get("pedidos") || "").split(",").map((s) => s.trim()).filter(Boolean);
+    for (const l of lojasIds) out.push(await sincronizarFalhasEntregaShopee(l, { dias, ateDias, orcamentoMs: porLoja, status: status.length ? status : undefined, diasCompleted, pedidos: pedidos.length ? pedidos : undefined }));
     return NextResponse.json({ sucesso: true, lojas: out });
   }
   if (sp.get("reprocessar") === "1") return NextResponse.json({ sucesso: true, ...(await reprocessarEtapasShopee(lojaId)) });
